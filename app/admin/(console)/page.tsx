@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cardClass } from "@/components/ui";
+import { formatDate } from "@/lib/format";
 import { CreateMemberForm } from "./CreateMemberForm";
 import { MemberActions } from "./MemberActions";
 
@@ -17,22 +18,15 @@ type MemberRow = {
   last_login_at: string | null;
 };
 
-const dateFormat = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Kolkata",
-});
-
-function formatDate(value: string | null) {
-  return value ? dateFormat.format(new Date(value)) : "Never";
-}
-
 export default async function AdminHomePage() {
-  await requireAdmin();
-  const members = (await db()`
-    SELECT id, username, full_name, role, is_active, created_at, last_login_at
-    FROM members ORDER BY created_at DESC
-  `) as MemberRow[];
+  // The session check and the data load run together; requireAdmin redirects before anything renders.
+  const [, members] = (await Promise.all([
+    requireAdmin(),
+    db()`
+      SELECT id, username, full_name, role, is_active, created_at, last_login_at
+      FROM members ORDER BY created_at DESC
+    `,
+  ])) as [unknown, MemberRow[]];
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -64,7 +58,7 @@ export default async function AdminHomePage() {
                 <tr key={m.id} className="align-top">
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-900">{m.full_name}</div>
-                    <div className="font-mono text-xs text-slate-500">{m.username}</div>
+                    <div className="break-all font-mono text-xs text-slate-500">{m.username}</div>
                   </td>
                   <td className="px-4 py-3 capitalize text-slate-700">{m.role}</td>
                   <td className="px-4 py-3">

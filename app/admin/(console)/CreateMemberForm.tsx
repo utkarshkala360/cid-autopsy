@@ -25,8 +25,8 @@ export function CreateMemberForm() {
           id="new-username"
           name="username"
           required
-          pattern="[a-z0-9._\-]{3,32}"
-          title="3–32 characters: lowercase letters, numbers, dot, dash or underscore"
+          maxLength={254}
+          placeholder="username or email"
           autoCapitalize="none"
           spellCheck={false}
           autoComplete="off"

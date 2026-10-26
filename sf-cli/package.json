@@ -1,0 +1,8 @@
+{
+  "name": "cid-autopsy-sf-cli",
+  "private": true,
+  "description": "Salesforce CLI vendored for server-side use. Installed by the root postinstall; see lib/salesforce/cli.ts.",
+  "dependencies": {
+    "@salesforce/cli": "2.155.7"
+  }
+}

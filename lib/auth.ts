@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import {
@@ -67,12 +68,16 @@ async function isRateLimited(scope: SessionKind, username: string, ip: string) {
   return Number(row.by_user) >= MAX_FAILURES_PER_USERNAME || Number(row.by_ip) >= MAX_FAILURES_PER_IP;
 }
 
+// Failures are recorded before responding so the rate limit can't be outrun; successes and
+// housekeeping don't need to block the sign-in.
 async function recordAttempt(scope: SessionKind, username: string, ip: string, success: boolean) {
-  await db()`
+  const insert = () => db()`
     INSERT INTO login_attempts (scope, username, ip, success)
     VALUES (${scope}, ${username}, ${ip}, ${success})
   `;
-  await db()`DELETE FROM login_attempts WHERE created_at < now() - interval '1 day'`;
+  if (success) after(insert);
+  else await insert();
+  after(() => db()`DELETE FROM login_attempts WHERE created_at < now() - interval '1 day'`);
 }
 
 export const RATE_LIMIT_MESSAGE = "Too many failed attempts. Try again in 15 minutes.";
@@ -81,18 +86,19 @@ export const RATE_LIMIT_MESSAGE = "Too many failed attempts. Try again in 15 min
 
 export async function loginAdmin(username: string, password: string) {
   const ip = await clientIp();
-  if (await isRateLimited("admin", username, ip)) return { ok: false, error: RATE_LIMIT_MESSAGE } as const;
+  const [limited, [row]] = await Promise.all([
+    isRateLimited("admin", username, ip),
+    db()`SELECT id, password_hash, session_version FROM admins WHERE username = ${username}`,
+  ]);
+  if (limited) return { ok: false, error: RATE_LIMIT_MESSAGE } as const;
 
-  const [row] = await db()`
-    SELECT id, password_hash, session_version FROM admins WHERE username = ${username}
-  `;
   const passwordMatches = await bcrypt.compare(password, row?.password_hash ?? DUMMY_HASH);
   const ok = Boolean(row && passwordMatches);
 
   await recordAttempt("admin", username, ip, ok);
   if (!ok) return { ok: false, error: "Invalid ID or password." } as const;
 
-  await db()`UPDATE admins SET last_login_at = now() WHERE id = ${row.id}`;
+  after(() => db()`UPDATE admins SET last_login_at = now() WHERE id = ${row.id}`);
   await startSession("admin", String(row.id), row.session_version);
   return { ok: true } as const;
 }
@@ -118,19 +124,19 @@ export async function requireAdmin() {
 
 export async function loginMember(username: string, password: string) {
   const ip = await clientIp();
-  if (await isRateLimited("member", username, ip)) return { ok: false, error: RATE_LIMIT_MESSAGE } as const;
+  const [limited, [row]] = await Promise.all([
+    isRateLimited("member", username, ip),
+    db()`SELECT id, password_hash, is_active, session_version FROM members WHERE username = ${username}`,
+  ]);
+  if (limited) return { ok: false, error: RATE_LIMIT_MESSAGE } as const;
 
-  const [row] = await db()`
-    SELECT id, password_hash, is_active, session_version
-    FROM members WHERE username = ${username}
-  `;
   const passwordMatches = await bcrypt.compare(password, row?.password_hash ?? DUMMY_HASH);
   const ok = Boolean(row && passwordMatches && row.is_active);
 
   await recordAttempt("member", username, ip, ok);
   if (!ok) return { ok: false, error: "Invalid ID or password." } as const;
 
-  await db()`UPDATE members SET last_login_at = now() WHERE id = ${row.id}`;
+  after(() => db()`UPDATE members SET last_login_at = now() WHERE id = ${row.id}`);
   await startSession("member", String(row.id), row.session_version);
   return { ok: true } as const;
 }

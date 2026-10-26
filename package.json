@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "dev": "next dev",
     "build": "node scripts/migrate.mjs && next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "npm ci --prefix sf-cli --omit=dev --no-audit --no-fund",
+    "sf": "node sf-cli/node_modules/@salesforce/cli/bin/run.js",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "admin:create": "node --env-file-if-exists=.env.local scripts/create-admin.mjs"
   },

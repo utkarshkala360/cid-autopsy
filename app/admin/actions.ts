@@ -6,7 +6,13 @@ import { endSession, hashPassword, loginAdmin, requireAdmin } from "@/lib/auth";
 import { db, isUniqueViolation } from "@/lib/db";
 import type { FormState } from "@/components/form-state";
 
+// An ID is either a plain username or an email address (stored lowercase).
 const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
+const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
+
+function isValidId(id: string) {
+  return USERNAME_RE.test(id) || (id.length <= 254 && EMAIL_RE.test(id));
+}
 const MIN_PASSWORD_LENGTH = 10;
 
 function field(formData: FormData, key: string) {
@@ -21,7 +27,7 @@ function memberId(formData: FormData) {
 }
 
 export async function adminLoginAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const result = await loginAdmin(field(formData, "username"), String(formData.get("password") ?? ""));
+  const result = await loginAdmin(field(formData, "username").toLowerCase(), String(formData.get("password") ?? ""));
   if (!result.ok) return { error: result.error };
   redirect("/admin");
 }
@@ -39,8 +45,10 @@ export async function createMemberAction(_prev: FormState, formData: FormData): 
   const role = field(formData, "role");
   const password = String(formData.get("password") ?? "");
 
-  if (!USERNAME_RE.test(username)) {
-    return { error: "ID must be 3–32 characters: lowercase letters, numbers, dot, dash or underscore." };
+  if (!isValidId(username)) {
+    return {
+      error: "ID must be an email address, or 3–32 characters of letters, numbers, dot, dash or underscore.",
+    };
   }
   if (!fullName || fullName.length > 100) return { error: "Full name is required (max 100 characters)." };
   if (role !== "agent" && role !== "member") return { error: "Choose a valid role." };

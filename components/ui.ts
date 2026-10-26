@@ -9,3 +9,4 @@ export const secondaryButtonClass =
 export const dangerButtonClass =
   "inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60";
 export const cardClass = "rounded-xl border border-slate-200 bg-white shadow-sm";
+export const badgeClass = "rounded-full px-2 py-0.5 text-xs font-medium";

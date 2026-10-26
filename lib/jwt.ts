@@ -10,10 +10,11 @@ export type SessionPayload = {
   sv: number;
 };
 
-// Each console's cookie is scoped to its own path so it's never sent to the other.
+// The admin cookie is scoped to /admin. The member cookie covers the rest of the app
+// (/dashboard, /customers); the audience check keeps it out of /admin.
 export const SESSION_COOKIES = {
   admin: { name: "cid_admin", path: "/admin", loginPath: "/admin/login" },
-  member: { name: "cid_member", path: "/dashboard", loginPath: "/dashboard/login" },
+  member: { name: "cid_session", path: "/", loginPath: "/dashboard/login" },
 } as const;
 
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
