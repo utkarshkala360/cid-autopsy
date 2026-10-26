@@ -1,6 +1,5 @@
 import "server-only";
 import { cache } from "react";
-import { timingSafeEqual, createHash } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
@@ -80,38 +79,33 @@ export const RATE_LIMIT_MESSAGE = "Too many failed attempts. Try again in 15 min
 
 // ---------- Admin ----------
 
-function safeEqual(a: string, b: string) {
-  const ha = createHash("sha256").update(a).digest();
-  const hb = createHash("sha256").update(b).digest();
-  return timingSafeEqual(ha, hb);
-}
-
 export async function loginAdmin(username: string, password: string) {
-  const expectedUser = process.env.ADMIN_USERNAME;
-  const expectedHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!expectedUser || !expectedHash) {
-    throw new Error("ADMIN_USERNAME and ADMIN_PASSWORD_HASH must be set.");
-  }
-
   const ip = await clientIp();
   if (await isRateLimited("admin", username, ip)) return { ok: false, error: RATE_LIMIT_MESSAGE } as const;
 
-  const userMatches = safeEqual(username, expectedUser);
-  const passwordMatches = await bcrypt.compare(password, userMatches ? expectedHash : DUMMY_HASH);
-  const ok = userMatches && passwordMatches;
+  const [row] = await db()`
+    SELECT id, password_hash, session_version FROM admins WHERE username = ${username}
+  `;
+  const passwordMatches = await bcrypt.compare(password, row?.password_hash ?? DUMMY_HASH);
+  const ok = Boolean(row && passwordMatches);
 
   await recordAttempt("admin", username, ip, ok);
   if (!ok) return { ok: false, error: "Invalid ID or password." } as const;
 
-  await startSession("admin", expectedUser, 1);
+  await db()`UPDATE admins SET last_login_at = now() WHERE id = ${row.id}`;
+  await startSession("admin", String(row.id), row.session_version);
   return { ok: true } as const;
 }
 
 export const getAdmin = cache(async () => {
   const session = await readSession("admin");
-  // Changing ADMIN_USERNAME invalidates all existing admin sessions.
-  if (!session || session.sub !== process.env.ADMIN_USERNAME) return null;
-  return { username: session.sub };
+  if (!session) return null;
+
+  const [row] = await db()`
+    SELECT username FROM admins WHERE id = ${session.sub} AND session_version = ${session.sv}
+  `;
+  if (!row) return null;
+  return { username: row.username as string };
 });
 
 export async function requireAdmin() {

@@ -6,7 +6,7 @@ export type SessionKind = "admin" | "member";
 export type SessionPayload = {
   sub: string;
   kind: SessionKind;
-  // Member session version; must match members.session_version to stay valid.
+  // Session version; must match the account's session_version to stay valid.
   sv: number;
 };
 
@@ -20,12 +20,18 @@ export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 const ISSUER = "cid-autopsy";
 
+let cachedKey: Promise<Uint8Array> | undefined;
+
+// The signing key is derived from the database URL (which contains the DB password),
+// so no separate secret has to be configured. Rotating the DB password signs everyone out.
 function secretKey() {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("SESSION_SECRET must be set to at least 32 characters.");
-  }
-  return new TextEncoder().encode(secret);
+  cachedKey ??= (async () => {
+    const dbUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+    if (!dbUrl) throw new Error("DATABASE_URL is not set.");
+    const data = new TextEncoder().encode(`cid-autopsy:session:v1:${dbUrl}`);
+    return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+  })();
+  return cachedKey;
 }
 
 export async function signSession(payload: SessionPayload) {
@@ -37,7 +43,7 @@ export async function signSession(payload: SessionPayload) {
     .setAudience(payload.kind)
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
-    .sign(secretKey());
+    .sign(await secretKey());
 }
 
 export async function verifySession(
@@ -46,7 +52,7 @@ export async function verifySession(
 ): Promise<SessionPayload | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secretKey(), {
+    const { payload } = await jwtVerify(token, await secretKey(), {
       algorithms: ["HS256"],
       issuer: ISSUER,
       audience: kind,

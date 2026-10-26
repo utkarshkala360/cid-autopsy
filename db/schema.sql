@@ -1,5 +1,15 @@
 -- CID Autopsy schema. Idempotent: safe to run on every deploy.
 
+CREATE TABLE IF NOT EXISTS admins (
+  id              BIGSERIAL PRIMARY KEY,
+  username        TEXT        NOT NULL UNIQUE,
+  password_hash   TEXT        NOT NULL,
+  -- Bumped on password change to invalidate existing sessions.
+  session_version INTEGER     NOT NULL DEFAULT 1,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at   TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS members (
   id              BIGSERIAL PRIMARY KEY,
   username        TEXT        NOT NULL UNIQUE,
