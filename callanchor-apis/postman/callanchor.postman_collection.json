@@ -105,6 +105,42 @@
               }
             }
           ]
+        },
+        {
+          "name": "getPortalProfile",
+          "request": {
+            "method": "GET",
+            "description": "Who the session belongs to; the session validity check. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/portal/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "portal",
+                "profile"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"profile\"]));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

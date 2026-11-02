@@ -75,6 +75,33 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PortalUser' }
+  /api/portal/profile:
+    get:
+      operationId: getPortalProfile
+      tags: [Auth]
+      summary: Who the session belongs to; the session validity check
+      description: Returns 200 with a profile for a valid session, and 401 for an invalid or missing one.
+      x-safety: read
+      x-verified: 2026-11-02
+      responses:
+        '200':
+          description: Valid session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile]
+                properties:
+                  profile: { $ref: '#/components/schemas/PortalProfile' }
+        '401':
+          description: Invalid or missing session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
   /api/fleet:
     get:
       operationId: getFleet
@@ -415,6 +442,15 @@ components:
           properties:
             canViewSystemLogs: { type: boolean }
             canViewAuditLogs: { type: boolean }
+    PortalProfile:
+      type: object
+      required: [portalUserId, name, email, mobile]
+      properties:
+        portalUserId: { type: string }
+        name: { type: string }
+        email: { type: string }
+        mobile: { type: string }
+        profileImageUrl: { type: [string, 'null'] }
     Pagination:
       type: object
       required: [page, limit, total, totalPages, hasMore]

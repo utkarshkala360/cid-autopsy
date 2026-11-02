@@ -17,7 +17,8 @@ live recording links, customer phone numbers and an AWS access key ID.
 ### 1. Unattended access
 
 Login needs an OTP call to a person. How long does a session last, and can we get a service account
-or API key? Scheduled monitoring can't run without this.
+or API key? Scheduled monitoring can't run without this. The app now checks sessions with
+`GET /api/portal/profile`, and members refresh them with an OTP, but that needs a person present.
 
 - Status: Open
 - Answer:

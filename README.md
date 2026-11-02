@@ -71,6 +71,16 @@ npm install --prefix callanchor-apis
 npm run ca -- list
 ```
 
+### CallAnchor session
+
+Every CallAnchor page needs a valid portal session, stored per member and encrypted like Salesforce credentials.
+
+- Each page render, and each route change through [SessionGuard](app/dashboard/(app)/call_anchor_config/SessionGuard.tsx), asks `GET /api/portal/profile` whether the cookie still works. The guard is needed because the router cache can serve a page without reaching the server.
+- A `401` or `403`, or no stored session, sends the member to **Validate OTP** at `/dashboard/call_anchor_config/verify`. After the OTP they return to the page they were on.
+- If CallAnchor is down the page stays open, because an OTP couldn't work anyway.
+
+New CallAnchor pages and server actions must call `requireCallAnchorSession()` from [lib/callanchor/session.ts](lib/callanchor/session.ts). `CALLANCHOR_BASE_URL` overrides the portal URL, for example to use the mock.
+
 ## Adding a sub app
 
 1. Register it in [lib/sub-apps.ts](lib/sub-apps.ts). This adds its dashboard card and nav link.

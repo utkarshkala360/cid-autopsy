@@ -11,7 +11,7 @@ responses, and `ca check` tells you when production no longer matches it.
 
 | Path | What it is |
 | --- | --- |
-| [openapi/callanchor.openapi.yaml](openapi/callanchor.openapi.yaml) | The contract: 16 operations. Edit this. |
+| [openapi/callanchor.openapi.yaml](openapi/callanchor.openapi.yaml) | The contract: 17 operations. Edit this. |
 | [postman/](postman/) | Collection generated from the contract, plus an environment |
 | [src/](src/) | Typed client, the `ca` CLI and a mock server |
 | [fixtures/](fixtures/) | Redacted sample responses |

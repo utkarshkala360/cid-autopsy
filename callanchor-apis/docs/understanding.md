@@ -23,6 +23,11 @@ Failure can happen at any step, so client health is really five questions:
 | Are calls reaching the CRM? | `callout-logs.aggregate`, `failedCallouts24h`, `syncedRate`, `integrations` |
 | Is the account in good standing? | `tenant` quota and trial fields, `oneapi/status`, `accessSuspended` |
 
+## Session check
+
+`GET /api/portal/profile` is the cheapest validity check. Confirmed live on 2 Nov 2026: a valid
+cookie returns 200 with `profile`, and an invalid or missing one returns 401 with `error`.
+
 ## Choosing endpoints
 
 - **`/api/fleet` is the starting point.** One call gives a metrics row per client, enough for a

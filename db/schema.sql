@@ -68,3 +68,11 @@ CREATE TABLE IF NOT EXISTS salesforce_orgs (
 );
 
 CREATE INDEX IF NOT EXISTS salesforce_orgs_customer_idx ON salesforce_orgs (customer_id);
+
+-- One CallAnchor portal session per member. The session cookie is AES-256-GCM encrypted. See lib/crypto.ts.
+CREATE TABLE IF NOT EXISTS callanchor_sessions (
+  member_id        BIGINT      PRIMARY KEY REFERENCES members (id) ON DELETE CASCADE,
+  mobile           TEXT        NOT NULL,
+  cookie_encrypted TEXT        NOT NULL,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
