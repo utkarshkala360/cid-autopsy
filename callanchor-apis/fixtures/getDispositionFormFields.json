@@ -1,0 +1,250 @@
+{
+  "fields": [
+    {
+      "id": "cmvqbp2f44n6q7l8fj031fdt1",
+      "slug": "project-name",
+      "label": "Project Name",
+      "type": "single_select",
+      "required": false,
+      "enabled": true,
+      "isDefault": false,
+      "sortOrder": 0,
+      "config": {
+        "options": [
+          {
+            "label": "ABHIMAAN HOMES",
+            "value": "abhimaan-homes"
+          },
+          {
+            "label": "Anarock Commercial",
+            "value": "anarock-commercial"
+          },
+          {
+            "label": "Anarock Residential",
+            "value": "anarock-residential"
+          }
+        ]
+      },
+      "archivedAt": null,
+      "usageCount": 154
+    },
+    {
+      "id": "cmvpbtntg4hbr7l8fhvia1hev",
+      "slug": "task-subject",
+      "label": "Task Subject",
+      "type": "single_select",
+      "required": true,
+      "enabled": true,
+      "isDefault": false,
+      "sortOrder": 1,
+      "config": {
+        "options": [
+          {
+            "label": "Virtual Meeting",
+            "value": "virtual-meeting"
+          },
+          {
+            "label": "Follow Up",
+            "value": "follow-up"
+          },
+          {
+            "label": "Outbound Call",
+            "value": "outbound-call"
+          }
+        ]
+      },
+      "archivedAt": null,
+      "usageCount": 154
+    },
+    {
+      "id": "cmvpbuhn64hc17l8fdkxg2ft6",
+      "slug": "call-meeting-status",
+      "label": "Call Meeting Status",
+      "type": "single_select",
+      "required": true,
+      "enabled": true,
+      "isDefault": false,
+      "sortOrder": 2,
+      "config": {
+        "options": [
+          {
+            "label": "Connected",
+            "value": "connected"
+          },
+          {
+            "label": "Not Connected",
+            "value": "not-connected"
+          },
+          {
+            "label": "Completed",
+            "value": "completed"
+          }
+        ]
+      },
+      "archivedAt": null,
+      "usageCount": 154
+    },
+    {
+      "id": "cmvpbv8q94hcb7l8fjn6s9d6q",
+      "slug": "priority",
+      "label": "Priority",
+      "type": "single_select",
+      "required": true,
+      "enabled": true,
+      "isDefault": false,
+      "sortOrder": 3,
+      "config": {
+        "options": [
+          {
+            "label": "Low",
+            "value": "low"
+          },
+          {
+            "label": "Medium",
+            "value": "medium"
+          },
+          {
+            "label": "High",
+            "value": "high"
+          }
+        ]
+      },
+      "archivedAt": null,
+      "usageCount": 154
+    },
+    {
+      "id": "cmvpbw6uy4hcl7l8fq2t6m6uy",
+      "slug": "next-action-status",
+      "label": "Next Action Status",
+      "type": "single_select",
+      "required": true,
+      "enabled": true,
+      "isDefault": false,
+      "sortOrder": 4,
+      "config": {
+        "options": [
+          {
+            "label": "No action needed",
+            "value": "no-action-needed"
+          },
+          {
+            "label": "Virtual Meeting",
+            "value": "virtual-meeting"
+          },
+          {
+            "label": "Follow Up",
+            "value": "follow-up"
+          }
+        ]
+      },
+      "archivedAt": null,
+      "usageCount": 154
+    },
+    {
+      "id": "cmvp1b1fv43k17l8fmhu9tv1r",
+      "slug": "note",
+      "label": "Agent note",
+      "type": "textarea",
+      "required": false,
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 5,
+      "config": {
+        "placeholder": "Add context about this call…"
+      },
+      "archivedAt": null,
+      "usageCount": 149
+    },
+    {
+      "id": "cmvp1b1fv43k27l8fvvbvaa3q",
+      "slug": "scheduled-at",
+      "label": "Callback scheduled",
+      "type": "datetime",
+      "required": true,
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 6,
+      "config": {},
+      "archivedAt": null,
+      "usageCount": 153
+    },
+    {
+      "id": "cmvp1b1fv43k07l8fvgyx6af1",
+      "slug": "outcome",
+      "label": "Outcome",
+      "type": "preset",
+      "required": true,
+      "enabled": false,
+      "isDefault": true,
+      "sortOrder": 7,
+      "config": null,
+      "archivedAt": null,
+      "usageCount": 0
+    }
+  ],
+  "presets": [
+    {
+      "id": "cmvp1b1fv43jt7l8fqhuu5r1y",
+      "slug": "interested",
+      "label": "Interested",
+      "description": "Prospect showed buying intent",
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 0
+    },
+    {
+      "id": "cmvp1b1fv43ju7l8fx6muwoel",
+      "slug": "callback",
+      "label": "Callback scheduled",
+      "description": "Follow-up time agreed on the call",
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 1
+    },
+    {
+      "id": "cmvp1b1fv43jv7l8fjm4hwoeh",
+      "slug": "not-interested",
+      "label": "Not interested",
+      "description": "Prospect declined or not a fit",
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 2
+    },
+    {
+      "id": "cmvp1b1fv43jw7l8fdoa6lg43",
+      "slug": "voicemail",
+      "label": "Voicemail",
+      "description": "Left a voicemail, no live conversation",
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 3
+    },
+    {
+      "id": "cmvp1b1fv43jx7l8f0zcndwtz",
+      "slug": "no-answer",
+      "label": "No answer",
+      "description": "Call rang out with no pickup",
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 4
+    },
+    {
+      "id": "cmvp1b1fv43jy7l8fumtxletc",
+      "slug": "wrong-number",
+      "label": "Wrong number",
+      "description": "Invalid or misdialed contact",
+      "enabled": false,
+      "isDefault": true,
+      "sortOrder": 5
+    },
+    {
+      "id": "cmvp1b1fv43jz7l8fqqfg3dzz",
+      "slug": "dnc",
+      "label": "Do not call",
+      "description": "Contact requested no further outreach",
+      "enabled": true,
+      "isDefault": true,
+      "sortOrder": 6
+    }
+  ]
+}

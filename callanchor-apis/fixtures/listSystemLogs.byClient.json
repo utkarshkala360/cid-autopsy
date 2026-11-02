@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "id": "cmvzb86klchh97l8feieuf5e6",
+      "occurredAt": "2026-11-02T13:43:56.229Z",
+      "category": "webhook",
+      "severity": "info",
+      "source": "custom-webhook-sync",
+      "clientId": "cmvp1b1fu43jk7l8f88qbvkov",
+      "actorType": "system",
+      "actorId": "cmvs21liw5pjc7l8f4xvu29gy",
+      "actorEmail": null,
+      "correlationId": "cmvzb86kechh57l8fsotuqqmb",
+      "resourceType": "callout_request",
+      "resourceId": "cmvzb86kechh57l8fsotuqqmb",
+      "httpMethod": null,
+      "httpPath": null,
+      "httpStatus": 201,
+      "durationMs": 461,
+      "message": "Sync delivered to salesforce",
+      "metadata": {
+        "status": "delivered",
+        "callRecordId": "cmvzb85muchgb7l8fjmnlzvlh",
+        "platformSlug": "salesforce",
+        "integrationId": "cmvp1b1fv43jl7l8fb0n4m3xx"
+      },
+      "ipAddress": "203.0.113.2"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 426,
+    "totalPages": 9,
+    "hasMore": true
+  }
+}

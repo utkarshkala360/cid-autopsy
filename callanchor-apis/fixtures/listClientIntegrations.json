@@ -1,0 +1,52 @@
+{
+  "configs": [
+    {
+      "platformId": "salesforce",
+      "platformName": "Salesforce",
+      "active": true,
+      "endpoint": "https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook",
+      "authMode": "oauth2",
+      "authFields": {
+        "authorizationScheme": "Bearer",
+        "clientId": "",
+        "clientSecret": "",
+        "grantType": "refresh_token",
+        "tokenUrl": "https://login.salesforce.com/services/oauth2/token",
+        "refreshToken": "",
+        "accessToken": "",
+        "instanceUrl": "https://acme.my.salesforce.com",
+        "tokenIssuedAt": "1793624212006"
+      },
+      "authFieldMasks": {
+        "clientId": "•••",
+        "clientSecret": "•••",
+        "refreshToken": "•••",
+        "accessToken": "•••"
+      },
+      "isCustom": true,
+      "scheduler": {
+        "frequency": "realtime",
+        "enabled": true
+      },
+      "eventTypes": [],
+      "connectedAt": "2026-10-26",
+      "lastHealthCheck": "2026-11-02T13:42:04.423Z"
+    },
+    {
+      "platformId": "zoho",
+      "platformName": "Zoho",
+      "active": false,
+      "endpoint": "https://hooks.callanchor.io/zoho",
+      "authMode": "oauth2",
+      "authFields": {},
+      "isCustom": false,
+      "scheduler": {
+        "frequency": "1h",
+        "enabled": true
+      },
+      "eventTypes": [],
+      "lastHealthCheck": "2026-11-02T13:42:39.865Z"
+    }
+  ],
+  "logs": []
+}

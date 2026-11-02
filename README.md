@@ -62,6 +62,15 @@ Orgs already authorized in VS Code can also be imported with `sf org auth show-s
 
 Either way the CLI logs in to verify the org before anything is saved. **Test** re-verifies an org. **Disconnect** deletes its credential and also revokes tokens minted by this app's login (imported ones are left alone, since your local CLI shares them).
 
+## CallAnchor APIs
+
+[callanchor-apis/](callanchor-apis/) is the source of truth for CallAnchor's portal API: the contract, a Postman collection, a CLI and a mock server. It's a standalone Node module with its own `package.json`, kept out of the Next build, so nothing in it ships to Vercel yet. See its [README](callanchor-apis/README.md).
+
+```bash
+npm install --prefix callanchor-apis
+npm run ca -- list
+```
+
 ## Adding a sub app
 
 1. Register it in [lib/sub-apps.ts](lib/sub-apps.ts). This adds its dashboard card and nav link.

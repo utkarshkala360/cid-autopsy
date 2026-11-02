@@ -1,0 +1,160 @@
+{
+  "items": [
+    {
+      "calleeId": "phone-0000000008",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000008",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:33",
+      "lastDatetimeLabel": "2 Nov 2026 · 06:40 pm",
+      "lastDatetime": "2026-11-02T13:10:40.423Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000025",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000025",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "05:45",
+      "lastDatetimeLabel": "2 Nov 2026 · 06:34 pm",
+      "lastDatetime": "2026-11-02T13:04:23.115Z",
+      "typesPresent": [
+        "Incoming"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000031",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000031",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:14",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:26 pm",
+      "lastDatetime": "2026-11-02T11:56:10.484Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000032",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000032",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:00",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:25 pm",
+      "lastDatetime": "2026-11-02T11:55:19.617Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000033",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000033",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:00",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:24 pm",
+      "lastDatetime": "2026-11-02T11:54:37.781Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000034",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000034",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:00",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:23 pm",
+      "lastDatetime": "2026-11-02T11:53:49.408Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000035",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000035",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:00",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:23 pm",
+      "lastDatetime": "2026-11-02T11:53:16.688Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000036",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000036",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:00",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:18 pm",
+      "lastDatetime": "2026-11-02T11:48:56.077Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000037",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000037",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:23",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:18 pm",
+      "lastDatetime": "2026-11-02T11:48:12.893Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    },
+    {
+      "calleeId": "phone-0000000038",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000038",
+      "callCount": 1,
+      "lastAgent": "Person 1",
+      "lastDuration": "00:00",
+      "lastDatetimeLabel": "2 Nov 2026 · 05:17 pm",
+      "lastDatetime": "2026-11-02T11:47:24.098Z",
+      "typesPresent": [
+        "Outgoing"
+      ]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 124,
+    "totalPages": 13,
+    "hasMore": true
+  },
+  "stats": {
+    "totalCalls": 155,
+    "uniqueContacts": 124,
+    "incoming": 15,
+    "outgoing": 133,
+    "missed": 7,
+    "rejected": 0,
+    "answerRate": 95,
+    "missedRate": 5,
+    "rejectedRate": 0
+  },
+  "agents": [
+    "Person 8",
+    "Person 10",
+    "Person 7",
+    "Person 1",
+    "Person 12",
+    "Person 11"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "linked": true,
+  "oneApiClientId": "6adf188fcdc09b4011badea5",
+  "assignProductStatus": "completed",
+  "cachedLicenseSeats": -1,
+  "licenseSeatsFetchedAt": "2026-11-02T13:49:40.632Z",
+  "cachedTrialExpiresAt": "2026-11-16T00:00:00.000Z",
+  "licenseCount": 5,
+  "accountStatus": "trial",
+  "clientStatus": "trial",
+  "backfillRecommended": false
+}

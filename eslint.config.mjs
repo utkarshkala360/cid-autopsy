@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Node module with its own dependencies and tests.
+    "callanchor-apis/**",
   ]),
 ]);
 

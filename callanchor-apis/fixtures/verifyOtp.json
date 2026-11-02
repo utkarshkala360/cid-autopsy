@@ -1,0 +1,20 @@
+{
+  "kind": "support",
+  "supportUserId": "cmsyix18z0cu010ngtzobg0nf",
+  "portalUserId": "cmsyix18w0cty10ngdavp4ppz",
+  "name": "Person 11",
+  "email": "user9@example.test",
+  "mobile": "+910000000030",
+  "profileImageUrl": "/uploads/profile-images/redacted.jpg",
+  "roleId": "support_agent",
+  "permissions": [
+    "clients:read",
+    "clients:write",
+    "audit:read",
+    "logs:read"
+  ],
+  "logAccess": {
+    "canViewSystemLogs": true,
+    "canViewAuditLogs": true
+  }
+}

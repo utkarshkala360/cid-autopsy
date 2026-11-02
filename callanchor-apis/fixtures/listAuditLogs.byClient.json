@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "id": "cmvz9uv29cezh7l8f5jgukrjk",
+      "clientId": "cmvp1b1fu43jk7l8f88qbvkov",
+      "actorUserId": "cmv7oet8a41au11mm8r3llkmf",
+      "actorEmail": "user8@example.test",
+      "actorType": "support",
+      "actorDisplayName": "Person 25",
+      "action": "sync",
+      "resourceType": "integration",
+      "resourceId": "cmvp1b1fu43jk7l8f88qbvkov",
+      "correlationId": "7f5ec7fd-76dc-41ca-96dc-60305fe139d4",
+      "metadata": {
+        "event": "manual_sync_all",
+        "totals": {
+          "failed": 19,
+          "synced": 0,
+          "blocked": 0,
+          "processed": 19
+        },
+        "platforms": [
+          "salesforce"
+        ]
+      },
+      "ipAddress": "203.0.113.3",
+      "occurredAt": "2026-11-02T13:05:35.169Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 19,
+    "totalPages": 1,
+    "hasMore": false
+  }
+}

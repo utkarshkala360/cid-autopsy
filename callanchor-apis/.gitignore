@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+
+# Credentials
+.env
+.env.*
+!.env.example
+.session
+
+# Live data pulled from production: contains customer PII
+data/
+*.csv
+*.xlsx
+
+# Real names found by the sheet importer, used only to scan fixtures locally
+.denylist

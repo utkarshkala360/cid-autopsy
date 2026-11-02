@@ -1,0 +1,726 @@
+{
+  "info": {
+    "name": "CallAnchor Portal API",
+    "description": "Generated from openapi/callanchor.openapi.yaml. Do not edit by hand.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "sendOtp",
+          "request": {
+            "method": "POST",
+            "description": "Place an OTP call to a portal user. Safety: auth.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{mobile}}\",\n  \"mode\": \"mobile\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/send-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "send-otp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get(\"allowLiveActions\") !== \"true\") pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "verifyOtp",
+          "request": {
+            "method": "POST",
+            "description": "Exchange an OTP for a portal session. Safety: auth.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{mobile}}\",\n  \"mode\": \"mobile\",\n  \"otp\": \"{{otp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get(\"allowLiveActions\") !== \"true\") pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const cookie = pm.cookies.get(\"callanchor_portal_session\");",
+                  "if (cookie) pm.environment.set(\"sessionCookie\", cookie);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fleet",
+      "item": [
+        {
+          "name": "getFleet",
+          "request": {
+            "method": "GET",
+            "description": "Fleet totals and one metrics row per client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/fleet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "fleet"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "listClients",
+          "request": {
+            "method": "GET",
+            "description": "List all clients. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getClient",
+          "request": {
+            "method": "GET",
+            "description": "One client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getClientTenant",
+          "request": {
+            "method": "GET",
+            "description": "Everything about one client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/tenant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "tenant"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "listClientIntegrations",
+          "request": {
+            "method": "GET",
+            "description": "Integration configs for a client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/integrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "integrations"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"configs\",\"logs\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getDispositionFormFields",
+          "request": {
+            "method": "GET",
+            "description": "Disposition form for a client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/disposition-form-fields",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "disposition-form-fields"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"fields\",\"presets\"]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Calls",
+      "item": [
+        {
+          "name": "listCallContacts",
+          "request": {
+            "method": "GET",
+            "description": "Calls grouped by contact, with call stats. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/call-contacts?page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "call-contacts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getRecordingLink",
+          "request": {
+            "method": "GET",
+            "description": "Issue a signed link to a call recording. Safety: sensitive.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/calls/{{callId}}/recording-link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "calls",
+                "{{callId}}",
+                "recording-link"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get(\"allowLiveActions\") !== \"true\") pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"callId\",\"recordingStatus\",\"url\",\"expiresAt\"]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sync",
+      "item": [
+        {
+          "name": "listCalloutLogs",
+          "request": {
+            "method": "GET",
+            "description": "CRM delivery attempts, with success aggregate. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/callout-logs?page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "callout-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"requestId\", pm.response.json().items[0]?.requestId ?? \"\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getAnchorLog",
+          "request": {
+            "method": "GET",
+            "description": "One delivery request with its attempts. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/anchor-logs/{{requestId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "anchor-logs",
+                "{{requestId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Logs",
+      "item": [
+        {
+          "name": "listSystemLogs",
+          "request": {
+            "method": "GET",
+            "description": "System logs, optionally for one client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/support/logs?page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "support",
+                "logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{clientId}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"items\",\"pagination\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "listAuditLogs",
+          "request": {
+            "method": "GET",
+            "description": "Audit logs, optionally for one client. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/support/audit-logs?page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "support",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{clientId}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"items\",\"pagination\"]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OneAPI",
+      "item": [
+        {
+          "name": "getOneApiStatus",
+          "request": {
+            "method": "GET",
+            "description": "Billing and licensing link status. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/oneapi/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "oneapi",
+                "status"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "backfillOneApi",
+          "request": {
+            "method": "POST",
+            "description": "Refresh a client's OneAPI link and license data. Safety: write.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/oneapi/backfill",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "oneapi",
+                "backfill"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get(\"allowLiveActions\") !== \"true\") pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

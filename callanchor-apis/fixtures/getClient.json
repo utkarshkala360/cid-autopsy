@@ -1,0 +1,46 @@
+{
+  "id": "cmvp1b1fu43jk7l8f88qbvkov",
+  "companyName": "Person 3",
+  "contactName": "Person 5",
+  "email": "user2@example.test",
+  "phone": "+910000000002",
+  "plan": "Trial",
+  "status": "trial",
+  "accessSuspended": false,
+  "createdAt": "2026-10-26",
+  "licenseCount": 5,
+  "licenseNumbers": [
+    "+910000000003",
+    "+910000000004",
+    "+910000000005",
+    "+910000000006",
+    "+910000000007"
+  ],
+  "portalAdminMobiles": [
+    "+910000000002"
+  ],
+  "numbers": [],
+  "platforms": [
+    {
+      "id": "salesforce",
+      "name": "Salesforce",
+      "active": true,
+      "connectedAt": "2026-10-26"
+    },
+    {
+      "id": "zoho",
+      "name": "Zoho",
+      "active": false
+    },
+    {
+      "id": "hubspot",
+      "name": "Hubspot",
+      "active": false
+    },
+    {
+      "id": "leadsquare",
+      "name": "Lead Square",
+      "active": false
+    }
+  ]
+}

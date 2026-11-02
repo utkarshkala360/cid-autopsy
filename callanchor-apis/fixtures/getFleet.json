@@ -1,0 +1,50 @@
+{
+  "totalCalls": 45990,
+  "callsToday": 779,
+  "failedCallouts24h": 129,
+  "totalLicenses": 120,
+  "trialsNearLimit": [
+    {
+      "clientId": "cmvan8c5t1mpf114m8m4guayg",
+      "companyName": "Person 9"
+    },
+    {
+      "clientId": "cmt12xvwk0nasmnhxn8dy32hw",
+      "companyName": "Person 19"
+    }
+  ],
+  "clientMetrics": [
+    {
+      "clientId": "cmvxhxexeakoq7l8f0dbs375i",
+      "companyName": "Person 4",
+      "status": "trial",
+      "totalCalls": 0,
+      "callsToday": 0,
+      "failedCallouts24h": 0,
+      "totalLicenses": 1,
+      "contractRecordedCalls": 0,
+      "contractPlatformSyncs": 0,
+      "contractRecordingLimit": 10,
+      "contractSyncLimit": 10,
+      "trialRecordedCalls": 0,
+      "trialPlatformSyncs": 0,
+      "trialRecordingLimit": 10,
+      "trialPlatformSyncLimit": 10,
+      "activeIntegrations": 0,
+      "syncedRate": 0
+    }
+  ],
+  "callRecords": [
+    {
+      "id": "cmvzb7beochcs7l8fbd9svwlm",
+      "calleeId": "phone-0000000028",
+      "calleeName": "Unknown",
+      "calleePhone": "+910000000028",
+      "agent": "Person 2",
+      "duration": "01:23",
+      "datetime": "2026-11-02T13:41:38.488Z",
+      "datetimeLabel": "2 Nov 2026 · 07:11 pm",
+      "type": "Incoming"
+    }
+  ]
+}

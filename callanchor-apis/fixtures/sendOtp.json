@@ -1,0 +1,5 @@
+{
+  "message": "OTP call originated successfully",
+  "otpSentTo": "+910000000030",
+  "otpChannel": "mobile"
+}

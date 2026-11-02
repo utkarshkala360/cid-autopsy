@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "id": "cmvzb7bp9chd67l8f0i1a0ial",
+      "occurredAt": "2026-11-02T13:43:16.221Z",
+      "category": "mobile",
+      "severity": "info",
+      "source": "mobile.recording.upload-init",
+      "clientId": "cmt1mg1rf00v9caa5hlyidcvb",
+      "actorType": "mobile",
+      "actorId": "cmu1b7jge2ggmewwgk4a1xzw1",
+      "actorEmail": null,
+      "correlationId": "dedff484-667d-4baf-a7b9-f2b3d8b2aa11",
+      "resourceType": "call_record",
+      "resourceId": "cmvzb7beochcs7l8fbd9svwlm",
+      "httpMethod": null,
+      "httpPath": null,
+      "httpStatus": null,
+      "durationMs": null,
+      "message": "Recording upload session initialized",
+      "metadata": {
+        "s3Key": "client/cmt1mg1rf00v9caa5hlyidcvb/team/cmu1b7jgb2ggkewwgbgyah8ip/call/cmvzb7beochcs7l8fbd9svwlm/1793626996155-1cabd951.mp3",
+        "fileSizeBytes": 334176,
+        "uploadSessionId": "ddf1f0b4-61f4-49ff-a69e-74bfba72ed93"
+      },
+      "ipAddress": "203.0.113.1"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 14629,
+    "totalPages": 293,
+    "hasMore": true
+  }
+}

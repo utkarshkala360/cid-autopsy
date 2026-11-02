@@ -1,0 +1,75 @@
+{
+  "request": {
+    "id": "cmvzbifjjcj4i7l8f1ech7djk",
+    "status": "delivered",
+    "endpoint": "https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook",
+    "payloadJson": {
+      "call": {
+        "id": "cmvzbiegfcj3o7l8fif9i8sfq",
+        "callType": "Outgoing",
+        "agentName": "Person 1",
+        "startedAt": "2026-11-02T11:46:15.010Z",
+        "calleeName": "Unknown",
+        "agentNumber": "+910000000003",
+        "calleePhone": "+910000000029",
+        "recordingUrl": null,
+        "dispositionNote": "<agent note>",
+        "durationSeconds": 0,
+        "dispositionLabel": null,
+        "dispositionScheduledAt": "2026-11-03T04:30:00.000Z"
+      },
+      "event": "call.completed",
+      "disposition": {
+        "fields": {
+          "note": "<agent note>",
+          "priority": "high",
+          "project-name": "acme-avantara",
+          "scheduled-at": "2026-11-03T04:30:00.000Z",
+          "task-subject": "follow-up",
+          "next-action-status": "follow-up",
+          "call-meeting-status": "not-connected"
+        },
+        "submittedAt": "2026-11-02T13:51:53.076Z"
+      },
+      "hasRecording": false
+    },
+    "attemptCount": 1,
+    "eventType": "call_completed",
+    "createdAt": "2026-11-02T13:51:54.415Z",
+    "completedAt": "2026-11-02T13:51:54.414Z"
+  },
+  "events": [
+    {
+      "id": "cmvzbifjncj4k7l8f17vznwjn",
+      "requestId": "cmvzbifjjcj4i7l8f1ech7djk",
+      "platformId": "salesforce",
+      "eventType": "call.completed",
+      "callId": "cmvzbiegfcj3o7l8fif9i8sfq",
+      "calleeName": "Unknown",
+      "attempt": 1,
+      "status": "delivered",
+      "httpStatus": 201,
+      "durationMs": 627,
+      "at": "2026-11-02T13:51:54.419Z",
+      "endpoint": "https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook",
+      "payloadPreview": "{\n  \"event\": \"call.completed\",\n  \"hasRecording\": false,\n  \"call\": {\n    \"id\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n    \"agentName\": \"Person 1\",\n    \"agentNumber\": \"+910000000003\",\n    \"calleeName\": \"Unknown\",\n    \"calleePhone\": \"+910000000029\",\n    \"callType\": \"Outgoing\",\n    \"durationSeconds\": 0,\n    \"startedAt\": \"2026-11-02T11:46:15.010Z\",\n    \"recordingUrl\": null,\n    \"dispositionLabel\": null,\n    \"dispositionNote\": \"<agent note>\",\n    \"dispositionScheduledAt\": \"2026-11-03T04:30:00.000Z\"\n  },\n  \"disposition\": {\n    \"submittedAt\": \"2026-11-02T13:51:53.076Z\",\n    \"fields\": {\n      \"project-name\": \"acme-avantara\",\n      \"task-subject\": \"follow-up\",\n      \"call-meeting-status\": \"not-connected\",\n      \"priority\": \"high\",\n      \"next-action-status\": \"follow-up\",\n      \"note\": \"<agent note>\",\n      \"scheduled-at\": \"2026-11-03T04:30:00.000Z\"\n    }\n  }\n}",
+      "responsePreview": "{\n  \"salesTaskId\": \"a0D000000000000052\",\n  \"activityId\": \"00T000000000000053\",\n  \"opportunityId\": \"006000000000000054\",\n  \"success\": true\n}",
+      "externalRecordId": "a0D000000000000052"
+    }
+  ],
+  "call": {
+    "callRecordId": "cmvzbiegfcj3o7l8fif9i8sfq",
+    "calleeId": "phone-0000000029",
+    "calleeName": "Unknown",
+    "calleePhone": "+910000000029",
+    "agentName": "Person 1",
+    "callType": "Outgoing",
+    "durationLabel": "00:00",
+    "callRecordAvailable": true
+  },
+  "platform": {
+    "slug": "salesforce",
+    "name": "Salesforce",
+    "isCustom": true
+  }
+}
