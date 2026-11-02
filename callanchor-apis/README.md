@@ -13,6 +13,7 @@ responses, and `ca check` tells you when production no longer matches it.
 | --- | --- |
 | [openapi/callanchor.openapi.yaml](openapi/callanchor.openapi.yaml) | The contract: 17 operations. Edit this. |
 | [postman/](postman/) | Collection generated from the contract, plus an environment |
+| [Web console](../app/dashboard/(app)/call_anchor_config/apis/) | Browse and run these APIs at `/dashboard/call_anchor_config/apis` |
 | [src/](src/) | Typed client, the `ca` CLI and a mock server |
 | [fixtures/](fixtures/) | Redacted sample responses |
 | [docs/understanding.md](docs/understanding.md) | How CallAnchor fits together |
@@ -66,7 +67,8 @@ collection. Set it to `true` only for the one request you mean to send, includin
 
 1. Update `openapi/callanchor.openapi.yaml`. When `ca check` passes for an operation, change its
    `x-verified` from `sample` to that date.
-2. Run `npm run generate:postman`.
+2. Run `npm run generate:postman` and `npm run generate:contract`. The second updates the copy the
+   app's API console uses.
 3. Add or refresh a redacted fixture in `fixtures/`, named `<operationId>.json`.
 4. Run `npm test`.
 

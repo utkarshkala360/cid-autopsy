@@ -12,7 +12,7 @@ info:
     - `x-safety`: `read`, `sensitive` (a read that issues access to a recording),
       `write` (changes state, needs --confirm) or `auth` (login flow).
     - `x-verified`: `sample` means the shape comes from one sheet sample and has
-      not been checked live. Change it to the date of the first passing `ca check`.
+      not been checked live. Otherwise it's the date of the first passing `ca check`.
 servers:
   - url: https://app.360callanchor.com
 tags:
@@ -108,7 +108,7 @@ paths:
       tags: [Fleet]
       summary: Fleet totals and one metrics row per client
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Fleet summary
@@ -120,24 +120,16 @@ paths:
       operationId: listClients
       tags: [Clients]
       summary: List all clients
-      description: The sheet shows one element, so the list envelope is unconfirmed.
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Clients
           content:
             application/json:
               schema:
-                oneOf:
-                  - type: array
-                    items: { $ref: '#/components/schemas/Client' }
-                  - type: object
-                    required: [items]
-                    properties:
-                      items:
-                        type: array
-                        items: { $ref: '#/components/schemas/Client' }
+                type: array
+                items: { $ref: '#/components/schemas/Client' }
   /api/clients/{clientId}:
     parameters:
       - $ref: '#/components/parameters/clientId'
@@ -146,7 +138,7 @@ paths:
       tags: [Clients]
       summary: One client
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Client
@@ -165,7 +157,7 @@ paths:
         sample). `callRecords` and `callAnchorLogs` are truncated previews, so use
         the paginated endpoints for history.
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Tenant
@@ -180,7 +172,7 @@ paths:
       tags: [Clients]
       summary: Integration configs for a client
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Integrations
@@ -204,7 +196,7 @@ paths:
       tags: [Clients]
       summary: Disposition form for a client
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Form fields and presets
@@ -230,7 +222,7 @@ paths:
       tags: [Calls]
       summary: Calls grouped by contact, with call stats
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       x-paginated: true
       responses:
         '200':
@@ -276,7 +268,7 @@ paths:
       summary: CRM delivery attempts, with success aggregate
       description: The sample asked for limit=50 and got limit=10, so there may be a server cap.
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       x-paginated: true
       responses:
         '200':
@@ -297,7 +289,7 @@ paths:
       tags: [Sync]
       summary: One delivery request with its attempts
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Request detail
@@ -312,7 +304,7 @@ paths:
       tags: [OneAPI]
       summary: Billing and licensing link status
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       responses:
         '200':
           description: Status
@@ -344,7 +336,7 @@ paths:
       tags: [Logs]
       summary: System logs, optionally for one client
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       x-paginated: true
       responses:
         '200':
@@ -369,7 +361,7 @@ paths:
       tags: [Logs]
       summary: Audit logs, optionally for one client
       x-safety: read
-      x-verified: sample
+      x-verified: 2026-11-02
       x-paginated: true
       responses:
         '200':
@@ -482,6 +474,7 @@ components:
         accessSuspended: { type: boolean }
         createdAt: { type: string, description: Date only (YYYY-MM-DD) }
         licenseCount: { type: integer }
+        licenseExpiresAt: { type: [string, 'null'] }
         licenseNumbers:
           type: array
           items: { type: string }
@@ -507,12 +500,12 @@ components:
         totalLicenses: { type: integer }
         contractRecordedCalls: { type: integer }
         contractPlatformSyncs: { type: integer }
-        contractRecordingLimit: { type: integer }
-        contractSyncLimit: { type: integer }
+        contractRecordingLimit: { type: [integer, 'null'], description: Null seen live; meaning unconfirmed }
+        contractSyncLimit: { type: [integer, 'null'], description: Null seen live; meaning unconfirmed }
         trialRecordedCalls: { type: integer }
         trialPlatformSyncs: { type: integer }
-        trialRecordingLimit: { type: integer }
-        trialPlatformSyncLimit: { type: integer }
+        trialRecordingLimit: { type: [integer, 'null'], description: Null seen live; meaning unconfirmed }
+        trialPlatformSyncLimit: { type: [integer, 'null'], description: Null seen live; meaning unconfirmed }
         activeIntegrations: { type: integer }
         syncedRate: { type: number }
     CallRecord:
@@ -666,7 +659,7 @@ components:
         id: { type: string }
         slug: { type: string }
         label: { type: string }
-        description: { type: string }
+        description: { type: [string, 'null'] }
         enabled: { type: boolean }
         isDefault: { type: boolean }
         sortOrder: { type: integer }
@@ -761,24 +754,24 @@ components:
             callAnchorAccountId: { type: string }
         trialRecordedCalls: { type: integer }
         trialPendingRecordings: { type: integer }
-        trialRecordingLimit: { type: integer }
+        trialRecordingLimit: { type: [integer, 'null'] }
         trialPlatformSyncs: { type: integer }
-        trialPlatformSyncLimit: { type: integer }
+        trialPlatformSyncLimit: { type: [integer, 'null'] }
         trialRecordingAtLimit: { type: boolean }
         trialExpiresAt: { type: [string, 'null'] }
         trialDaysRemaining: { type: [integer, 'null'] }
         trialExpired: { type: boolean }
         contractRecordedCalls: { type: integer }
         contractPendingRecordings: { type: integer }
-        contractRecordingLimit: { type: integer }
+        contractRecordingLimit: { type: [integer, 'null'] }
         contractRecordingUnlimited: { type: boolean }
         contractPlatformSyncs: { type: integer }
-        contractSyncLimit: { type: integer }
+        contractSyncLimit: { type: [integer, 'null'] }
         contractSyncUnlimited: { type: boolean }
         contractRecordingAtLimit: { type: boolean }
         contractLicenseCount: { type: integer }
         contractLicenseActiveCount: { type: integer }
-        contractLicenseLimit: { type: integer }
+        contractLicenseLimit: { type: [integer, 'null'] }
         contractLicenseUnlimited: { type: boolean }
         contractLicenseAtLimit: { type: boolean }
         contractLicenseOverCap: { type: boolean }
@@ -788,7 +781,7 @@ components:
         contractSeatGraceEndsAt: { type: [string, 'null'] }
         contractSeatGracePeriodHours: { type: integer }
         contractIntegrationCount: { type: integer }
-        contractIntegrationLimit: { type: integer }
+        contractIntegrationLimit: { type: [integer, 'null'] }
         contractIntegrationUnlimited: { type: boolean }
         contractIntegrationAtLimit: { type: boolean }
         trialRecordingRetentionHeld: { type: boolean }
@@ -922,8 +915,8 @@ components:
       properties:
         linked: { type: boolean }
         oneApiClientId: { type: [string, 'null'] }
-        assignProductStatus: { type: string }
-        cachedLicenseSeats: { type: integer, description: Meaning of -1 unconfirmed }
+        assignProductStatus: { type: [string, 'null'] }
+        cachedLicenseSeats: { type: [integer, 'null'], description: Meaning of -1 unconfirmed }
         licenseSeatsFetchedAt: { type: [string, 'null'] }
         cachedTrialExpiresAt: { type: [string, 'null'] }
         licenseCount: { type: integer }
@@ -967,13 +960,13 @@ components:
         ipAddress: { type: [string, 'null'] }
     AuditLog:
       type: object
-      required: [id, action, resourceType, actorType, occurredAt]
+      required: [id, action, resourceType, occurredAt]
       properties:
         id: { type: string }
         clientId: { type: [string, 'null'] }
         actorUserId: { type: [string, 'null'] }
         actorEmail: { type: [string, 'null'] }
-        actorType: { type: string }
+        actorType: { type: [string, 'null'] }
         actorDisplayName: { type: [string, 'null'] }
         action: { type: string }
         resourceType: { type: string }

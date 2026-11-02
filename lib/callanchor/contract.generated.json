@@ -1,0 +1,2323 @@
+{
+  "operations": [
+    {
+      "id": "sendOtp",
+      "method": "post",
+      "path": "/api/auth/send-otp",
+      "tag": "Auth",
+      "summary": "Place an OTP call to a portal user",
+      "safety": "auth",
+      "paginated": false,
+      "verified": "sample",
+      "params": [],
+      "schema": {
+        "$ref": "#/components/schemas/OtpSent"
+      }
+    },
+    {
+      "id": "verifyOtp",
+      "method": "post",
+      "path": "/api/auth/verify-otp",
+      "tag": "Auth",
+      "summary": "Exchange an OTP for a portal session",
+      "safety": "auth",
+      "paginated": false,
+      "verified": "sample",
+      "params": [],
+      "schema": {
+        "$ref": "#/components/schemas/PortalUser"
+      }
+    },
+    {
+      "id": "getPortalProfile",
+      "method": "get",
+      "path": "/api/portal/profile",
+      "tag": "Auth",
+      "summary": "Who the session belongs to; the session validity check",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [],
+      "schema": {
+        "type": "object",
+        "required": [
+          "profile"
+        ],
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/PortalProfile"
+          }
+        }
+      }
+    },
+    {
+      "id": "getFleet",
+      "method": "get",
+      "path": "/api/fleet",
+      "tag": "Fleet",
+      "summary": "Fleet totals and one metrics row per client",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [],
+      "schema": {
+        "$ref": "#/components/schemas/Fleet"
+      }
+    },
+    {
+      "id": "listClients",
+      "method": "get",
+      "path": "/api/clients",
+      "tag": "Clients",
+      "summary": "List all clients",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [],
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Client"
+        }
+      }
+    },
+    {
+      "id": "getClient",
+      "method": "get",
+      "path": "/api/clients/{clientId}",
+      "tag": "Clients",
+      "summary": "One client",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/Client"
+      }
+    },
+    {
+      "id": "getClientTenant",
+      "method": "get",
+      "path": "/api/clients/{clientId}/tenant",
+      "tag": "Clients",
+      "summary": "Everything about one client",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/Tenant"
+      }
+    },
+    {
+      "id": "listClientIntegrations",
+      "method": "get",
+      "path": "/api/clients/{clientId}/integrations",
+      "tag": "Clients",
+      "summary": "Integration configs for a client",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "configs",
+          "logs"
+        ],
+        "properties": {
+          "configs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Integration"
+            }
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalloutEvent"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "getDispositionFormFields",
+      "method": "get",
+      "path": "/api/clients/{clientId}/disposition-form-fields",
+      "tag": "Clients",
+      "summary": "Disposition form for a client",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "fields",
+          "presets"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionField"
+            }
+          },
+          "presets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionPresetRecord"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "listCallContacts",
+      "method": "get",
+      "path": "/api/clients/{clientId}/call-contacts",
+      "tag": "Calls",
+      "summary": "Calls grouped by contact, with call stats",
+      "safety": "read",
+      "paginated": true,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "page",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/CallContacts"
+      }
+    },
+    {
+      "id": "getRecordingLink",
+      "method": "get",
+      "path": "/api/clients/{clientId}/calls/{callId}/recording-link",
+      "tag": "Calls",
+      "summary": "Issue a signed link to a call recording",
+      "safety": "sensitive",
+      "paginated": false,
+      "verified": "sample",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "callId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "callId",
+          "recordingStatus",
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "callId": {
+            "type": "string"
+          },
+          "recordingStatus": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "id": "listCalloutLogs",
+      "method": "get",
+      "path": "/api/clients/{clientId}/callout-logs",
+      "tag": "Sync",
+      "summary": "CRM delivery attempts, with success aggregate",
+      "safety": "read",
+      "paginated": true,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "page",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/CalloutLogs"
+      }
+    },
+    {
+      "id": "getAnchorLog",
+      "method": "get",
+      "path": "/api/clients/{clientId}/anchor-logs/{requestId}",
+      "tag": "Sync",
+      "summary": "One delivery request with its attempts",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "requestId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/AnchorLog"
+      }
+    },
+    {
+      "id": "getOneApiStatus",
+      "method": "get",
+      "path": "/api/clients/{clientId}/oneapi/status",
+      "tag": "OneAPI",
+      "summary": "Billing and licensing link status",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/OneApiStatus"
+      }
+    },
+    {
+      "id": "backfillOneApi",
+      "method": "post",
+      "path": "/api/clients/{clientId}/oneapi/backfill",
+      "tag": "OneAPI",
+      "summary": "Refresh a client's OneAPI link and license data",
+      "safety": "write",
+      "paginated": false,
+      "verified": "sample",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/OneApiBackfill"
+      }
+    },
+    {
+      "id": "listSystemLogs",
+      "method": "get",
+      "path": "/api/support/logs",
+      "tag": "Logs",
+      "summary": "System logs, optionally for one client",
+      "safety": "read",
+      "paginated": true,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "page",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        },
+        {
+          "name": "clientId",
+          "in": "query"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemLog"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      }
+    },
+    {
+      "id": "listAuditLogs",
+      "method": "get",
+      "path": "/api/support/audit-logs",
+      "tag": "Logs",
+      "summary": "Audit logs, optionally for one client",
+      "safety": "read",
+      "paginated": true,
+      "verified": "2026-11-02",
+      "params": [
+        {
+          "name": "page",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        },
+        {
+          "name": "clientId",
+          "in": "query"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLog"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      }
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "portalSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "callanchor_portal_session"
+      }
+    },
+    "parameters": {
+      "clientId": {
+        "name": "clientId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "clientIdFilter": {
+        "name": "clientId",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 50
+        }
+      }
+    },
+    "schemas": {
+      "OtpRequest": {
+        "type": "object",
+        "required": [
+          "identifier",
+          "mode"
+        ],
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "E.164 mobile"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "mobile"
+            ]
+          }
+        }
+      },
+      "OtpSent": {
+        "type": "object",
+        "required": [
+          "message",
+          "otpSentTo",
+          "otpChannel"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "otpSentTo": {
+            "type": "string"
+          },
+          "otpChannel": {
+            "type": "string"
+          }
+        }
+      },
+      "PortalUser": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "email",
+          "roleId",
+          "permissions"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "supportUserId": {
+            "type": "string"
+          },
+          "portalUserId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "mobile": {
+            "type": "string"
+          },
+          "profileImageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roleId": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "logAccess": {
+            "type": "object",
+            "properties": {
+              "canViewSystemLogs": {
+                "type": "boolean"
+              },
+              "canViewAuditLogs": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "PortalProfile": {
+        "type": "object",
+        "required": [
+          "portalUserId",
+          "name",
+          "email",
+          "mobile"
+        ],
+        "properties": {
+          "portalUserId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "mobile": {
+            "type": "string"
+          },
+          "profileImageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasMore"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Platform": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "connectedAt": {
+            "type": "string"
+          }
+        }
+      },
+      "Client": {
+        "type": "object",
+        "required": [
+          "id",
+          "companyName",
+          "plan",
+          "status",
+          "accessSuspended",
+          "licenseCount",
+          "platforms"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Seen: trial"
+          },
+          "accessSuspended": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Date only (YYYY-MM-DD)"
+          },
+          "licenseCount": {
+            "type": "integer"
+          },
+          "licenseExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "licenseNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "portalAdminMobiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "numbers": {
+            "type": "array",
+            "items": {}
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Platform"
+            }
+          }
+        }
+      },
+      "ClientMetrics": {
+        "type": "object",
+        "required": [
+          "clientId",
+          "companyName",
+          "status",
+          "totalCalls",
+          "callsToday",
+          "failedCallouts24h",
+          "totalLicenses",
+          "activeIntegrations",
+          "syncedRate"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "totalCalls": {
+            "type": "integer"
+          },
+          "callsToday": {
+            "type": "integer"
+          },
+          "failedCallouts24h": {
+            "type": "integer"
+          },
+          "totalLicenses": {
+            "type": "integer"
+          },
+          "contractRecordedCalls": {
+            "type": "integer"
+          },
+          "contractPlatformSyncs": {
+            "type": "integer"
+          },
+          "contractRecordingLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Null seen live; meaning unconfirmed"
+          },
+          "contractSyncLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Null seen live; meaning unconfirmed"
+          },
+          "trialRecordedCalls": {
+            "type": "integer"
+          },
+          "trialPlatformSyncs": {
+            "type": "integer"
+          },
+          "trialRecordingLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Null seen live; meaning unconfirmed"
+          },
+          "trialPlatformSyncLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Null seen live; meaning unconfirmed"
+          },
+          "activeIntegrations": {
+            "type": "integer"
+          },
+          "syncedRate": {
+            "type": "number"
+          }
+        }
+      },
+      "CallRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "calleeId",
+          "calleeName",
+          "calleePhone",
+          "agent",
+          "duration",
+          "datetime",
+          "datetimeLabel",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "calleeId": {
+            "type": "string"
+          },
+          "calleeName": {
+            "type": "string"
+          },
+          "calleePhone": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string"
+          },
+          "teamMemberId": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string",
+            "description": "mm:ss"
+          },
+          "datetime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "datetimeLabel": {
+            "type": "string",
+            "description": "Display label in IST"
+          },
+          "type": {
+            "type": "string",
+            "description": "Seen: Incoming, Outgoing"
+          },
+          "recordingStatus": {
+            "type": "string"
+          },
+          "platformSyncStatus": {
+            "type": "string"
+          },
+          "anyIntegrationSynced": {
+            "type": "boolean"
+          },
+          "dispositionLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionScheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionDisplayFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "displayValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Fleet": {
+        "type": "object",
+        "required": [
+          "totalCalls",
+          "callsToday",
+          "failedCallouts24h",
+          "totalLicenses",
+          "trialsNearLimit",
+          "clientMetrics",
+          "callRecords"
+        ],
+        "properties": {
+          "totalCalls": {
+            "type": "integer"
+          },
+          "callsToday": {
+            "type": "integer"
+          },
+          "failedCallouts24h": {
+            "type": "integer"
+          },
+          "totalLicenses": {
+            "type": "integer"
+          },
+          "trialsNearLimit": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "clientId",
+                "companyName"
+              ],
+              "properties": {
+                "clientId": {
+                  "type": "string"
+                },
+                "companyName": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "clientMetrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientMetrics"
+            }
+          },
+          "callRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallRecord"
+            }
+          }
+        }
+      },
+      "LoginEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tone": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          }
+        }
+      },
+      "License": {
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "status",
+          "isLoggedIn",
+          "isActive",
+          "lifetimeCallRecordCount"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Seen: assigned"
+          },
+          "assignedTo": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          },
+          "assignedAtLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginDevice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginAndroidBrand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginAndroidModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginFirmwareVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginGoogleDialerPresent": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "lastLoginAppVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLoginAppVersionCode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "isLoggedIn": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "callCapturePolicy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recordingEnabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "allowMobileLogout": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "lifetimeCallRecordCount": {
+            "type": "integer"
+          },
+          "loginHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoginEvent"
+            }
+          }
+        }
+      },
+      "Integration": {
+        "type": "object",
+        "required": [
+          "platformId",
+          "platformName",
+          "active",
+          "endpoint",
+          "authMode",
+          "isCustom",
+          "scheduler"
+        ],
+        "properties": {
+          "platformId": {
+            "type": "string"
+          },
+          "platformName": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "authMode": {
+            "type": "string"
+          },
+          "authFields": {
+            "type": "object",
+            "description": "Secrets come back blank; see authFieldMasks."
+          },
+          "authFieldMasks": {
+            "type": "object",
+            "description": "Masked secrets, keyed by field."
+          },
+          "isCustom": {
+            "type": "boolean"
+          },
+          "scheduler": {
+            "type": "object",
+            "properties": {
+              "frequency": {
+                "type": "string",
+                "description": "Seen: realtime, 1h"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {}
+          },
+          "connectedAt": {
+            "type": "string"
+          },
+          "lastHealthCheck": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CalloutEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "requestId",
+          "platformId",
+          "eventType",
+          "callId",
+          "attempt",
+          "status",
+          "at",
+          "endpoint"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "platformId": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string",
+            "description": "Seen: call.completed, recording.ready"
+          },
+          "callId": {
+            "type": "string"
+          },
+          "calleeName": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "description": "Seen: delivered, failed"
+          },
+          "httpStatus": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "payloadPreview": {
+            "type": "string",
+            "description": "JSON text of the sent payload"
+          },
+          "responsePreview": {
+            "type": "string",
+            "description": "JSON text of the CRM's reply"
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "Present on failures"
+          },
+          "externalRecordId": {
+            "type": "string",
+            "description": "Present on success"
+          }
+        }
+      },
+      "DispositionPreset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "DispositionPresetRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer"
+          }
+        }
+      },
+      "DispositionField": {
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "label",
+          "type",
+          "required",
+          "enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Seen: single_select, textarea, datetime, preset"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "config": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Options or placeholder, depending on type."
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "usageCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "Tenant": {
+        "type": "object",
+        "required": [
+          "clientId",
+          "callRecords",
+          "licenses",
+          "integrations",
+          "callAnchorLogs",
+          "updatedAt"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "viewerTeamMemberId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewerTeamMemberName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "callRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallRecord"
+            }
+          },
+          "licenses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/License"
+            }
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Integration"
+            }
+          },
+          "callAnchorLogs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalloutEvent"
+            }
+          },
+          "teamMembers": {
+            "type": "array",
+            "items": {}
+          },
+          "dispositionSettings": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "promptTiming": {
+                "type": "string"
+              },
+              "allowSkip": {
+                "type": "boolean"
+              },
+              "skipRequiresReason": {
+                "type": "boolean"
+              },
+              "reminderIfIncomplete": {
+                "type": "boolean"
+              },
+              "maxPromptSeconds": {
+                "type": "integer"
+              },
+              "presetDispositions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DispositionPreset"
+                }
+              }
+            }
+          },
+          "callCaptureSettings": {
+            "type": "object",
+            "properties": {
+              "defaultPolicy": {
+                "type": "string"
+              },
+              "allowLicenseOverride": {
+                "type": "boolean"
+              },
+              "recordingEnabled": {
+                "type": "boolean"
+              }
+            }
+          },
+          "mobileAppSettings": {
+            "type": "object",
+            "properties": {
+              "allowMobileLogout": {
+                "type": "boolean"
+              },
+              "allowLicenseOverride": {
+                "type": "boolean"
+              }
+            }
+          },
+          "dataRetentionSettings": {
+            "type": "object",
+            "properties": {
+              "preset": {
+                "type": "string"
+              },
+              "customDays": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "storageSettings": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "clientStatus": {
+                "type": "string"
+              },
+              "storageChoice": {
+                "type": "string"
+              },
+              "ownProvider": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provider": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "bucket": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "secretIdMasked": {
+                "type": "string"
+              },
+              "roleArnMasked": {
+                "type": "string"
+              },
+              "externalIdMasked": {
+                "type": "string"
+              },
+              "kmsKeyId": {
+                "type": "string"
+              },
+              "lastValidatedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastError": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "migrationQueued": {
+                "type": "integer"
+              },
+              "migrationDone": {
+                "type": "integer"
+              },
+              "migrationFailed": {
+                "type": "integer"
+              },
+              "callAnchorAccountId": {
+                "type": "string"
+              }
+            }
+          },
+          "trialRecordedCalls": {
+            "type": "integer"
+          },
+          "trialPendingRecordings": {
+            "type": "integer"
+          },
+          "trialRecordingLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "trialPlatformSyncs": {
+            "type": "integer"
+          },
+          "trialPlatformSyncLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "trialRecordingAtLimit": {
+            "type": "boolean"
+          },
+          "trialExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trialDaysRemaining": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "trialExpired": {
+            "type": "boolean"
+          },
+          "contractRecordedCalls": {
+            "type": "integer"
+          },
+          "contractPendingRecordings": {
+            "type": "integer"
+          },
+          "contractRecordingLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "contractRecordingUnlimited": {
+            "type": "boolean"
+          },
+          "contractPlatformSyncs": {
+            "type": "integer"
+          },
+          "contractSyncLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "contractSyncUnlimited": {
+            "type": "boolean"
+          },
+          "contractRecordingAtLimit": {
+            "type": "boolean"
+          },
+          "contractLicenseCount": {
+            "type": "integer"
+          },
+          "contractLicenseActiveCount": {
+            "type": "integer"
+          },
+          "contractLicenseLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "contractLicenseUnlimited": {
+            "type": "boolean"
+          },
+          "contractLicenseAtLimit": {
+            "type": "boolean"
+          },
+          "contractLicenseOverCap": {
+            "type": "boolean"
+          },
+          "contractLicenseActivationLocked": {
+            "type": "boolean"
+          },
+          "contractLicenseOverBy": {
+            "type": "integer"
+          },
+          "contractSeatCompliancePhase": {
+            "type": "string"
+          },
+          "contractSeatGraceEndsAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contractSeatGracePeriodHours": {
+            "type": "integer"
+          },
+          "contractIntegrationCount": {
+            "type": "integer"
+          },
+          "contractIntegrationLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "contractIntegrationUnlimited": {
+            "type": "boolean"
+          },
+          "contractIntegrationAtLimit": {
+            "type": "boolean"
+          },
+          "trialRecordingRetentionHeld": {
+            "type": "boolean"
+          },
+          "trialRecordingDeletionDueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trialRecordingAccessRevoked": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CallContacts": {
+        "type": "object",
+        "required": [
+          "items",
+          "pagination",
+          "stats",
+          "agents"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "calleeId": {
+                  "type": "string"
+                },
+                "calleeName": {
+                  "type": "string"
+                },
+                "calleePhone": {
+                  "type": "string"
+                },
+                "callCount": {
+                  "type": "integer"
+                },
+                "lastAgent": {
+                  "type": "string"
+                },
+                "lastDuration": {
+                  "type": "string"
+                },
+                "lastDatetimeLabel": {
+                  "type": "string"
+                },
+                "lastDatetime": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "typesPresent": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "stats": {
+            "type": "object",
+            "required": [
+              "totalCalls",
+              "uniqueContacts",
+              "incoming",
+              "outgoing",
+              "missed",
+              "rejected"
+            ],
+            "properties": {
+              "totalCalls": {
+                "type": "integer"
+              },
+              "uniqueContacts": {
+                "type": "integer"
+              },
+              "incoming": {
+                "type": "integer"
+              },
+              "outgoing": {
+                "type": "integer"
+              },
+              "missed": {
+                "type": "integer"
+              },
+              "rejected": {
+                "type": "integer"
+              },
+              "answerRate": {
+                "type": "number"
+              },
+              "missedRate": {
+                "type": "number"
+              },
+              "rejectedRate": {
+                "type": "number"
+              }
+            }
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CalloutLogs": {
+        "type": "object",
+        "required": [
+          "items",
+          "pagination",
+          "aggregate"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalloutEvent"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "aggregate": {
+            "type": "object",
+            "required": [
+              "total",
+              "delivered",
+              "failed",
+              "retrying",
+              "queued",
+              "successRate"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "delivered": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "retrying": {
+                "type": "integer"
+              },
+              "queued": {
+                "type": "integer"
+              },
+              "successRate": {
+                "type": "number"
+              },
+              "avgDurationMs": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "CallPayload": {
+        "type": "object",
+        "description": "The body CallAnchor sends to the CRM.",
+        "required": [
+          "event",
+          "hasRecording",
+          "call"
+        ],
+        "properties": {
+          "event": {
+            "type": "string"
+          },
+          "hasRecording": {
+            "type": "boolean"
+          },
+          "call": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "callType": {
+                "type": "string"
+              },
+              "agentName": {
+                "type": "string"
+              },
+              "agentNumber": {
+                "type": "string"
+              },
+              "startedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "calleeName": {
+                "type": "string"
+              },
+              "calleePhone": {
+                "type": "string"
+              },
+              "recordingUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dispositionNote": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dispositionLabel": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "durationSeconds": {
+                "type": "integer"
+              },
+              "dispositionScheduledAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "disposition": {
+            "type": "object",
+            "properties": {
+              "submittedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "fields": {
+                "type": "object",
+                "description": "Client-specific, keyed by form field slug."
+              }
+            }
+          }
+        }
+      },
+      "AnchorLog": {
+        "type": "object",
+        "required": [
+          "request",
+          "events",
+          "call",
+          "platform"
+        ],
+        "properties": {
+          "request": {
+            "type": "object",
+            "required": [
+              "id",
+              "status",
+              "endpoint",
+              "eventType"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              },
+              "payloadJson": {
+                "$ref": "#/components/schemas/CallPayload"
+              },
+              "attemptCount": {
+                "type": "integer"
+              },
+              "eventType": {
+                "type": "string",
+                "description": "Underscored: call_completed, recording_ready"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalloutEvent"
+            }
+          },
+          "call": {
+            "type": "object",
+            "properties": {
+              "callRecordId": {
+                "type": "string"
+              },
+              "calleeId": {
+                "type": "string"
+              },
+              "calleeName": {
+                "type": "string"
+              },
+              "calleePhone": {
+                "type": "string"
+              },
+              "agentName": {
+                "type": "string"
+              },
+              "callType": {
+                "type": "string"
+              },
+              "durationLabel": {
+                "type": "string"
+              },
+              "callRecordAvailable": {
+                "type": "boolean"
+              }
+            }
+          },
+          "platform": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "isCustom": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "OneApiStatus": {
+        "type": "object",
+        "required": [
+          "linked",
+          "assignProductStatus",
+          "licenseCount",
+          "accountStatus",
+          "clientStatus",
+          "backfillRecommended"
+        ],
+        "properties": {
+          "linked": {
+            "type": "boolean"
+          },
+          "oneApiClientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignProductStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cachedLicenseSeats": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Meaning of -1 unconfirmed"
+          },
+          "licenseSeatsFetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cachedTrialExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "licenseCount": {
+            "type": "integer"
+          },
+          "accountStatus": {
+            "type": "string"
+          },
+          "clientStatus": {
+            "type": "string"
+          },
+          "backfillRecommended": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OneApiBackfill": {
+        "type": "object",
+        "required": [
+          "action",
+          "clientId",
+          "assignSucceeded"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "oneApiClientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignProductStatus": {
+            "type": "string"
+          },
+          "assignSucceeded": {
+            "type": "boolean"
+          },
+          "licenseSeats": {
+            "type": "integer"
+          },
+          "licenseCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "SystemLog": {
+        "type": "object",
+        "required": [
+          "id",
+          "occurredAt",
+          "category",
+          "severity",
+          "source",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": "string",
+            "description": "Seen: mobile, webhook"
+          },
+          "severity": {
+            "type": "string",
+            "description": "Seen: info"
+          },
+          "source": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorEmail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correlationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "httpMethod": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "httpPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "httpStatus": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "ipAddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuditLog": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "resourceType",
+          "occurredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorEmail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actorDisplayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correlationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "ipAddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

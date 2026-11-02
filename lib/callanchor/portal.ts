@@ -3,6 +3,7 @@ import "server-only";
 // HTTP calls to the CallAnchor portal. The contract lives in callanchor-apis/openapi.
 const COOKIE = "callanchor_portal_session";
 const TIMEOUT_MS = 8000;
+const CONSOLE_TIMEOUT_MS = 25000;
 
 export type PortalProfile = {
   portalUserId: string;
@@ -50,6 +51,19 @@ export async function checkSession(cookie: string): Promise<SessionCheck> {
   } catch {
     return { status: "unavailable" };
   }
+}
+
+// Runs one contract operation with a member's session, for the API console.
+export async function callPortal(cookie: string, method: string, path: string) {
+  const started = Date.now();
+  const response = await fetch(new URL(path, baseUrl()), {
+    method,
+    redirect: "manual",
+    cache: "no-store",
+    signal: AbortSignal.timeout(CONSOLE_TIMEOUT_MS),
+    headers: { Cookie: `${COOKIE}=${cookie}` },
+  });
+  return { status: response.status, durationMs: Date.now() - started, text: await response.text() };
 }
 
 // Places a real OTP call.

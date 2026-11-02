@@ -5,7 +5,7 @@ A standalone module inside cid-autopsy, excluded from the root tsconfig and ESLi
 Source of truth for CallAnchor's portal API. Read README.md first.
 
 - `openapi/callanchor.openapi.yaml` is the contract. Change it first, then run
-  `npm run generate:postman`. Never edit the generated collection by hand.
+  `npm run generate:postman` and `npm run generate:contract`. Never edit generated files by hand.
 - Production holds customer PII. Only redacted fixtures are committed; `data/`, `.session`
   and `.env` stay out of git. `npm test` scans for leaks and must pass before a commit.
 - Never run `sendOtp`, a `write` operation or `getRecordingLink` against production

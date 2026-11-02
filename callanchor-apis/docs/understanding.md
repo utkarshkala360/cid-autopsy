@@ -2,7 +2,7 @@
 
 Working notes for building the client health system. Everything here comes from one set of
 samples captured on 2 Nov 2026, mostly from one trial client with 5 licenses. Treat the numbers as
-examples until they're confirmed live.
+examples. The response shapes of all read operations were confirmed live the same day.
 
 ## The data flow
 
@@ -59,7 +59,6 @@ cookie returns 200 with `profile`, and an invalid or missing one returns 401 wit
 
 | Gap | Effect |
 | --- | --- |
-| `GET /api/clients` sample is a single object | List envelope unknown; the client accepts an array or `{items}` |
 | `callout-logs` asked for limit 50, returned limit 10 | Possible server cap, which affects paging |
 | Enum values seen in only one state (`status: trial`, `severity: info`) | Paid, churned and error values unknown |
 | Recording-link sample's response `callId` differs from the requested one | Probably two different captures |

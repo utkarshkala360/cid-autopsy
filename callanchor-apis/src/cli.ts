@@ -23,8 +23,7 @@ const [command, target] = positionals;
 const clientFlag = (flags.client ?? process.env.CALLANCHOR_CLIENT_ID) as string | undefined;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const clientList = (body: unknown) =>
-  (Array.isArray(body) ? body : (body as { items: unknown[] }).items) as { id: string; companyName: string }[];
+const clientList = (body: unknown) => body as { id: string; companyName: string }[];
 
 async function login() {
   const identifier = (flags.mobile ?? process.env.CALLANCHOR_MOBILE) as string | undefined;
@@ -41,12 +40,21 @@ async function login() {
 
 /** Runs every read operation once and compares each response with the contract. */
 async function check() {
-  const ids: Record<string, string> = { page: "1", limit: "1" };
+  const ids: Record<string, string> = { page: "1", limit: PAGE_LIMIT };
   const first = await send(operation("listClients"));
-  ids.clientId = clientFlag ?? clientList(first.body)[0]?.id;
-  if (!ids.clientId) throw new Error("No clients returned.");
-  const tenant = (await send(operation("getClientTenant"), ids)).body as any;
-  ids.requestId = tenant.callAnchorLogs?.[0]?.requestId;
+  const candidates = clientFlag ? [clientFlag] : clientList(first.body).map((c) => c.id);
+  if (!candidates.length) throw new Error("No clients returned.");
+  // New clients have no logs, so look for one that can exercise the id-based operations.
+  for (const clientId of candidates) {
+    ids.clientId ??= clientId;
+    const logs = (await send(operation("listCalloutLogs"), { clientId, page: "1", limit: "1" })).body as any;
+    if (logs.items?.[0]?.requestId) {
+      ids.clientId = clientId;
+      ids.requestId = logs.items[0].requestId;
+      break;
+    }
+    await sleep(PAUSE_MS);
+  }
 
   let broken = 0;
   const reads = operations.filter((o) => o.safety === "read").sort((a, b) => a.id.localeCompare(b.id));
@@ -62,7 +70,8 @@ async function check() {
       const drift = undocumented(op.schema, body);
       broken += errors.length ? 1 : 0;
       console.log(`${errors.length ? "FAIL" : drift.length ? "DRIFT" : "OK"}  ${op.id}`);
-      errors.forEach((e) => console.log(`      break: ${e}`));
+      const grouped = Map.groupBy(errors, (e) => e.replace(/\/\d+/g, "/*"));
+      grouped.forEach((seen, e) => console.log(`      break: ${e}${seen.length > 1 ? ` (${seen.length} times)` : ""}`));
       drift.forEach((d) => console.log(`      undocumented: ${d}`));
     } catch (error) {
       broken++;

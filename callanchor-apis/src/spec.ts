@@ -13,6 +13,7 @@ export type Operation = {
   summary: string;
   safety: "read" | "sensitive" | "write" | "auth";
   paginated: boolean;
+  verified: string;
   params: { name: string; in: string }[];
   schema: Schema;
 };
@@ -32,11 +33,14 @@ export const operations: Operation[] = Object.entries<Schema>(doc.paths).flatMap
       summary: op.summary,
       safety: op["x-safety"],
       paginated: Boolean(op["x-paginated"]),
+      verified: String(op["x-verified"]),
       params: [...(item.parameters ?? []), ...(op.parameters ?? [])].map(deref).map((p: Schema) => ({ name: p.name, in: p.in })),
       schema: op.responses["200"].content["application/json"].schema,
     };
   }),
 );
+
+export const components = doc.components;
 
 export function operation(id: string): Operation {
   const op = operations.find((o) => o.id === id);

@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 
 export const CALLANCHOR_PATH = "/dashboard/call_anchor_config";
 export const VERIFY_PATH = `${CALLANCHOR_PATH}/verify`;
+export const APIS_PATH = `${CALLANCHOR_PATH}/apis`;
 
 // Each attempt can place a real phone call.
 const OTP_SCOPE = "callanchor_otp";
@@ -17,7 +18,7 @@ export type MemberSession = SessionCheck | { status: "missing" };
 
 const context = (memberId: string) => `callanchor_session:${memberId}`;
 
-async function storedCookie(memberId: string) {
+export async function storedCookie(memberId: string) {
   const [row] = await db()`SELECT cookie_encrypted FROM callanchor_sessions WHERE member_id = ${memberId}`;
   if (!row) return null;
   try {

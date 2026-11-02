@@ -26,7 +26,7 @@ or API key? Scheduled monitoring can't run without this. The app now checks sess
 ### 2. Client count and polling limits
 
 How many clients are there, and how often may we poll `/api/fleet` and the per-client endpoints in
-production? Are there rate limits?
+production? Are there rate limits? There were 47 clients on 2 Nov 2026, so the count is known.
 
 - Status: Open
 - Answer:
@@ -69,7 +69,8 @@ filling these in hours later, or is `startedAt` affected by delayed upload or de
 
 ### 7. Field definitions
 
-What does `cachedLicenseSeats: -1` mean, given a contract limit of 5? What are all the `status`
+What does `cachedLicenseSeats: -1` mean, given a contract limit of 5? What does a `null` quota limit
+in `/api/fleet` mean: unlimited? What are all the `status`
 values (only `trial` has been seen)? Do the `trial*` and `contract*` counters ever differ?
 
 - Status: Open
@@ -77,14 +78,18 @@ values (only `trial` has been seen)? Do the `trial*` and `contract*` counters ev
 
 ## To confirm with live data
 
+The read operations were checked live on 2 Nov 2026, across all 47 clients for the per-client ones.
+Several fields turned out to be nullable, including quota limits, `cachedLicenseSeats` and
+`assignProductStatus`.
+
 These should settle themselves on the first `npm run ca -- check`. Answer here if you already know.
 
 ### 8. Shape of `GET /api/clients`
 
 The sheet shows a single object. Is the response an array or `{ items: [...] }`?
 
-- Status: Open
-- Answer:
+- Status: Answered
+- Answer: An array, confirmed live on 2 Nov 2026.
 
 ### 9. Page size on `callout-logs`
 

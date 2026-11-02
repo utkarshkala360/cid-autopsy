@@ -6,7 +6,8 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 | --- | --- | --- |
 | `/admin` | Admin Console: create, disable, reset passwords for and delete agents/members | Admins (stored in the database) |
 | `/dashboard` | Dashboard: home for sub apps | Agents/members created in the Admin Console |
-| `/dashboard/call_anchor_config` | CallAnchor Config sub app (placeholder) | Agents/members |
+| `/dashboard/call_anchor_config` | CallAnchor Config sub app | Agents/members |
+| `/dashboard/call_anchor_config/apis` | API console: run CallAnchor's APIs live | Agents/members with a CallAnchor login |
 | `/customers` | Customers | Agents/members |
 | `/customers/<id>` | A customer and its integrations | Agents/members |
 | `/customers/<id>/integrations/salesforce` | That customer's Salesforce orgs; **+ Connect Salesforce** adds one | Agents/members |
@@ -78,6 +79,8 @@ Every CallAnchor page needs a valid portal session, stored per member and encryp
 - Each page render, and each route change through [SessionGuard](app/dashboard/(app)/call_anchor_config/SessionGuard.tsx), asks `GET /api/portal/profile` whether the cookie still works. The guard is needed because the router cache can serve a page without reaching the server.
 - A `401` or `403`, or no stored session, sends the member to **Validate OTP** at `/dashboard/call_anchor_config/verify`. After the OTP they return to the page they were on.
 - If CallAnchor is down the page stays open, because an OTP couldn't work anyway.
+
+The **API console** at `/dashboard/call_anchor_config/apis` runs any operation from the contract live with the member's own session and marks whether the response matches. Writes need a confirmation. Responses contain customer data, and every signed-in member with a CallAnchor login can use it.
 
 New CallAnchor pages and server actions must call `requireCallAnchorSession()` from [lib/callanchor/session.ts](lib/callanchor/session.ts). `CALLANCHOR_BASE_URL` overrides the portal URL, for example to use the mock.
 
