@@ -71,7 +71,8 @@ filling these in hours later, or is `startedAt` affected by delayed upload or de
 
 What does `cachedLicenseSeats: -1` mean, given a contract limit of 5? What does a `null` quota limit
 in `/api/fleet` mean: unlimited? What are all the `status`
-values (only `trial` has been seen)? Do the `trial*` and `contract*` counters ever differ?
+values (`trial`, `active` and `inactive` seen by 3 Nov 2026)? Do the `trial*` and `contract*` counters
+ever differ?
 
 - Status: Open
 - Answer:
@@ -95,8 +96,9 @@ The sheet shows a single object. Is the response an array or `{ items: [...] }`?
 
 The sample asked for `limit=50` and got `limit=10`. Is there a server cap?
 
-- Status: Open
-- Answer:
+- Status: Answered
+- Answer: Yes, 100 rows. `limit=200` returns 100, on both `callout-logs` and `support/logs`
+  (checked live on 3 Nov 2026). `support/logs` only goes back about 3 days.
 
 ### 10. Window of `callout-logs.aggregate`
 

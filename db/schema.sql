@@ -76,3 +76,64 @@ CREATE TABLE IF NOT EXISTS callanchor_sessions (
   cookie_encrypted TEXT        NOT NULL,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- CallAnchor client health store, filled incrementally by lib/callanchor/store.ts. Payloads and CRM
+-- replies aren't stored: each event keeps only a masked label of what came back.
+
+-- CRM delivery attempts (callout-logs), one row per attempt.
+CREATE TABLE IF NOT EXISTS ca_callout_events (
+  id          TEXT        PRIMARY KEY,
+  client_id   TEXT        NOT NULL,
+  platform_id TEXT        NOT NULL,
+  event_type  TEXT        NOT NULL,
+  call_id     TEXT        NOT NULL,
+  attempt     INTEGER     NOT NULL,
+  status      TEXT        NOT NULL,
+  http_status INTEGER,
+  duration_ms INTEGER,
+  at          TIMESTAMPTZ NOT NULL,
+  label       TEXT        NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ca_callout_events_client_at_idx ON ca_callout_events (client_id, at DESC);
+CREATE INDEX IF NOT EXISTS ca_callout_events_at_idx ON ca_callout_events (at DESC);
+
+-- System logs (support/logs). CallAnchor keeps about 3 days; this keeps them longer.
+CREATE TABLE IF NOT EXISTS ca_system_logs (
+  id          TEXT        PRIMARY KEY,
+  client_id   TEXT,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  category    TEXT        NOT NULL,
+  severity    TEXT        NOT NULL,
+  source      TEXT        NOT NULL,
+  resource_id TEXT,
+  -- Masked. `detail` is the one metadata field the pipeline needs: recordingStatus or status.
+  message     TEXT        NOT NULL,
+  detail      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ca_system_logs_client_at_idx ON ca_system_logs (client_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS ca_system_logs_at_idx ON ca_system_logs (occurred_at DESC);
+
+-- Latest per-client state: fleet metrics, tenant counts, OneAPI status and the lifetime sync aggregate.
+CREATE TABLE IF NOT EXISTS ca_client_snapshots (
+  client_id    TEXT        PRIMARY KEY,
+  company_name TEXT,
+  status       TEXT,
+  data         JSONB,
+  fetched_at   TIMESTAMPTZ,
+  aggregate    JSONB
+);
+
+-- One row per stream ('snapshots', 'logs', 'callouts:<clientId>'): the milestone a pull resumes from.
+CREATE TABLE IF NOT EXISTS ca_sync_state (
+  stream       TEXT        PRIMARY KEY,
+  -- Newest row stored. The next pull reads back only to here.
+  milestone_at TIMESTAMPTZ,
+  pulled_at    TIMESTAMPTZ,
+  -- Last time the trailing 5 days were read again.
+  refreshed_at TIMESTAMPTZ,
+  -- Held while a pull runs, so two viewers don't pull the same stream at once.
+  lease_until  TIMESTAMPTZ,
+  last_error   TEXT
+);

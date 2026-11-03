@@ -66,6 +66,31 @@ export async function callPortal(cookie: string, method: string, path: string) {
   return { status: response.status, durationMs: Date.now() - started, text: await response.text() };
 }
 
+export class PortalError extends Error {
+  status: number;
+  constructor(status: number, path: string) {
+    super(`${path.split("?")[0]}: HTTP ${status}`);
+    this.status = status;
+  }
+  // A redirect means the portal sent us to its login page, like the CLI assumes.
+  get rejected() {
+    return this.status === 401 || this.status === 403 || (this.status >= 300 && this.status < 400);
+  }
+}
+
+// Reads one contract operation as JSON. GET only, so nothing built on it can change CallAnchor.
+export async function getJson<T>(cookie: string, path: string, timeoutMs = CONSOLE_TIMEOUT_MS): Promise<T> {
+  const response = await fetch(new URL(path, baseUrl()), {
+    method: "GET",
+    redirect: "manual",
+    cache: "no-store",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: { Cookie: `${COOKIE}=${cookie}` },
+  });
+  if (!response.ok) throw new PortalError(response.status, path);
+  return (await response.json()) as T;
+}
+
 // Places a real OTP call.
 export async function sendOtp(mobile: string) {
   try {

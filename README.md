@@ -7,6 +7,8 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 | `/admin` | Admin Console: create, disable, reset passwords for and delete agents/members | Admins (stored in the database) |
 | `/dashboard` | Dashboard: home for sub apps | Agents/members created in the Admin Console |
 | `/dashboard/call_anchor_config` | CallAnchor Config sub app | Agents/members |
+| `/dashboard/call_anchor_config/health` | Client health: recordings, CRM syncs and errors for every client | Agents/members with a CallAnchor login |
+| `/dashboard/call_anchor_config/health/<clientId>` | One client's full health breakdown | Agents/members with a CallAnchor login |
 | `/dashboard/call_anchor_config/apis` | API console: run CallAnchor's APIs live | Agents/members with a CallAnchor login |
 | `/customers` | Customers | Agents/members |
 | `/customers/<id>` | A customer and its integrations | Agents/members |
@@ -81,6 +83,29 @@ Every CallAnchor page needs a valid portal session, stored per member and encryp
 - If CallAnchor is down the page stays open, because an OTP couldn't work anyway.
 
 The **API console** at `/dashboard/call_anchor_config/apis` runs any operation from the contract live with the member's own session and marks whether the response matches. Writes need a confirmation. Responses contain customer data, and every signed-in member with a CallAnchor login can use it.
+
+**Client health** at `/dashboard/call_anchor_config/health` scores every client from data stored in Postgres, which each visit brings up to date with the member's session, using GET requests only.
+
+[lib/callanchor/store.ts](lib/callanchor/store.ts) keeps the `ca_*` tables:
+
+| Stream | Source | Table |
+| --- | --- | --- |
+| `callouts:<clientId>` | Each client's `callout-logs` | `ca_callout_events` |
+| `logs` | `support/logs`, every client at once | `ca_system_logs` |
+| `snapshots` | `/api/fleet`, plus each client's tenant and OneAPI status | `ca_client_snapshots` |
+
+- **Milestones.** `ca_sync_state` holds each stream's milestone, its newest stored row. A visit reads newest-first back to the milestone, minus a 10-minute overlap, and then moves the milestone forward. That's usually one page per stream. A pull less than 30 seconds old is reused.
+- **5-day refresh.** Once a day each stream reads the last 5 days again and updates stored rows in place, to pick up late changes. It runs with `after()`, once the page has been sent. A stream's first pull is this same 5-day read, which backfills it (about 20 seconds for the whole fleet).
+- **Snapshots** are refreshed every 10 minutes, also after the response.
+- **Leases.** A lease on each stream stops two viewers pulling the same data at once.
+- **What's stored:** no payloads or CRM replies, only a masked label of what came back. Rows older than 90 days are deleted. The `SYNC` settings hold these numbers.
+
+[lib/callanchor/health.ts](lib/callanchor/health.ts) does the scoring:
+
+- **Consolidated view:** the last 24 hours from the store.
+- **One client, over 24 hours or 3, 7 or 30 days:** stored events, plus the tenant, call stats and audit logs read live. A recording is followed from call ingest through upload, verification, the `recording.ready` sync and the S3 purge. A stage with no next step after 30 minutes counts as stuck. History only goes back as far as the store does: CallAnchor keeps about 3 days of system logs, and the first pull stores 5 days of callouts.
+- **Masking:** CRM replies are grouped by shape and errors by message, with ids, numbers, emails and links masked.
+- **Scoring:** the thresholds are in `THRESHOLDS`.
 
 New CallAnchor pages and server actions must call `requireCallAnchorSession()` from [lib/callanchor/session.ts](lib/callanchor/session.ts). `CALLANCHOR_BASE_URL` overrides the portal URL, for example to use the mock.
 
