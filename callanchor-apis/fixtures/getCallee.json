@@ -1,0 +1,55 @@
+{
+  "profile": {
+    "id": "phone-0000009004",
+    "name": "Person 55",
+    "phone": "+910000009004",
+    "stats": {
+      "total": 1,
+      "incoming": 0,
+      "missed": 0,
+      "outgoing": 1,
+      "rejected": 0
+    },
+    "logs": [
+      {
+        "id": "cmvkma22v1aei7l8fmykwby0c",
+        "time": "12:26 pm",
+        "date": "2026-10-23",
+        "dayLabel": "FRI",
+        "type": "Outgoing",
+        "agent": "Person 56",
+        "duration": "00:05",
+        "durationSeconds": 5,
+        "recordingStatus": "synced",
+        "platformSyncStatus": "synced",
+        "recordingUnavailableReason": null,
+        "recordingPermissionDisabledAt": null,
+        "dispositionLabel": "Interested",
+        "dispositionNote": null,
+        "dispositionScheduledAt": null,
+        "dispositionDisplayFields": [
+          {
+            "slug": "select-calling-agent",
+            "label": "Select Calling Agent",
+            "type": "single_select",
+            "displayValue": "test-1"
+          },
+          {
+            "slug": "outcome",
+            "label": "Outcome",
+            "type": "preset",
+            "displayValue": "Interested"
+          }
+        ],
+        "recordingSynced": false,
+        "recordingDeleted": false,
+        "recordingAvailable": false,
+        "aiInsightStatus": null,
+        "aiInsightErrorCode": null,
+        "aiOverallSentiment": null,
+        "aiSentimentScore": null,
+        "aiCreditsUsed": null
+      }
+    ]
+  }
+}

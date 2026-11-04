@@ -1,0 +1,7 @@
+{
+  "seatGracePeriodHours": 24,
+  "seatGraceStartedAt": null,
+  "seatGraceEndsAt": null,
+  "minHours": 1,
+  "maxHours": 168
+}

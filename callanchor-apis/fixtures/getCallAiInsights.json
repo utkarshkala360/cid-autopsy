@@ -1,0 +1,26 @@
+{
+  "data": {
+    "callRecordId": "cmvkma22v1aei7l8fmykwby0c",
+    "status": "queued",
+    "overallSentiment": null,
+    "sentimentScore": null,
+    "customerTone": null,
+    "agentTone": null,
+    "sentimentTimeline": [],
+    "sentimentDrivers": [],
+    "momSummary": null,
+    "momKeyPoints": [],
+    "nextActions": [],
+    "languageCode": null,
+    "errorCode": null,
+    "errorMessage": null,
+    "completedAt": null,
+    "segments": [],
+    "agentName": "Person 56",
+    "calleeName": "Person 55",
+    "calleePhone": "+910000009004",
+    "durationLabel": "00:05",
+    "startedAt": "2026-10-23T06:56:20.470Z",
+    "missing": true
+  }
+}

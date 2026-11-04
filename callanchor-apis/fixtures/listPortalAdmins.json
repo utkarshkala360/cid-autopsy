@@ -1,0 +1,26 @@
+{
+  "admins": [
+    {
+      "portalUserId": "cmuvbsy3d0ii9bmk6w5qu044i",
+      "teamMemberId": "cmuvbsy3i0iibbmk6nbzn6ihg",
+      "name": "Person 53",
+      "email": "user53@example.test",
+      "mobile": "+910000009002",
+      "licenseNumber": null,
+      "isActive": true,
+      "lastLoginAt": null,
+      "createdAt": "2026-10-05T14:09:17.977Z"
+    },
+    {
+      "portalUserId": "cmuzm44sk0q6b8tpxnycdngly",
+      "teamMemberId": "cmuzm44sp0q6d8tpxposla2ip",
+      "name": "Person 54",
+      "email": "user54@example.test",
+      "mobile": "+910000009003",
+      "licenseNumber": null,
+      "isActive": true,
+      "lastLoginAt": "2026-11-04T11:25:39.860Z",
+      "createdAt": "2026-10-08T14:09:00.741Z"
+    }
+  ]
+}

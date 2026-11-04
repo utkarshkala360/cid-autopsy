@@ -55,6 +55,14 @@ async function check() {
     }
     await sleep(PAUSE_MS);
   }
+  // Ids for the per-item reads, from the same client's lists.
+  const one = { clientId: ids.clientId, page: "1", limit: "1" };
+  const contacts = (await send(operation("listCallContacts"), one)).body as any;
+  if (contacts.items?.[0]) ids.calleeId = contacts.items[0].calleeId;
+  const tenant = (await send(operation("getClientTenant"), one)).body as any;
+  if (tenant.callRecords?.[0]) ids.callId = tenant.callRecords[0].id;
+  const audit = (await send(operation("listAuditLogs"), one)).body as any;
+  if (audit.items?.[0]) ids.auditLogId = audit.items[0].id;
 
   let broken = 0;
   const reads = operations.filter((o) => o.safety === "read").sort((a, b) => a.id.localeCompare(b.id));

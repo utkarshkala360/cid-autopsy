@@ -1,0 +1,15 @@
+{
+  "id": "cmw2162e12n18gem6a3y5mhkm",
+  "clientId": "cmus74leshej2ewwgii5qaycf",
+  "actorUserId": "cmuzm44sk0q6b8tpxnycdngly",
+  "actorEmail": "user54@example.test",
+  "actorType": null,
+  "actorDisplayName": null,
+  "action": "login",
+  "resourceType": "portal_user",
+  "resourceId": "cmuzm44sk0q6b8tpxnycdngly",
+  "correlationId": null,
+  "metadata": null,
+  "ipAddress": null,
+  "occurredAt": "2026-11-04T11:25:39.865Z"
+}

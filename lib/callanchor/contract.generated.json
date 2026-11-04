@@ -12,7 +12,9 @@
       "params": [],
       "schema": {
         "$ref": "#/components/schemas/OtpSent"
-      }
+      },
+      "curl": "curl -s -X POST \"https://app.360callanchor.com/api/auth/send-otp\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"identifier\":\"'\"$CALLANCHOR_MOBILE\"'\",\"mode\":\"mobile\"}'",
+      "sample": "{\n  \"message\": \"OTP call originated successfully\",\n  \"otpSentTo\": \"+910000000030\",\n  \"otpChannel\": \"mobile\"\n}"
     },
     {
       "id": "verifyOtp",
@@ -26,7 +28,9 @@
       "params": [],
       "schema": {
         "$ref": "#/components/schemas/PortalUser"
-      }
+      },
+      "curl": "curl -s -X POST \"https://app.360callanchor.com/api/auth/verify-otp\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"identifier\":\"'\"$CALLANCHOR_MOBILE\"'\",\"mode\":\"mobile\",\"otp\":\"'\"$OTP\"'\"}' \\\n  -c cookies.txt",
+      "sample": "{\n  \"kind\": \"support\",\n  \"supportUserId\": \"cmsyix18z0cu010ngtzobg0nf\",\n  \"portalUserId\": \"cmsyix18w0cty10ngdavp4ppz\",\n  \"name\": \"Person 11\",\n  \"email\": \"user9@example.test\",\n  \"mobile\": \"+910000000030\",\n  \"profileImageUrl\": \"/uploads/profile-images/redacted.jpg\",\n  \"roleId\": \"support_agent\",\n  \"permissions\": [\n    \"clients:read\",\n    \"clients:write\",\n    \"… 2 more\"\n  ],\n  \"logAccess\": {\n    \"canViewSystemLogs\": true,\n    \"canViewAuditLogs\": true\n  }\n}"
     },
     {
       "id": "getPortalProfile",
@@ -48,7 +52,9 @@
             "$ref": "#/components/schemas/PortalProfile"
           }
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/portal/profile\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"profile\": {\n    \"portalUserId\": \"cmsample0000portaluser00000\",\n    \"name\": \"Person 11\",\n    \"email\": \"user1@example.test\",\n    \"mobile\": \"+910000000001\",\n    \"profileImageUrl\": \"/uploads/profile-images/redacted.jpg\"\n  }\n}"
     },
     {
       "id": "getFleet",
@@ -62,7 +68,9 @@
       "params": [],
       "schema": {
         "$ref": "#/components/schemas/Fleet"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/fleet\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"totalCalls\": 45990,\n  \"callsToday\": 779,\n  \"failedCallouts24h\": 129,\n  \"totalLicenses\": 120,\n  \"trialsNearLimit\": [\n    {\n      \"clientId\": \"cmvan8c5t1mpf114m8m4guayg\",\n      \"companyName\": \"Person 9\"\n    },\n    {\n      \"clientId\": \"cmt12xvwk0nasmnhxn8dy32hw\",\n      \"companyName\": \"Person 19\"\n    }\n  ],\n  \"clientMetrics\": [\n    {\n      \"clientId\": \"cmvxhxexeakoq7l8f0dbs375i\",\n      \"companyName\": \"Person 4\",\n      \"status\": \"trial\",\n      \"totalCalls\": 0,\n      \"callsToday\": 0,\n      \"failedCallouts24h\": 0,\n      \"totalLicenses\": 1,\n      \"contractRecordedCalls\": 0,\n      \"contractPlatformSyncs\": 0,\n      \"contractRecordingLimit\": 10,\n      \"contractSyncLimit\": 10,\n      \"trialRecordedCalls\": 0,\n      \"trialPlatformSyncs\": 0,\n      \"trialRecordingLimit\": 10,\n      \"trialPlatformSyncLimit\": 10,\n      \"activeIntegrations\": 0,\n      \"syncedRate\": 0\n    }\n  ],\n  \"callRecords\": [\n    {\n      \"id\": \"cmvzb7beochcs7l8fbd9svwlm\",\n      \"calleeId\": \"phone-0000000028\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000028\",\n      \"agent\": \"Person 2\",\n      \"duration\": \"01:23\",\n      \"datetime\": \"2026-11-02T13:41:38.488Z\",\n      \"datetimeLabel\": \"2 Nov 2026 · 07:11 pm\",\n      \"type\": \"Incoming\"\n    }\n  ]\n}"
     },
     {
       "id": "listClients",
@@ -79,7 +87,9 @@
         "items": {
           "$ref": "#/components/schemas/Client"
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "[\n  {\n    \"id\": \"cmvxhxexeakoq7l8f0dbs375i\",\n    \"companyName\": \"Person 4\",\n    \"contactName\": \"Person 22\",\n    \"email\": \"user1@example.test\",\n    \"phone\": \"+910000000001\",\n    \"plan\": \"Trial\",\n    \"status\": \"trial\",\n    \"accessSuspended\": false,\n    \"createdAt\": \"2026-11-01\",\n    \"licenseCount\": 1,\n    \"licenseNumbers\": [\n      \"+910000000001\"\n    ],\n    \"portalAdminMobiles\": [\n      \"+910000000001\"\n    ],\n    \"numbers\": [],\n    \"platforms\": [\n      {\n        \"id\": \"salesforce\",\n        \"name\": \"Salesforce\",\n        \"active\": false\n      },\n      {\n        \"id\": \"zoho\",\n        \"name\": \"Zoho\",\n        \"active\": false\n      },\n      \"… 2 more\"\n    ]\n  }\n]"
     },
     {
       "id": "getClient",
@@ -98,7 +108,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/Client"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"id\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n  \"companyName\": \"Person 3\",\n  \"contactName\": \"Person 5\",\n  \"email\": \"user2@example.test\",\n  \"phone\": \"+910000000002\",\n  \"plan\": \"Trial\",\n  \"status\": \"trial\",\n  \"accessSuspended\": false,\n  \"createdAt\": \"2026-10-26\",\n  \"licenseCount\": 5,\n  \"licenseNumbers\": [\n    \"+910000000003\",\n    \"+910000000004\",\n    \"… 3 more\"\n  ],\n  \"portalAdminMobiles\": [\n    \"+910000000002\"\n  ],\n  \"numbers\": [],\n  \"platforms\": [\n    {\n      \"id\": \"salesforce\",\n      \"name\": \"Salesforce\",\n      \"active\": true,\n      \"connectedAt\": \"2026-10-26\"\n    },\n    {\n      \"id\": \"zoho\",\n      \"name\": \"Zoho\",\n      \"active\": false\n    },\n    \"… 2 more\"\n  ]\n}"
     },
     {
       "id": "getClientTenant",
@@ -117,7 +129,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/Tenant"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/tenant\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"clientId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n  \"viewerTeamMemberId\": null,\n  \"viewerTeamMemberName\": null,\n  \"callRecords\": [\n    {\n      \"id\": \"cmvzagkz1cf5f7l8fchqj1okj\",\n      \"calleeId\": \"phone-0000000008\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000008\",\n      \"agent\": \"Person 1\",\n      \"teamMemberId\": \"cmvs21lit5pja7l8flvsfgi3o\",\n      \"duration\": \"00:33\",\n      \"durationSeconds\": 33,\n      \"datetime\": \"2026-11-02T13:10:40.423Z\",\n      \"datetimeLabel\": \"2 Nov 2026 · 06:40 pm\",\n      \"type\": \"Outgoing\",\n      \"recordingStatus\": \"synced\",\n      \"platformSyncStatus\": \"synced\",\n      \"recordingUnavailableReason\": null,\n      \"recordingPermissionDisabledAt\": null,\n      \"anyIntegrationSynced\": true,\n      \"dispositionLabel\": null,\n      \"dispositionNote\": \"<agent note>\",\n      \"dispositionScheduledAt\": \"2026-11-02T13:23:00.000Z\",\n      \"dispositionDisplayFields\": [\n        {\n          \"slug\": \"project-name\",\n          \"label\": \"Project Name\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"acme-avantara\"\n        },\n        {\n          \"slug\": \"task-subject\",\n          \"label\": \"Task Subject\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"follow-up\"\n        },\n        \"… 5 more\"\n      ],\n      \"aiInsightStatus\": null,\n      \"aiInsightErrorCode\": null,\n      \"aiOverallSentiment\": null,\n      \"aiSentimentScore\": null,\n      \"aiCreditsUsed\": null\n    }\n  ],\n  \"licenses\": [\n    {\n      \"id\": \"cmvs21liw5pjc7l8f4xvu29gy\",\n      \"number\": \"+910000000003\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvs21lit5pja7l8flvsfgi3o\",\n        \"name\": \"Person 1\",\n        \"email\": \"user3@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"28 Oct 2026\",\n      \"lastLoginLabel\": \"28 Oct 2026 · 05:40 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 38,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"2 Nov 2026 · 04:34 pm\",\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"28 Oct 2026 · 05:53 pm\",\n          \"tone\": \"green\",\n          \"icon\": \"outreach\"\n        },\n        \"… 1 more\"\n      ]\n    },\n    {\n      \"id\": \"cmvs21lhf5pii7l8fwnb1iwas\",\n      \"number\": \"+910000000004\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvs21lhc5pig7l8fscoajcp0\",\n        \"name\": \"Person 6\",\n        \"email\": \"user4@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"28 Oct 2026\",\n      \"lastLoginLabel\": \"30 Oct 2026 · 05:12 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 0,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": null,\n          \"at\": null,\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": null,\n          \"at\": null,\n          \"tone\": \"slate\",\n          \"icon\": \"outreach\"\n        },\n        \"… 1 more\"\n      ]\n    },\n    \"… 3 more\"\n  ],\n  \"integrations\": [\n    {\n      \"platformId\": \"salesforce\",\n      \"platformName\": \"Salesforce\",\n      \"active\": true,\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {\n        \"authorizationScheme\": \"Bearer\",\n        \"clientId\": \"\",\n        \"clientSecret\": \"\",\n        \"grantType\": \"refresh_token\",\n        \"tokenUrl\": \"https://login.salesforce.com/services/oauth2/token\",\n        \"refreshToken\": \"\",\n        \"accessToken\": \"\",\n        \"instanceUrl\": \"https://acme.my.salesforce.com\",\n        \"tokenIssuedAt\": \"1793624212006\"\n      },\n      \"authFieldMasks\": {\n        \"clientId\": \"•••\",\n        \"clientSecret\": \"•••\",\n        \"refreshToken\": \"•••\",\n        \"accessToken\": \"•••\"\n      },\n      \"isCustom\": true,\n      \"scheduler\": {\n        \"frequency\": \"realtime\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"connectedAt\": \"2026-10-26\",\n      \"lastHealthCheck\": \"2026-11-02T13:40:42.885Z\"\n    },\n    {\n      \"platformId\": \"zoho\",\n      \"platformName\": \"Zoho\",\n      \"active\": false,\n      \"endpoint\": \"https://hooks.callanchor.io/zoho\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {},\n      \"isCustom\": false,\n      \"scheduler\": {\n        \"frequency\": \"1h\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"lastHealthCheck\": \"2026-11-02T13:41:05.294Z\"\n    }\n  ],\n  \"callAnchorLogs\": [\n    {\n      \"id\": \"cmvzb41d0ch4d7l8ftothpzjf\",\n      \"requestId\": \"cmvzb41cuch4b7l8fdgmtj699\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzb3znjch347l8fh4bl7yzh\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1283,\n      \"at\": \"2026-11-02T13:40:42.852Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzb3znjch347l8fh4bl7yzh\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000009\\\",\\n   …\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000001\\\",\\n  \\\"activityId\\\": \\\"00T000000000000002\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000003\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000001\"\n    },\n    {\n      \"id\": \"cmvzb3kvhch2n7l8f413rj15w\",\n      \"requestId\": \"cmvzb3kvdch2l7l8fcg6zi9ha\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzb3jasch1e7l8fgp4zf6s4\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1076,\n      \"at\": \"2026-11-02T13:40:21.486Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzb3jasch1e7l8fgp4zf6s4\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000010\\\",\\n   …\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000004\\\",\\n  \\\"activityId\\\": \\\"00T000000000000005\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000006\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000004\"\n    },\n    \"… 18 more\"\n  ],\n  \"teamMembers\": [],\n  \"dispositionSettings\": {\n    \"enabled\": true,\n    \"required\": true,\n    \"promptTiming\": \"immediate\",\n    \"allowSkip\": false,\n    \"skipRequiresReason\": true,\n    \"reminderIfIncomplete\": true,\n    \"maxPromptSeconds\": 0,\n    \"presetDispositions\": [\n      {\n        \"id\": \"interested\",\n        \"label\": \"Interested\",\n        \"enabled\": true,\n        \"description\": \"Prospect showed buying intent\"\n      },\n      {\n        \"id\": \"callback\",\n        \"label\": \"Callback scheduled\",\n        \"enabled\": true,\n        \"description\": \"Follow-up time agreed on the call\"\n      },\n      \"… 5 more\"\n    ],\n    \"allowLicenseOverride\": true\n  },\n  \"callCaptureSettings\": {\n    \"defaultPolicy\": \"default_business_allow_personal\",\n    \"allowLicenseOverride\": true,\n    \"recordingEnabled\": true,\n    \"deleteLocalRecording\": false\n  },\n  \"mobileAppSettings\": {\n    \"allowMobileLogout\": true,\n    \"allowLicenseOverride\": true\n  },\n  \"dataRetentionSettings\": {\n    \"preset\": \"day_1\",\n    \"customDays\": null\n  },\n  \"storageSettings\": {\n    \"mode\": \"trial_default\",\n    \"clientStatus\": \"trial\",\n    \"storageChoice\": \"default\",\n    \"ownProvider\": null,\n    \"provider\": \"platform_default\",\n    \"status\": \"draft\",\n    \"bucket\": \"\",\n    \"region\": \"\",\n    \"secretIdMasked\": \"\",\n    \"roleArnMasked\": \"\",\n    \"externalIdMasked\": \"\",\n    \"kmsKeyId\": \"\",\n    \"lastValidatedAt\": null,\n    \"lastError\": null,\n    \"migrationQueued\": 0,\n    \"migrationDone\": 0,\n    \"migrationFailed\": 0,\n    \"callAnchorAccountId\": \"YOUR_CALL_ANCHOR_AWS_ACCOUNT_ID\"\n  },\n  \"trialRecordedCalls\": 8,\n  \"trialPendingRecordings\": 2,\n  \"trialRecordingLimit\": 250,\n  \"trialPlatformSyncs\": 17,\n  \"trialPlatformSyncLimit\": 250,\n  \"trialRecordingAtLimit\": false,\n  \"trialExpiresAt\": \"2026-11-16T00:00:00.000Z\",\n  \"trialDaysRemaining\": 14,\n  \"trialExpired\": false,\n  \"contractRecordedCalls\": 8,\n  \"contractPendingRecordings\": 2,\n  \"contractRecordingLimit\": 250,\n  \"contractRecordingUnlimited\": false,\n  \"contractPlatformSyncs\": 17,\n  \"contractSyncLimit\": 250,\n  \"contractSyncUnlimited\": false,\n  \"contractRecordingAtLimit\": false,\n  \"contractLicenseCount\": 5,\n  \"contractLicenseActiveCount\": 5,\n  \"contractLicenseLimit\": 5,\n  \"contractLicenseUnlimited\": false,\n  \"contractLicenseAtLimit\": true,\n  \"contractLicenseOverCap\": false,\n  \"contractLicenseActivationLocked\": false,\n  \"contractLicenseOverBy\": 0,\n  \"contractSeatCompliancePhase\": \"compliant\",\n  \"contractSeatGraceEndsAt\": null,\n  \"contractSeatGracePeriodHours\": 24,\n  \"contractIntegrationCount\": 1,\n  \"contractIntegrationLimit\": 2,\n  \"contractIntegrationUnlimited\": false,\n  \"contractIntegrationAtLimit\": false,\n  \"trialRecordingRetentionHeld\": false,\n  \"trialRecordingDeletionDueAt\": \"2026-11-22T00:00:00.000Z\",\n  \"trialRecordingAccessRevoked\": false,\n  \"updatedAt\": \"2026-11-02T13:40:41.514Z\"\n}"
     },
     {
       "id": "listClientIntegrations",
@@ -154,7 +168,9 @@
             }
           }
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/integrations\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"configs\": [\n    {\n      \"platformId\": \"salesforce\",\n      \"platformName\": \"Salesforce\",\n      \"active\": true,\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {\n        \"authorizationScheme\": \"Bearer\",\n        \"clientId\": \"\",\n        \"clientSecret\": \"\",\n        \"grantType\": \"refresh_token\",\n        \"tokenUrl\": \"https://login.salesforce.com/services/oauth2/token\",\n        \"refreshToken\": \"\",\n        \"accessToken\": \"\",\n        \"instanceUrl\": \"https://acme.my.salesforce.com\",\n        \"tokenIssuedAt\": \"1793624212006\"\n      },\n      \"authFieldMasks\": {\n        \"clientId\": \"•••\",\n        \"clientSecret\": \"•••\",\n        \"refreshToken\": \"•••\",\n        \"accessToken\": \"•••\"\n      },\n      \"isCustom\": true,\n      \"scheduler\": {\n        \"frequency\": \"realtime\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"connectedAt\": \"2026-10-26\",\n      \"lastHealthCheck\": \"2026-11-02T13:42:04.423Z\"\n    },\n    {\n      \"platformId\": \"zoho\",\n      \"platformName\": \"Zoho\",\n      \"active\": false,\n      \"endpoint\": \"https://hooks.callanchor.io/zoho\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {},\n      \"isCustom\": false,\n      \"scheduler\": {\n        \"frequency\": \"1h\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"lastHealthCheck\": \"2026-11-02T13:42:39.865Z\"\n    }\n  ],\n  \"logs\": []\n}"
     },
     {
       "id": "getDispositionFormFields",
@@ -191,7 +207,9 @@
             }
           }
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/disposition-form-fields\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"fields\": [\n    {\n      \"id\": \"cmvqbp2f44n6q7l8fj031fdt1\",\n      \"slug\": \"project-name\",\n      \"label\": \"Project Name\",\n      \"type\": \"single_select\",\n      \"required\": false,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 0,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"ABHIMAAN HOMES\",\n            \"value\": \"abhimaan-homes\"\n          },\n          {\n            \"label\": \"Anarock Commercial\",\n            \"value\": \"anarock-commercial\"\n          },\n          \"… 1 more\"\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvpbtntg4hbr7l8fhvia1hev\",\n      \"slug\": \"task-subject\",\n      \"label\": \"Task Subject\",\n      \"type\": \"single_select\",\n      \"required\": true,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 1,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"Virtual Meeting\",\n            \"value\": \"virtual-meeting\"\n          },\n          {\n            \"label\": \"Follow Up\",\n            \"value\": \"follow-up\"\n          },\n          \"… 1 more\"\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    \"… 6 more\"\n  ],\n  \"presets\": [\n    {\n      \"id\": \"cmvp1b1fv43jt7l8fqhuu5r1y\",\n      \"slug\": \"interested\",\n      \"label\": \"Interested\",\n      \"description\": \"Prospect showed buying intent\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 0\n    },\n    {\n      \"id\": \"cmvp1b1fv43ju7l8fx6muwoel\",\n      \"slug\": \"callback\",\n      \"label\": \"Callback scheduled\",\n      \"description\": \"Follow-up time agreed on the call\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 1\n    },\n    \"… 5 more\"\n  ]\n}"
     },
     {
       "id": "listCallContacts",
@@ -218,7 +236,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/CallContacts"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/call-contacts?page=1&limit=50\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"items\": [\n    {\n      \"calleeId\": \"phone-0000000008\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000008\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:33\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 06:40 pm\",\n      \"lastDatetime\": \"2026-11-02T13:10:40.423Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000025\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000025\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"05:45\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 06:34 pm\",\n      \"lastDatetime\": \"2026-11-02T13:04:23.115Z\",\n      \"typesPresent\": [\n        \"Incoming\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    \"… 8 more\"\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 124,\n    \"totalPages\": 13,\n    \"hasMore\": true\n  },\n  \"stats\": {\n    \"totalCalls\": 155,\n    \"uniqueContacts\": 124,\n    \"incoming\": 15,\n    \"outgoing\": 133,\n    \"missed\": 7,\n    \"rejected\": 0,\n    \"answerRate\": 95,\n    \"missedRate\": 5,\n    \"rejectedRate\": 0\n  },\n  \"agents\": [\n    \"Person 8\",\n    \"Person 10\",\n    \"… 4 more\"\n  ]\n}"
     },
     {
       "id": "getRecordingLink",
@@ -262,7 +282,9 @@
             "format": "date-time"
           }
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/calls/$CALL_ID/recording-link\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"callId\": \"cmvzbekinciv37l8fvzx1y6e0\",\n  \"recordingStatus\": \"synced\",\n  \"url\": \"https://recordings.example.test/file.m4a?X-Amz-Signature=REDACTED\",\n  \"expiresAt\": \"2026-11-02T13:54:31.739Z\"\n}"
     },
     {
       "id": "listCalloutLogs",
@@ -289,7 +311,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/CalloutLogs"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/callout-logs?page=1&limit=50\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"items\": [\n    {\n      \"id\": \"cmvzbpwf0cjmj7l8f73937y36\",\n      \"requestId\": \"cmvzbpwewcjmh7l8fy243yjmk\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzbpv0ccjkk7l8f20vo9j3m\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 973,\n      \"at\": \"2026-11-02T13:57:42.876Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbpv0ccjkk7l8f20vo9j3m\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000039\\\",\\n   …\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000055\\\",\\n  \\\"activityId\\\": \\\"00T000000000000056\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000057\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000055\"\n    },\n    {\n      \"id\": \"cmvzbos88cjk37l8fsmg89ujf\",\n      \"requestId\": \"cmvzbos85cjk17l8fszc7082q\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzboqkhcjis7l8fmkluleyh\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1251,\n      \"at\": \"2026-11-02T13:56:50.793Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzboqkhcjis7l8fmkluleyh\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000040\\\",\\n   …\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000058\\\",\\n  \\\"activityId\\\": \\\"00T000000000000059\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000060\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000058\"\n    },\n    \"… 8 more\"\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 253,\n    \"totalPages\": 26,\n    \"hasMore\": true\n  },\n  \"aggregate\": {\n    \"total\": 253,\n    \"delivered\": 109,\n    \"failed\": 144,\n    \"retrying\": 0,\n    \"queued\": 0,\n    \"successRate\": 43,\n    \"avgDurationMs\": 525\n  }\n}"
     },
     {
       "id": "getAnchorLog",
@@ -312,7 +336,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/AnchorLog"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/anchor-logs/$REQUEST_ID\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"request\": {\n    \"id\": \"cmvzbifjjcj4i7l8f1ech7djk\",\n    \"status\": \"delivered\",\n    \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n    \"payloadJson\": {\n      \"call\": {\n        \"id\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n        \"callType\": \"Outgoing\",\n        \"agentName\": \"Person 1\",\n        \"startedAt\": \"2026-11-02T11:46:15.010Z\",\n        \"calleeName\": \"Unknown\",\n        \"agentNumber\": \"+910000000003\",\n        \"calleePhone\": \"+910000000029\",\n        \"recordingUrl\": null,\n        \"dispositionNote\": \"<agent note>\",\n        \"durationSeconds\": 0,\n        \"dispositionLabel\": null,\n        \"dispositionScheduledAt\": \"2026-11-03T04:30:00.000Z\"\n      },\n      \"event\": \"call.completed\",\n      \"disposition\": {\n        \"fields\": {\n          \"note\": \"<agent note>\",\n          \"priority\": \"high\",\n          \"project-name\": \"acme-avantara\",\n          \"scheduled-at\": \"2026-11-03T04:30:00.000Z\",\n          \"task-subject\": \"follow-up\",\n          \"next-action-status\": \"follow-up\",\n          \"call-meeting-status\": \"not-connected\"\n        },\n        \"submittedAt\": \"2026-11-02T13:51:53.076Z\"\n      },\n      \"hasRecording\": false\n    },\n    \"attemptCount\": 1,\n    \"eventType\": \"call_completed\",\n    \"createdAt\": \"2026-11-02T13:51:54.415Z\",\n    \"completedAt\": \"2026-11-02T13:51:54.414Z\"\n  },\n  \"events\": [\n    {\n      \"id\": \"cmvzbifjncj4k7l8f17vznwjn\",\n      \"requestId\": \"cmvzbifjjcj4i7l8f1ech7djk\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 627,\n      \"at\": \"2026-11-02T13:51:54.419Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbiegfcj3o7l8fif9i8sfq\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000029\\\",\\n   …\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000052\\\",\\n  \\\"activityId\\\": \\\"00T000000000000053\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000054\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000052\"\n    }\n  ],\n  \"call\": {\n    \"callRecordId\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n    \"calleeId\": \"phone-0000000029\",\n    \"calleeName\": \"Unknown\",\n    \"calleePhone\": \"+910000000029\",\n    \"agentName\": \"Person 1\",\n    \"callType\": \"Outgoing\",\n    \"durationLabel\": \"00:00\",\n    \"callRecordAvailable\": true\n  },\n  \"platform\": {\n    \"slug\": \"salesforce\",\n    \"name\": \"Salesforce\",\n    \"isCustom\": true\n  }\n}"
     },
     {
       "id": "getOneApiStatus",
@@ -331,7 +357,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/OneApiStatus"
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/oneapi/status\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"linked\": true,\n  \"oneApiClientId\": \"6adf188fcdc09b4011badea5\",\n  \"assignProductStatus\": \"completed\",\n  \"cachedLicenseSeats\": -1,\n  \"licenseSeatsFetchedAt\": \"2026-11-02T13:49:40.632Z\",\n  \"cachedTrialExpiresAt\": \"2026-11-16T00:00:00.000Z\",\n  \"licenseCount\": 5,\n  \"accountStatus\": \"trial\",\n  \"clientStatus\": \"trial\",\n  \"backfillRecommended\": false\n}"
     },
     {
       "id": "backfillOneApi",
@@ -350,7 +378,9 @@
       ],
       "schema": {
         "$ref": "#/components/schemas/OneApiBackfill"
-      }
+      },
+      "curl": "curl -s -X POST \"https://app.360callanchor.com/api/clients/$CLIENT_ID/oneapi/backfill\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{}'",
+      "sample": "{\n  \"action\": \"refreshed\",\n  \"clientId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n  \"oneApiClientId\": \"6adf188fcdc09b4011badea5\",\n  \"assignProductStatus\": \"completed\",\n  \"assignSucceeded\": true,\n  \"licenseSeats\": -1,\n  \"licenseCount\": 5\n}"
     },
     {
       "id": "listSystemLogs",
@@ -392,7 +422,9 @@
             "$ref": "#/components/schemas/Pagination"
           }
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/support/logs?page=1&limit=50\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"items\": [\n    {\n      \"id\": \"cmvzb7bp9chd67l8f0i1a0ial\",\n      \"occurredAt\": \"2026-11-02T13:43:16.221Z\",\n      \"category\": \"mobile\",\n      \"severity\": \"info\",\n      \"source\": \"mobile.recording.upload-init\",\n      \"clientId\": \"cmt1mg1rf00v9caa5hlyidcvb\",\n      \"actorType\": \"mobile\",\n      \"actorId\": \"cmu1b7jge2ggmewwgk4a1xzw1\",\n      \"actorEmail\": null,\n      \"correlationId\": \"dedff484-667d-4baf-a7b9-f2b3d8b2aa11\",\n      \"resourceType\": \"call_record\",\n      \"resourceId\": \"cmvzb7beochcs7l8fbd9svwlm\",\n      \"httpMethod\": null,\n      \"httpPath\": null,\n      \"httpStatus\": null,\n      \"durationMs\": null,\n      \"message\": \"Recording upload session initialized\",\n      \"metadata\": {\n        \"s3Key\": \"client/cmt1mg1rf00v9caa5hlyidcvb/team/cmu1b7jgb2ggkewwgbgyah8ip/call/cmvzb7beochcs7l8fbd9svwlm/1793626996155-1cabd951.mp3\",\n        \"fileSizeBytes\": 334176,\n        \"uploadSessionId\": \"ddf1f0b4-61f4-49ff-a69e-74bfba72ed93\"\n      },\n      \"ipAddress\": \"203.0.113.1\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 14629,\n    \"totalPages\": 293,\n    \"hasMore\": true\n  }\n}"
     },
     {
       "id": "listAuditLogs",
@@ -434,7 +466,427 @@
             "$ref": "#/components/schemas/Pagination"
           }
         }
-      }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/support/audit-logs?page=1&limit=50\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"items\": [\n    {\n      \"id\": \"cmvz9uv29cezh7l8f5jgukrjk\",\n      \"clientId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n      \"actorUserId\": \"cmv7oet8a41au11mm8r3llkmf\",\n      \"actorEmail\": \"user8@example.test\",\n      \"actorType\": \"support\",\n      \"actorDisplayName\": \"Person 25\",\n      \"action\": \"sync\",\n      \"resourceType\": \"integration\",\n      \"resourceId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n      \"correlationId\": \"7f5ec7fd-76dc-41ca-96dc-60305fe139d4\",\n      \"metadata\": {\n        \"event\": \"manual_sync_all\",\n        \"totals\": {\n          \"failed\": 19,\n          \"synced\": 0,\n          \"blocked\": 0,\n          \"processed\": 19\n        },\n        \"platforms\": [\n          \"salesforce\"\n        ]\n      },\n      \"ipAddress\": \"203.0.113.3\",\n      \"occurredAt\": \"2026-11-02T13:05:35.169Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 79,\n    \"totalPages\": 2,\n    \"hasMore\": true\n  }\n}"
+    },
+    {
+      "id": "getAuditLog",
+      "method": "get",
+      "path": "/api/support/audit-logs/{auditLogId}",
+      "tag": "Logs",
+      "summary": "One audit log entry",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "auditLogId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/AuditLog"
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/support/audit-logs/$AUDIT_LOG_ID\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"id\": \"cmw2162e12n18gem6a3y5mhkm\",\n  \"clientId\": \"cmus74leshej2ewwgii5qaycf\",\n  \"actorUserId\": \"cmuzm44sk0q6b8tpxnycdngly\",\n  \"actorEmail\": \"user54@example.test\",\n  \"actorType\": null,\n  \"actorDisplayName\": null,\n  \"action\": \"login\",\n  \"resourceType\": \"portal_user\",\n  \"resourceId\": \"cmuzm44sk0q6b8tpxnycdngly\",\n  \"correlationId\": null,\n  \"metadata\": null,\n  \"ipAddress\": null,\n  \"occurredAt\": \"2026-11-04T11:25:39.865Z\"\n}"
+    },
+    {
+      "id": "getAuthMe",
+      "method": "get",
+      "path": "/api/auth/me",
+      "tag": "Auth",
+      "summary": "The signed-in user, with role, permissions and log access",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [],
+      "schema": {
+        "type": "object",
+        "required": [
+          "authenticated",
+          "profile"
+        ],
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/PortalUser"
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/auth/me\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"authenticated\": true,\n  \"profile\": {\n    \"kind\": \"support\",\n    \"supportUserId\": \"cmsyix18z0cu010ngtzobg0nf\",\n    \"portalUserId\": \"cmsyix18w0cty10ngdavp4ppz\",\n    \"name\": \"Person 51\",\n    \"email\": \"user51@example.test\",\n    \"mobile\": \"+910000009001\",\n    \"profileImageUrl\": \"/uploads/profile-images/redacted.jpg\",\n    \"roleId\": \"support_agent\",\n    \"permissions\": [\n      \"clients:read\",\n      \"clients:write\",\n      \"… 2 more\"\n    ],\n    \"logAccess\": {\n      \"canViewSystemLogs\": true,\n      \"canViewAuditLogs\": true\n    }\n  }\n}"
+    },
+    {
+      "id": "getLatestAppBuild",
+      "method": "get",
+      "path": "/api/app-build/latest",
+      "tag": "App",
+      "summary": "The active Android app release",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [],
+      "schema": {
+        "type": "object",
+        "required": [
+          "release"
+        ],
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/AppRelease"
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/app-build/latest\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"release\": {\n    \"id\": \"cmtv7z3s907zvewwgn4ger641\",\n    \"version\": \"1.0.6\",\n    \"downloadUrl\": \"https://downloads.example.test/callanchor.apk\",\n    \"qrImageUrl\": \"https://downloads.example.test/callanchor-qr.png\",\n    \"notes\": null,\n    \"isActive\": true,\n    \"createdAt\": \"2026-09-10T07:42:24.490Z\",\n    \"uploadedBy\": {\n      \"id\": \"cmrajg5ki001pct84lxmtpl6v\",\n      \"email\": \"user52@example.test\",\n      \"name\": \"Person 52\"\n    }\n  }\n}"
+    },
+    {
+      "id": "getOnboardingProgress",
+      "method": "get",
+      "path": "/api/clients/{clientId}/onboarding-progress",
+      "tag": "Clients",
+      "summary": "Onboarding steps a client has completed",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "steps",
+          "welcomeDismissed",
+          "portalTourCompleted"
+        ],
+        "properties": {
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "stepKey"
+              ],
+              "properties": {
+                "stepKey": {
+                  "type": "string",
+                  "description": "Seen: mobile_login"
+                },
+                "completedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "welcomeDismissed": {
+            "type": "boolean"
+          },
+          "portalTourCompleted": {
+            "type": "boolean"
+          },
+          "termsAcceptedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/onboarding-progress\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"steps\": [\n    {\n      \"stepKey\": \"mobile_login\",\n      \"completedAt\": \"2026-10-23T06:52:09.899Z\"\n    },\n    {\n      \"stepKey\": \"first_call\",\n      \"completedAt\": \"2026-10-23T06:56:46.861Z\"\n    },\n    \"… 1 more\"\n  ],\n  \"welcomeDismissed\": false,\n  \"portalTourCompleted\": false,\n  \"termsAcceptedAt\": null\n}"
+    },
+    {
+      "id": "listPortalAdmins",
+      "method": "get",
+      "path": "/api/clients/{clientId}/portal-admins",
+      "tag": "Clients",
+      "summary": "A client's customer-portal admins",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "admins"
+        ],
+        "properties": {
+          "admins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortalAdmin"
+            }
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/portal-admins\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"admins\": [\n    {\n      \"portalUserId\": \"cmuvbsy3d0ii9bmk6w5qu044i\",\n      \"teamMemberId\": \"cmuvbsy3i0iibbmk6nbzn6ihg\",\n      \"name\": \"Person 53\",\n      \"email\": \"user53@example.test\",\n      \"mobile\": \"+910000009002\",\n      \"licenseNumber\": null,\n      \"isActive\": true,\n      \"lastLoginAt\": null,\n      \"createdAt\": \"2026-10-05T14:09:17.977Z\"\n    },\n    {\n      \"portalUserId\": \"cmuzm44sk0q6b8tpxnycdngly\",\n      \"teamMemberId\": \"cmuzm44sp0q6d8tpxposla2ip\",\n      \"name\": \"Person 54\",\n      \"email\": \"user54@example.test\",\n      \"mobile\": \"+910000009003\",\n      \"licenseNumber\": null,\n      \"isActive\": true,\n      \"lastLoginAt\": \"2026-11-04T11:25:39.860Z\",\n      \"createdAt\": \"2026-10-08T14:09:00.741Z\"\n    }\n  ]\n}"
+    },
+    {
+      "id": "listNotifications",
+      "method": "get",
+      "path": "/api/clients/{clientId}/notifications",
+      "tag": "Clients",
+      "summary": "A client's portal notifications",
+      "safety": "read",
+      "paginated": true,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "page",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "notifications",
+          "unreadCount",
+          "pagination"
+        ],
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {}
+          },
+          "unreadCount": {
+            "type": "integer"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/notifications?page=1&limit=50\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"notifications\": [],\n  \"unreadCount\": 0,\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0,\n    \"hasMore\": false\n  }\n}"
+    },
+    {
+      "id": "getAiCredits",
+      "method": "get",
+      "path": "/api/clients/{clientId}/ai-credits",
+      "tag": "Clients",
+      "summary": "AI credit balance, entitlements and purchase history",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "from",
+          "in": "query"
+        },
+        {
+          "name": "to",
+          "in": "query"
+        },
+        {
+          "name": "cursor",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/AiCredits"
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/ai-credits\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"balance\": 0,\n  \"purchasedCredits\": 0,\n  \"creditsUsed\": 0,\n  \"usagePercent\": null,\n  \"allotmentEpoch\": 1,\n  \"overdrawnBy\": 0,\n  \"licenses\": [],\n  \"entitlements\": {\n    \"aiInsightsOptIn\": false,\n    \"accountStatus\": \"purchased\",\n    \"isTrial\": false,\n    \"aiAllowed\": false\n  },\n  \"purchaseChanges\": [],\n  \"purchaseChangesNextCursor\": null\n}"
+    },
+    {
+      "id": "listDispositionSets",
+      "method": "get",
+      "path": "/api/clients/{clientId}/disposition-sets",
+      "tag": "Clients",
+      "summary": "Disposition form sets, with field and license counts",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "sets"
+        ],
+        "properties": {
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionSet"
+            }
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/disposition-sets\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"sets\": [\n    {\n      \"id\": \"c4771f8d3aee42c891631d98fe442a20\",\n      \"name\": \"Org default\",\n      \"tag\": null,\n      \"isDefault\": true,\n      \"sortOrder\": 0,\n      \"activeFieldCount\": 2,\n      \"licenseCount\": 0,\n      \"createdAt\": \"2026-11-03T17:39:35.770Z\",\n      \"updatedAt\": \"2026-11-03T17:39:35.770Z\"\n    }\n  ]\n}"
+    },
+    {
+      "id": "getLicenseSeatCompliance",
+      "method": "get",
+      "path": "/api/clients/{clientId}/license-seat-compliance",
+      "tag": "Licenses",
+      "summary": "Whether active licenses are within the contracted seat limit",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "$ref": "#/components/schemas/SeatCompliance"
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/license-seat-compliance\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"phase\": \"compliant\",\n  \"total\": 0,\n  \"activeCount\": 0,\n  \"limit\": 5,\n  \"overBy\": 0,\n  \"overCap\": false,\n  \"activationLocked\": false,\n  \"seatGraceStartedAt\": null,\n  \"seatGraceEndsAt\": null,\n  \"seatGracePeriodHours\": 24,\n  \"recommendations\": []\n}"
+    },
+    {
+      "id": "getLicenseSeatSettings",
+      "method": "get",
+      "path": "/api/clients/{clientId}/license-seat-settings",
+      "tag": "Licenses",
+      "summary": "The grace period allowed when licenses exceed the seat limit",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "seatGracePeriodHours",
+          "minHours",
+          "maxHours"
+        ],
+        "properties": {
+          "seatGracePeriodHours": {
+            "type": "integer"
+          },
+          "seatGraceStartedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seatGraceEndsAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minHours": {
+            "type": "integer"
+          },
+          "maxHours": {
+            "type": "integer"
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/license-seat-settings\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"seatGracePeriodHours\": 24,\n  \"seatGraceStartedAt\": null,\n  \"seatGraceEndsAt\": null,\n  \"minHours\": 1,\n  \"maxHours\": 168\n}"
+    },
+    {
+      "id": "getCallee",
+      "method": "get",
+      "path": "/api/clients/{clientId}/callees/{calleeId}",
+      "tag": "Calls",
+      "summary": "One contact with call stats and every call to or from them",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "calleeId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "profile"
+        ],
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/Callee"
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/callees/$CALLEE_ID\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"profile\": {\n    \"id\": \"phone-0000009004\",\n    \"name\": \"Person 55\",\n    \"phone\": \"+910000009004\",\n    \"stats\": {\n      \"total\": 1,\n      \"incoming\": 0,\n      \"missed\": 0,\n      \"outgoing\": 1,\n      \"rejected\": 0\n    },\n    \"logs\": [\n      {\n        \"id\": \"cmvkma22v1aei7l8fmykwby0c\",\n        \"time\": \"12:26 pm\",\n        \"date\": \"2026-10-23\",\n        \"dayLabel\": \"FRI\",\n        \"type\": \"Outgoing\",\n        \"agent\": \"Person 56\",\n        \"duration\": \"00:05\",\n        \"durationSeconds\": 5,\n        \"recordingStatus\": \"synced\",\n        \"platformSyncStatus\": \"synced\",\n        \"recordingUnavailableReason\": null,\n        \"recordingPermissionDisabledAt\": null,\n        \"dispositionLabel\": \"Interested\",\n        \"dispositionNote\": null,\n        \"dispositionScheduledAt\": null,\n        \"dispositionDisplayFields\": [\n          {\n            \"slug\": \"select-calling-agent\",\n            \"label\": \"Select Calling Agent\",\n            \"type\": \"single_select\",\n            \"displayValue\": \"test-1\"\n          },\n          {\n            \"slug\": \"outcome\",\n            \"label\": \"Outcome\",\n            \"type\": \"preset\",\n            \"displayValue\": \"Interested\"\n          }\n        ],\n        \"recordingSynced\": false,\n        \"recordingDeleted\": false,\n        \"recordingAvailable\": false,\n        \"aiInsightStatus\": null,\n        \"aiInsightErrorCode\": null,\n        \"aiOverallSentiment\": null,\n        \"aiSentimentScore\": null,\n        \"aiCreditsUsed\": null\n      }\n    ]\n  }\n}"
+    },
+    {
+      "id": "getCallAiInsights",
+      "method": "get",
+      "path": "/api/clients/{clientId}/calls/{callId}/ai-insights",
+      "tag": "Calls",
+      "summary": "A call's AI sentiment, summary and next actions",
+      "safety": "read",
+      "paginated": false,
+      "verified": "2026-11-05",
+      "params": [
+        {
+          "name": "clientId",
+          "in": "path"
+        },
+        {
+          "name": "callId",
+          "in": "path"
+        }
+      ],
+      "schema": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CallAiInsights"
+          }
+        }
+      },
+      "curl": "curl -s \"https://app.360callanchor.com/api/clients/$CLIENT_ID/calls/$CALL_ID/ai-insights\" \\\n  -H \"Cookie: callanchor_portal_session=$CALLANCHOR_SESSION\"",
+      "sample": "{\n  \"data\": {\n    \"callRecordId\": \"cmvkma22v1aei7l8fmykwby0c\",\n    \"status\": \"queued\",\n    \"overallSentiment\": null,\n    \"sentimentScore\": null,\n    \"customerTone\": null,\n    \"agentTone\": null,\n    \"sentimentTimeline\": [],\n    \"sentimentDrivers\": [],\n    \"momSummary\": null,\n    \"momKeyPoints\": [],\n    \"nextActions\": [],\n    \"languageCode\": null,\n    \"errorCode\": null,\n    \"errorMessage\": null,\n    \"completedAt\": null,\n    \"segments\": [],\n    \"agentName\": \"Person 56\",\n    \"calleeName\": \"Person 55\",\n    \"calleePhone\": \"+910000009004\",\n    \"durationLabel\": \"00:05\",\n    \"startedAt\": \"2026-10-23T06:56:20.470Z\",\n    \"missing\": true\n  }\n}"
     }
   ],
   "components": {
@@ -846,6 +1298,9 @@
             "type": "string",
             "description": "mm:ss"
           },
+          "durationSeconds": {
+            "type": "integer"
+          },
           "datetime": {
             "type": "string",
             "format": "date-time"
@@ -864,8 +1319,50 @@
           "platformSyncStatus": {
             "type": "string"
           },
+          "recordingUnavailableReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recordingPermissionDisabledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "anyIntegrationSynced": {
             "type": "boolean"
+          },
+          "aiInsightStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiInsightErrorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiOverallSentiment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiSentimentScore": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "aiCreditsUsed": {
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "dispositionLabel": {
             "type": [
@@ -1362,6 +1859,16 @@
           },
           "usageCount": {
             "type": "integer"
+          },
+          "setMembershipCount": {
+            "type": "integer",
+            "description": "How many disposition sets include this field"
+          },
+          "setNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -1443,6 +1950,9 @@
               "maxPromptSeconds": {
                 "type": "integer"
               },
+              "allowLicenseOverride": {
+                "type": "boolean"
+              },
               "presetDispositions": {
                 "type": "array",
                 "items": {
@@ -1461,6 +1971,9 @@
                 "type": "boolean"
               },
               "recordingEnabled": {
+                "type": "boolean"
+              },
+              "deleteLocalRecording": {
                 "type": "boolean"
               }
             }
@@ -1743,6 +2256,30 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "latestAiInsightStatus": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "latestAiInsightErrorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "latestAiOverallSentiment": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "latestAiCreditsUsed": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               }
             }
@@ -2315,6 +2852,570 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AppRelease": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "downloadUrl",
+          "isActive",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "qrImageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uploadedBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "PortalAdmin": {
+        "type": "object",
+        "required": [
+          "portalUserId",
+          "name",
+          "email",
+          "isActive"
+        ],
+        "properties": {
+          "portalUserId": {
+            "type": "string"
+          },
+          "teamMemberId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "mobile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "licenseNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "lastLoginAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AiCredits": {
+        "type": "object",
+        "required": [
+          "balance",
+          "purchasedCredits",
+          "creditsUsed",
+          "entitlements"
+        ],
+        "properties": {
+          "balance": {
+            "type": "number"
+          },
+          "purchasedCredits": {
+            "type": "number"
+          },
+          "creditsUsed": {
+            "type": "number"
+          },
+          "usagePercent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "allotmentEpoch": {
+            "type": "integer"
+          },
+          "overdrawnBy": {
+            "type": "number"
+          },
+          "licenses": {
+            "type": "array",
+            "items": {}
+          },
+          "entitlements": {
+            "type": "object",
+            "properties": {
+              "aiInsightsOptIn": {
+                "type": "boolean"
+              },
+              "accountStatus": {
+                "type": "string",
+                "description": "Seen: purchased"
+              },
+              "isTrial": {
+                "type": "boolean"
+              },
+              "aiAllowed": {
+                "type": "boolean"
+              }
+            }
+          },
+          "purchaseChanges": {
+            "type": "array",
+            "items": {}
+          },
+          "purchaseChangesNextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DispositionSet": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "isDefault"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "activeFieldCount": {
+            "type": "integer"
+          },
+          "licenseCount": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SeatCompliance": {
+        "type": "object",
+        "required": [
+          "phase",
+          "total",
+          "activeCount",
+          "limit",
+          "overBy",
+          "overCap",
+          "activationLocked"
+        ],
+        "properties": {
+          "phase": {
+            "type": "string",
+            "description": "Seen: compliant"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "activeCount": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "overBy": {
+            "type": "integer"
+          },
+          "overCap": {
+            "type": "boolean"
+          },
+          "activationLocked": {
+            "type": "boolean"
+          },
+          "seatGraceStartedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seatGraceEndsAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seatGracePeriodHours": {
+            "type": "integer"
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {}
+          }
+        }
+      },
+      "CalleeCall": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "agent",
+          "duration"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string",
+            "description": "Display label in IST"
+          },
+          "date": {
+            "type": "string",
+            "description": "Display label in IST"
+          },
+          "dayLabel": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Seen: Outgoing"
+          },
+          "agent": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string",
+            "description": "mm:ss"
+          },
+          "durationSeconds": {
+            "type": "integer"
+          },
+          "recordingStatus": {
+            "type": "string"
+          },
+          "platformSyncStatus": {
+            "type": "string"
+          },
+          "recordingUnavailableReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recordingPermissionDisabledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionScheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dispositionDisplayFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "displayValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "recordingSynced": {
+            "type": "boolean"
+          },
+          "recordingDeleted": {
+            "type": "boolean"
+          },
+          "recordingAvailable": {
+            "type": "boolean"
+          },
+          "aiInsightStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiInsightErrorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiOverallSentiment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiSentimentScore": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "aiCreditsUsed": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      },
+      "Callee": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "stats",
+          "logs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "incoming": {
+                "type": "integer"
+              },
+              "missed": {
+                "type": "integer"
+              },
+              "outgoing": {
+                "type": "integer"
+              },
+              "rejected": {
+                "type": "integer"
+              }
+            }
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalleeCall"
+            }
+          }
+        }
+      },
+      "CallAiInsights": {
+        "type": "object",
+        "required": [
+          "callRecordId",
+          "status",
+          "missing"
+        ],
+        "properties": {
+          "callRecordId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Seen: queued"
+          },
+          "overallSentiment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sentimentScore": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "customerTone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agentTone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sentimentTimeline": {
+            "type": "array",
+            "items": {}
+          },
+          "sentimentDrivers": {
+            "type": "array",
+            "items": {}
+          },
+          "momSummary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Minutes of the meeting"
+          },
+          "momKeyPoints": {
+            "type": "array",
+            "items": {}
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {}
+          },
+          "languageCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorMessage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segments": {
+            "type": "array",
+            "items": {}
+          },
+          "agentName": {
+            "type": "string"
+          },
+          "calleeName": {
+            "type": "string"
+          },
+          "calleePhone": {
+            "type": "string"
+          },
+          "durationLabel": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "missing": {
+            "type": "boolean"
           }
         }
       }

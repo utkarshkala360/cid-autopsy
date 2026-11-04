@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "stepKey": "mobile_login",
+      "completedAt": "2026-10-23T06:52:09.899Z"
+    },
+    {
+      "stepKey": "first_call",
+      "completedAt": "2026-10-23T06:56:46.861Z"
+    },
+    {
+      "stepKey": "first_recording_synced",
+      "completedAt": "2026-10-23T06:56:47.658Z"
+    }
+  ],
+  "welcomeDismissed": false,
+  "portalTourCompleted": false,
+  "termsAcceptedAt": null
+}

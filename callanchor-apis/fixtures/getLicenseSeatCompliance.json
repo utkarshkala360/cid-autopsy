@@ -1,0 +1,13 @@
+{
+  "phase": "compliant",
+  "total": 0,
+  "activeCount": 0,
+  "limit": 5,
+  "overBy": 0,
+  "overCap": false,
+  "activationLocked": false,
+  "seatGraceStartedAt": null,
+  "seatGraceEndsAt": null,
+  "seatGracePeriodHours": 24,
+  "recommendations": []
+}

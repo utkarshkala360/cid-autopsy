@@ -19,6 +19,7 @@ const tracked = [
   "openapi/callanchor.openapi.yaml",
   "postman/callanchor.postman_collection.json",
   "postman/callanchor.postman_environment.json",
+  "docs/api-reference.md",
 ];
 
 for (const file of tracked) {

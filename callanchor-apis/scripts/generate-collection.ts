@@ -1,9 +1,9 @@
 // Generates the Postman collection from the OpenAPI contract.
 // Edit the contract, then run: npm run generate:postman
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { operations, type Operation } from "../src/spec.ts";
 
-const TAGS = ["Auth", "Fleet", "Clients", "Calls", "Sync", "Logs", "OneAPI"];
+const TAGS = ["Auth", "Fleet", "Clients", "Licenses", "Calls", "Sync", "Logs", "OneAPI", "App"];
 const BODIES: Record<string, string> = {
   sendOtp: '{\n  "identifier": "{{mobile}}",\n  "mode": "mobile"\n}',
   verifyOtp: '{\n  "identifier": "{{mobile}}",\n  "mode": "mobile",\n  "otp": "{{otp}}"\n}',
@@ -39,11 +39,17 @@ function tests(op: Operation): string[] {
 function item(op: Operation) {
   const query = op.params.filter((p) => p.in === "query").map((p) => ({
     key: p.name,
-    value: p.name === "page" ? "1" : p.name === "limit" ? "50" : "{{clientId}}",
-    disabled: p.name === "clientId",
+    value: p.name === "page" ? "1" : p.name === "limit" ? "50" : `{{${p.name}}}`,
+    disabled: p.name !== "page" && p.name !== "limit",
   }));
   const queryString = query.filter((q) => !q.disabled).map((q) => `${q.key}=${q.value}`).join("&");
   const body = BODIES[op.id];
+  const url = {
+    raw: `{{baseUrl}}${fullPath(op)}${queryString ? `?${queryString}` : ""}`,
+    host: ["{{baseUrl}}"],
+    path: fullPath(op).split("/").filter(Boolean),
+    ...(query.length ? { query } : {}),
+  };
   return {
     name: op.id,
     request: {
@@ -54,13 +60,18 @@ function item(op: Operation) {
         ...(body ? [{ key: "Content-Type", value: "application/json" }] : []),
       ],
       ...(body ? { body: { mode: "raw", raw: body } } : {}),
-      url: {
-        raw: `{{baseUrl}}${fullPath(op)}${queryString ? `?${queryString}` : ""}`,
-        host: ["{{baseUrl}}"],
-        path: fullPath(op).split("/").filter(Boolean),
-        ...(query.length ? { query } : {}),
-      },
+      url,
     },
+    // The redacted fixture, so Postman shows a sample response before anyone signs in.
+    response: [{
+      name: "Sample (redacted)",
+      originalRequest: { method: op.method.toUpperCase(), header: [], url },
+      status: "OK",
+      code: 200,
+      _postman_previewlanguage: "json",
+      header: [{ key: "Content-Type", value: "application/json" }],
+      body: readFileSync(new URL(`../fixtures/${op.id}.json`, import.meta.url), "utf8"),
+    }],
     event: [
       ...(op.safety === "read" ? [] : [{ listen: "prerequest", script: { type: "text/javascript", exec: GUARD } }]),
       { listen: "test", script: { type: "text/javascript", exec: tests(op) } },

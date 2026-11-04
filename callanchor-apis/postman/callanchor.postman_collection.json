@@ -35,6 +35,36 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/send-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "send-otp"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"OTP call originated successfully\",\n  \"otpSentTo\": \"+910000000030\",\n  \"otpChannel\": \"mobile\"\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "prerequest",
@@ -83,6 +113,36 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "verify-otp"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"kind\": \"support\",\n  \"supportUserId\": \"cmsyix18z0cu010ngtzobg0nf\",\n  \"portalUserId\": \"cmsyix18w0cty10ngdavp4ppz\",\n  \"name\": \"Person 11\",\n  \"email\": \"user9@example.test\",\n  \"mobile\": \"+910000000030\",\n  \"profileImageUrl\": \"/uploads/profile-images/redacted.jpg\",\n  \"roleId\": \"support_agent\",\n  \"permissions\": [\n    \"clients:read\",\n    \"clients:write\",\n    \"audit:read\",\n    \"logs:read\"\n  ],\n  \"logAccess\": {\n    \"canViewSystemLogs\": true,\n    \"canViewAuditLogs\": true\n  }\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "prerequest",
@@ -129,6 +189,36 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/portal/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "portal",
+                    "profile"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"profile\": {\n    \"portalUserId\": \"cmsample0000portaluser00000\",\n    \"name\": \"Person 11\",\n    \"email\": \"user1@example.test\",\n    \"mobile\": \"+910000000001\",\n    \"profileImageUrl\": \"/uploads/profile-images/redacted.jpg\"\n  }\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -137,6 +227,72 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"profile\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getAuthMe",
+          "request": {
+            "method": "GET",
+            "description": "The signed-in user, with role, permissions and log access. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "me"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"authenticated\": true,\n  \"profile\": {\n    \"kind\": \"support\",\n    \"supportUserId\": \"cmsyix18z0cu010ngtzobg0nf\",\n    \"portalUserId\": \"cmsyix18w0cty10ngdavp4ppz\",\n    \"name\": \"Person 51\",\n    \"email\": \"user51@example.test\",\n    \"mobile\": \"+910000009001\",\n    \"profileImageUrl\": \"/uploads/profile-images/redacted.jpg\",\n    \"roleId\": \"support_agent\",\n    \"permissions\": [\n      \"clients:read\",\n      \"clients:write\",\n      \"audit:read\",\n      \"logs:read\"\n    ],\n    \"logAccess\": {\n      \"canViewSystemLogs\": true,\n      \"canViewAuditLogs\": true\n    }\n  }\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"authenticated\",\"profile\"]));"
                 ]
               }
             }
@@ -169,6 +325,35 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/fleet",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "fleet"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"totalCalls\": 45990,\n  \"callsToday\": 779,\n  \"failedCallouts24h\": 129,\n  \"totalLicenses\": 120,\n  \"trialsNearLimit\": [\n    {\n      \"clientId\": \"cmvan8c5t1mpf114m8m4guayg\",\n      \"companyName\": \"Person 9\"\n    },\n    {\n      \"clientId\": \"cmt12xvwk0nasmnhxn8dy32hw\",\n      \"companyName\": \"Person 19\"\n    }\n  ],\n  \"clientMetrics\": [\n    {\n      \"clientId\": \"cmvxhxexeakoq7l8f0dbs375i\",\n      \"companyName\": \"Person 4\",\n      \"status\": \"trial\",\n      \"totalCalls\": 0,\n      \"callsToday\": 0,\n      \"failedCallouts24h\": 0,\n      \"totalLicenses\": 1,\n      \"contractRecordedCalls\": 0,\n      \"contractPlatformSyncs\": 0,\n      \"contractRecordingLimit\": 10,\n      \"contractSyncLimit\": 10,\n      \"trialRecordedCalls\": 0,\n      \"trialPlatformSyncs\": 0,\n      \"trialRecordingLimit\": 10,\n      \"trialPlatformSyncLimit\": 10,\n      \"activeIntegrations\": 0,\n      \"syncedRate\": 0\n    }\n  ],\n  \"callRecords\": [\n    {\n      \"id\": \"cmvzb7beochcs7l8fbd9svwlm\",\n      \"calleeId\": \"phone-0000000028\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000028\",\n      \"agent\": \"Person 2\",\n      \"duration\": \"01:23\",\n      \"datetime\": \"2026-11-02T13:41:38.488Z\",\n      \"datetimeLabel\": \"2 Nov 2026 · 07:11 pm\",\n      \"type\": \"Incoming\"\n    }\n  ]\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -208,6 +393,35 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": \"cmvxhxexeakoq7l8f0dbs375i\",\n    \"companyName\": \"Person 4\",\n    \"contactName\": \"Person 22\",\n    \"email\": \"user1@example.test\",\n    \"phone\": \"+910000000001\",\n    \"plan\": \"Trial\",\n    \"status\": \"trial\",\n    \"accessSuspended\": false,\n    \"createdAt\": \"2026-11-01\",\n    \"licenseCount\": 1,\n    \"licenseNumbers\": [\n      \"+910000000001\"\n    ],\n    \"portalAdminMobiles\": [\n      \"+910000000001\"\n    ],\n    \"numbers\": [],\n    \"platforms\": [\n      {\n        \"id\": \"salesforce\",\n        \"name\": \"Salesforce\",\n        \"active\": false\n      },\n      {\n        \"id\": \"zoho\",\n        \"name\": \"Zoho\",\n        \"active\": false\n      },\n      {\n        \"id\": \"hubspot\",\n        \"name\": \"Hubspot\",\n        \"active\": false\n      },\n      {\n        \"id\": \"leadsquare\",\n        \"name\": \"Lead Square\",\n        \"active\": false\n      }\n    ]\n  }\n]\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -243,6 +457,36 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n  \"companyName\": \"Person 3\",\n  \"contactName\": \"Person 5\",\n  \"email\": \"user2@example.test\",\n  \"phone\": \"+910000000002\",\n  \"plan\": \"Trial\",\n  \"status\": \"trial\",\n  \"accessSuspended\": false,\n  \"createdAt\": \"2026-10-26\",\n  \"licenseCount\": 5,\n  \"licenseNumbers\": [\n    \"+910000000003\",\n    \"+910000000004\",\n    \"+910000000005\",\n    \"+910000000006\",\n    \"+910000000007\"\n  ],\n  \"portalAdminMobiles\": [\n    \"+910000000002\"\n  ],\n  \"numbers\": [],\n  \"platforms\": [\n    {\n      \"id\": \"salesforce\",\n      \"name\": \"Salesforce\",\n      \"active\": true,\n      \"connectedAt\": \"2026-10-26\"\n    },\n    {\n      \"id\": \"zoho\",\n      \"name\": \"Zoho\",\n      \"active\": false\n    },\n    {\n      \"id\": \"hubspot\",\n      \"name\": \"Hubspot\",\n      \"active\": false\n    },\n    {\n      \"id\": \"leadsquare\",\n      \"name\": \"Lead Square\",\n      \"active\": false\n    }\n  ]\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -279,6 +523,37 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/tenant",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "tenant"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"clientId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n  \"viewerTeamMemberId\": null,\n  \"viewerTeamMemberName\": null,\n  \"callRecords\": [\n    {\n      \"id\": \"cmvzagkz1cf5f7l8fchqj1okj\",\n      \"calleeId\": \"phone-0000000008\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000008\",\n      \"agent\": \"Person 1\",\n      \"teamMemberId\": \"cmvs21lit5pja7l8flvsfgi3o\",\n      \"duration\": \"00:33\",\n      \"durationSeconds\": 33,\n      \"datetime\": \"2026-11-02T13:10:40.423Z\",\n      \"datetimeLabel\": \"2 Nov 2026 · 06:40 pm\",\n      \"type\": \"Outgoing\",\n      \"recordingStatus\": \"synced\",\n      \"platformSyncStatus\": \"synced\",\n      \"recordingUnavailableReason\": null,\n      \"recordingPermissionDisabledAt\": null,\n      \"anyIntegrationSynced\": true,\n      \"dispositionLabel\": null,\n      \"dispositionNote\": \"<agent note>\",\n      \"dispositionScheduledAt\": \"2026-11-02T13:23:00.000Z\",\n      \"dispositionDisplayFields\": [\n        {\n          \"slug\": \"project-name\",\n          \"label\": \"Project Name\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"acme-avantara\"\n        },\n        {\n          \"slug\": \"task-subject\",\n          \"label\": \"Task Subject\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"follow-up\"\n        },\n        {\n          \"slug\": \"call-meeting-status\",\n          \"label\": \"Call Meeting Status\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"connected\"\n        },\n        {\n          \"slug\": \"priority\",\n          \"label\": \"Priority\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"high\"\n        },\n        {\n          \"slug\": \"next-action-status\",\n          \"label\": \"Next Action Status\",\n          \"type\": \"single_select\",\n          \"displayValue\": \"no-action-needed\"\n        },\n        {\n          \"slug\": \"note\",\n          \"label\": \"Agent note\",\n          \"type\": \"textarea\",\n          \"displayValue\": \"<agent note>\"\n        },\n        {\n          \"slug\": \"scheduled-at\",\n          \"label\": \"Callback scheduled\",\n          \"type\": \"datetime\",\n          \"displayValue\": \"2 Nov 2026 · 06:53 pm\"\n        }\n      ],\n      \"aiInsightStatus\": null,\n      \"aiInsightErrorCode\": null,\n      \"aiOverallSentiment\": null,\n      \"aiSentimentScore\": null,\n      \"aiCreditsUsed\": null\n    }\n  ],\n  \"licenses\": [\n    {\n      \"id\": \"cmvs21liw5pjc7l8f4xvu29gy\",\n      \"number\": \"+910000000003\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvs21lit5pja7l8flvsfgi3o\",\n        \"name\": \"Person 1\",\n        \"email\": \"user3@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"28 Oct 2026\",\n      \"lastLoginLabel\": \"28 Oct 2026 · 05:40 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 38,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"2 Nov 2026 · 04:34 pm\",\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"28 Oct 2026 · 05:53 pm\",\n          \"tone\": \"green\",\n          \"icon\": \"outreach\"\n        },\n        {\n          \"id\": \"session-started\",\n          \"title\": \"Session Started\",\n          \"description\": \" signed in on Samsung SM-A076B for +910000000003.\",\n          \"at\": \"28 Oct 2026 · 05:40 pm\",\n          \"tone\": \"blue\",\n          \"icon\": \"session\"\n        }\n      ]\n    },\n    {\n      \"id\": \"cmvs21lhf5pii7l8fwnb1iwas\",\n      \"number\": \"+910000000004\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvs21lhc5pig7l8fscoajcp0\",\n        \"name\": \"Person 6\",\n        \"email\": \"user4@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"28 Oct 2026\",\n      \"lastLoginLabel\": \"30 Oct 2026 · 05:12 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 0,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": null,\n          \"at\": null,\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": null,\n          \"at\": null,\n          \"tone\": \"slate\",\n          \"icon\": \"outreach\"\n        },\n        {\n          \"id\": \"session-started\",\n          \"title\": \"Session Started\",\n          \"description\": \" signed in on Samsung SM-A076B for +910000000004.\",\n          \"at\": \"30 Oct 2026 · 05:12 pm\",\n          \"tone\": \"blue\",\n          \"icon\": \"session\"\n        }\n      ]\n    },\n    {\n      \"id\": \"cmvs21li55pix7l8fko0theq2\",\n      \"number\": \"+910000000005\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvs21li35piv7l8fdmcv2z6w\",\n        \"name\": \"Person 7\",\n        \"email\": \"user5@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"28 Oct 2026\",\n      \"lastLoginLabel\": \"29 Oct 2026 · 12:15 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 52,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"2 Nov 2026 · 02:24 pm\",\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"28 Oct 2026 · 07:07 pm\",\n          \"tone\": \"green\",\n          \"icon\": \"outreach\"\n        },\n        {\n          \"id\": \"session-started\",\n          \"title\": \"Session Started\",\n          \"description\": \"Person 10 signed in on Samsung SM-A076B for +910000000005.\",\n          \"at\": \"29 Oct 2026 · 12:15 pm\",\n          \"tone\": \"blue\",\n          \"icon\": \"session\"\n        }\n      ]\n    },\n    {\n      \"id\": \"cmvs21lgk5pi37l8fbno1dt3m\",\n      \"number\": \"+910000000006\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvs21lgh5pi17l8fwla8nvnu\",\n        \"name\": \"Person 12\",\n        \"email\": \"user6@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"28 Oct 2026\",\n      \"lastLoginLabel\": \"28 Oct 2026 · 05:41 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 26,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"2 Nov 2026 · 02:05 pm\",\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"29 Oct 2026 · 03:40 pm\",\n          \"tone\": \"green\",\n          \"icon\": \"outreach\"\n        },\n        {\n          \"id\": \"session-started\",\n          \"title\": \"Session Started\",\n          \"description\": \" signed in on Samsung SM-A076B for +910000000006.\",\n          \"at\": \"28 Oct 2026 · 05:41 pm\",\n          \"tone\": \"blue\",\n          \"icon\": \"session\"\n        }\n      ]\n    },\n    {\n      \"id\": \"cmvuwmlds8pta7l8fwu2pvnkz\",\n      \"number\": \"+910000000007\",\n      \"status\": \"assigned\",\n      \"assignedTo\": {\n        \"id\": \"cmvuwmldp8pt87l8f6slllr3f\",\n        \"name\": \"Person 8\",\n        \"email\": \"user7@example.test\",\n        \"role\": \"Agent\"\n      },\n      \"assignedAtLabel\": \"30 Oct 2026\",\n      \"lastLoginLabel\": \"30 Oct 2026 · 05:16 pm\",\n      \"lastLoginDevice\": \"Samsung SM-A076B\",\n      \"lastLoginAndroidBrand\": \"samsung\",\n      \"lastLoginAndroidModel\": \"SM-A076B\",\n      \"lastLoginFirmwareVersion\": \"BP4A.251205.006\",\n      \"lastLoginGoogleDialerPresent\": false,\n      \"lastLoginAppVersion\": \"1.0.6(7)\",\n      \"lastLoginAppVersionCode\": 7,\n      \"isLoggedIn\": true,\n      \"isActive\": true,\n      \"callCapturePolicy\": null,\n      \"recordingEnabled\": null,\n      \"allowMobileLogout\": null,\n      \"lifetimeCallRecordCount\": 16,\n      \"loginHistory\": [\n        {\n          \"id\": \"latest-activity\",\n          \"title\": \"Latest Activity\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"2 Nov 2026 · 03:05 pm\",\n          \"tone\": \"slate\",\n          \"icon\": \"activity\"\n        },\n        {\n          \"id\": \"first-outreach\",\n          \"title\": \"First Outreach\",\n          \"description\": \"Outgoing call to Unknown\",\n          \"at\": \"30 Oct 2026 · 05:18 pm\",\n          \"tone\": \"green\",\n          \"icon\": \"outreach\"\n        },\n        {\n          \"id\": \"session-started\",\n          \"title\": \"Session Started\",\n          \"description\": \" signed in on Samsung SM-A076B for +910000000007.\",\n          \"at\": \"30 Oct 2026 · 05:16 pm\",\n          \"tone\": \"blue\",\n          \"icon\": \"session\"\n        }\n      ]\n    }\n  ],\n  \"integrations\": [\n    {\n      \"platformId\": \"salesforce\",\n      \"platformName\": \"Salesforce\",\n      \"active\": true,\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {\n        \"authorizationScheme\": \"Bearer\",\n        \"clientId\": \"\",\n        \"clientSecret\": \"\",\n        \"grantType\": \"refresh_token\",\n        \"tokenUrl\": \"https://login.salesforce.com/services/oauth2/token\",\n        \"refreshToken\": \"\",\n        \"accessToken\": \"\",\n        \"instanceUrl\": \"https://acme.my.salesforce.com\",\n        \"tokenIssuedAt\": \"1793624212006\"\n      },\n      \"authFieldMasks\": {\n        \"clientId\": \"•••\",\n        \"clientSecret\": \"•••\",\n        \"refreshToken\": \"•••\",\n        \"accessToken\": \"•••\"\n      },\n      \"isCustom\": true,\n      \"scheduler\": {\n        \"frequency\": \"realtime\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"connectedAt\": \"2026-10-26\",\n      \"lastHealthCheck\": \"2026-11-02T13:40:42.885Z\"\n    },\n    {\n      \"platformId\": \"zoho\",\n      \"platformName\": \"Zoho\",\n      \"active\": false,\n      \"endpoint\": \"https://hooks.callanchor.io/zoho\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {},\n      \"isCustom\": false,\n      \"scheduler\": {\n        \"frequency\": \"1h\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"lastHealthCheck\": \"2026-11-02T13:41:05.294Z\"\n    }\n  ],\n  \"callAnchorLogs\": [\n    {\n      \"id\": \"cmvzb41d0ch4d7l8ftothpzjf\",\n      \"requestId\": \"cmvzb41cuch4b7l8fdgmtj699\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzb3znjch347l8fh4bl7yzh\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1283,\n      \"at\": \"2026-11-02T13:40:42.852Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzb3znjch347l8fh4bl7yzh\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000009\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 33,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:04:54.562Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:41:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:40:40.711Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:41:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000001\\\",\\n  \\\"activityId\\\": \\\"00T000000000000002\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000003\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000001\"\n    },\n    {\n      \"id\": \"cmvzb3kvhch2n7l8f413rj15w\",\n      \"requestId\": \"cmvzb3kvdch2l7l8fcg6zi9ha\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzb3jasch1e7l8fgp4zf6s4\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1076,\n      \"at\": \"2026-11-02T13:40:21.486Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzb3jasch1e7l8fgp4zf6s4\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000010\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 34,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:03:53.722Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:41:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:40:19.522Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:41:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000004\\\",\\n  \\\"activityId\\\": \\\"00T000000000000005\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000006\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000004\"\n    },\n    {\n      \"id\": \"cmvzb32lech0m7l8fihy843ki\",\n      \"requestId\": \"cmvzb32l9ch0k7l8fi08n27ny\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzb30dtcgym7l8f5g8vepzc\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1167,\n      \"at\": \"2026-11-02T13:39:57.794Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzb30dtcgym7l8f5g8vepzc\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000011\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 31,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:02:32.768Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:40:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:39:55.000Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:40:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000007\\\",\\n  \\\"activityId\\\": \\\"00T000000000000008\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000009\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000007\"\n    },\n    {\n      \"id\": \"cmvzayv1ncgql7l8fftxm3lic\",\n      \"requestId\": \"cmvzayv1kcgqj7l8fj9v6ydxs\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzaytzgcgpp7l8f9diqxows\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 581,\n      \"at\": \"2026-11-02T13:36:41.387Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzaytzgcgpp7l8f9diqxows\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000012\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:58:55.003Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:37:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:36:40.069Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:37:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000010\\\",\\n  \\\"activityId\\\": \\\"00T000000000000011\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000012\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000010\"\n    },\n    {\n      \"id\": \"cmvzaxym3cgpe7l8falrvlq3m\",\n      \"requestId\": \"cmvzaxylzcgpc7l8f1pgrx8au\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzaxxi5cgoe7l8flg7h8pws\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 637,\n      \"at\": \"2026-11-02T13:35:59.355Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzaxxi5cgoe7l8flg7h8pws\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000013\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:36:10.693Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:36:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:35:57.981Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:36:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000013\\\",\\n  \\\"activityId\\\": \\\"00T000000000000014\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000015\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000013\"\n    },\n    {\n      \"id\": \"cmvzax68mcglh7l8fn18gn1b2\",\n      \"requestId\": \"cmvzax68icglf7l8fcg7jdwby\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzax478cgk87l8fk8myf4pi\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1602,\n      \"at\": \"2026-11-02T13:35:22.582Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzax478cgk87l8fk8myf4pi\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000014\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 31,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:57:51.532Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:36:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:35:20.032Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:36:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000016\\\",\\n  \\\"activityId\\\": \\\"00T000000000000017\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000018\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000016\"\n    },\n    {\n      \"id\": \"cmvzavirlcgg77l8fxdncu1gd\",\n      \"requestId\": \"cmvzaviricgg57l8faidj2j8b\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzavgkccgen7l8fwufkkpys\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1146,\n      \"at\": \"2026-11-02T13:34:05.506Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzavgkccgen7l8fwufkkpys\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000015\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 30,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:33:02.781Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:35:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:34:02.717Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:35:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000019\\\",\\n  \\\"activityId\\\": \\\"00T000000000000020\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000021\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000019\"\n    },\n    {\n      \"id\": \"cmvzau2mwcgcb7l8frujvqajc\",\n      \"requestId\": \"cmvzau2mscgc97l8fy62s396u\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzau1l3cgbf7l8f1mttotza\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 602,\n      \"at\": \"2026-11-02T13:32:57.945Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzau1l3cgbf7l8f1mttotza\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000016\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:56:55.267Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:33:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:32:56.644Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:33:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000022\\\",\\n  \\\"activityId\\\": \\\"00T000000000000023\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000024\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000022\"\n    },\n    {\n      \"id\": \"cmvzaswoscga67l8fdruqhzyu\",\n      \"requestId\": \"cmvzaswoocga47l8f6527iq8l\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzasvnlcg8j7l8f296mfr2b\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 582,\n      \"at\": \"2026-11-02T13:32:03.580Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzasvnlcg8j7l8f296mfr2b\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000017\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:56:01.023Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:33:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:32:02.298Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:33:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000025\\\",\\n  \\\"activityId\\\": \\\"00T000000000000026\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000027\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000025\"\n    },\n    {\n      \"id\": \"cmvzasg1ocg837l8f8lw0hww3\",\n      \"requestId\": \"cmvzasg1kcg817l8fcbs32gfa\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzasevxcg6u7l8fq1g1z520\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"failed\",\n      \"httpStatus\": 404,\n      \"durationMs\": 204,\n      \"at\": \"2026-11-02T13:31:42.012Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzasevxcg6u7l8fq1g1z520\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000018\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 139,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:52:32.036Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:32:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:31:40.582Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:32:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"No Opportunity owned by the agent found for 0000000018 in project \\\\\\\"acme-avantara\\\\\\\".\\\",\\n    \\\"code\\\": \\\"OPPORTUNITY_NOT_FOUND\\\"\\n  },\\n  \\\"success\\\": false\\n}\",\n      \"errorMessage\": \"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"No Opportunity owned by the agent found for 0000000018 in project \\\\\\\"acme-avantara\\\\\\\".\\\",\\n    \\\"code\\\": \\\"OPPORTUNITY_NOT_FOUND\\\"\\n  },\\n  \\\"success\\\": false\\n}\"\n    },\n    {\n      \"id\": \"cmvzarey7cg5f7l8f07l1hdov\",\n      \"requestId\": \"cmvzarey3cg5d7l8fkrwubnl6\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzardzfcg4j7l8fa88d7g7v\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 453,\n      \"at\": \"2026-11-02T13:30:53.935Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzardzfcg4j7l8fa88d7g7v\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000019\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:51:41.681Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:31:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:30:52.749Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:31:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000028\\\",\\n  \\\"activityId\\\": \\\"00T000000000000029\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000030\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000028\"\n    },\n    {\n      \"id\": \"cmvzaqva9cg367l8fbkhwiofl\",\n      \"requestId\": \"cmvzaqva5cg347l8f8d4whvf2\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzaqucvcg2a7l8fycdvfmox\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 461,\n      \"at\": \"2026-11-02T13:30:28.449Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzaqucvcg2a7l8fycdvfmox\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000020\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:51:14.464Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:31:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:30:27.303Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:31:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000031\\\",\\n  \\\"activityId\\\": \\\"00T000000000000032\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000033\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000031\"\n    },\n    {\n      \"id\": \"cmvzaqcrscg207l8fnjooyx3k\",\n      \"requestId\": \"cmvzaqcrocg1y7l8fycj1sfog\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzaqbwccg147l8f2mtqqy35\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"failed\",\n      \"httpStatus\": 404,\n      \"durationMs\": 297,\n      \"at\": \"2026-11-02T13:30:04.456Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzaqbwccg147l8f2mtqqy35\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000021\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:48:14.640Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:31:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:30:03.386Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:31:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"No Opportunity owned by the agent found for 0000000021 in project \\\\\\\"acme-avantara\\\\\\\".\\\",\\n    \\\"code\\\": \\\"OPPORTUNITY_NOT_FOUND\\\"\\n  },\\n  \\\"success\\\": false\\n}\",\n      \"errorMessage\": \"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"No Opportunity owned by the agent found for 0000000021 in project \\\\\\\"acme-avantara\\\\\\\".\\\",\\n    \\\"code\\\": \\\"OPPORTUNITY_NOT_FOUND\\\"\\n  },\\n  \\\"success\\\": false\\n}\"\n    },\n    {\n      \"id\": \"cmvzapp6acfzp7l8fcufhbilg\",\n      \"requestId\": \"cmvzapp66cfzn7l8fdqsafybu\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzapo2gcfyt7l8f9a98vbjp\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 623,\n      \"at\": \"2026-11-02T13:29:33.875Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzapo2gcfyt7l8f9a98vbjp\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000022\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:47:52.439Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:30:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:29:32.501Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:30:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000034\\\",\\n  \\\"activityId\\\": \\\"00T000000000000035\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000036\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000034\"\n    },\n    {\n      \"id\": \"cmvzaop4ocfwr7l8fqd4yxyz7\",\n      \"requestId\": \"cmvzaop4lcfwp7l8fdrg8k6nm\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzaooalcfvv7l8fywfdvxel\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 721,\n      \"at\": \"2026-11-02T13:28:47.161Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzaooalcfvv7l8fywfdvxel\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000023\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:47:00.483Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:29:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:28:46.131Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:29:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000037\\\",\\n  \\\"activityId\\\": \\\"00T000000000000038\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000039\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000037\"\n    },\n    {\n      \"id\": \"cmvzan3z2cfbx7l8fntuk2bc9\",\n      \"requestId\": \"cmvzan3yycfbv7l8fvfyja81h\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzan2tpcfae7l8fpc3nl3v1\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 681,\n      \"at\": \"2026-11-02T13:27:33.086Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzan2tpcfae7l8fpc3nl3v1\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000024\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:45:49.214Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:28:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:27:31.678Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:28:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000040\\\",\\n  \\\"activityId\\\": \\\"00T000000000000041\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000042\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000040\"\n    },\n    {\n      \"id\": \"cmvzamefycf9r7l8f033mvf77\",\n      \"requestId\": \"cmvzameftcf9p7l8f2ekkmacb\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzamboacf8o7l8f6h2x2lk5\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1936,\n      \"at\": \"2026-11-02T13:26:59.998Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzamboacf8o7l8f6h2x2lk5\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000025\\\",\\n    \\\"callType\\\": \\\"Incoming\\\",\\n    \\\"durationSeconds\\\": 345,\\n    \\\"startedAt\\\": \\\"2026-11-02T13:04:23.115Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:27:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:26:56.467Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:27:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000043\\\",\\n  \\\"activityId\\\": \\\"00T000000000000044\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000045\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000043\"\n    },\n    {\n      \"id\": \"cmvzahxpdcf837l8fe7emlpn2\",\n      \"requestId\": \"cmvzahxp9cf817l8f5eja0eyv\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzahwnvcf777l8fy5gzrqeu\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 535,\n      \"at\": \"2026-11-02T13:23:31.681Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzahwnvcf777l8fy5gzrqeu\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000026\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:45:05.359Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:24:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:23:30.390Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:24:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000046\\\",\\n  \\\"activityId\\\": \\\"00T000000000000047\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000048\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000046\"\n    },\n    {\n      \"id\": \"cmvzagntdcf6q7l8f6koxxx37\",\n      \"requestId\": \"cmvzagnt8cf6o7l8fauza1kws\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzagkz1cf5f7l8fchqj1okj\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1932,\n      \"at\": \"2026-11-02T13:22:32.209Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzagkz1cf5f7l8fchqj1okj\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000008\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 33,\\n    \\\"startedAt\\\": \\\"2026-11-02T13:10:40.423Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:23:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:22:28.637Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:23:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000049\\\",\\n  \\\"activityId\\\": \\\"00T000000000000050\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000051\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000049\"\n    },\n    {\n      \"id\": \"cmvz9uv1scezb7l8fc4t19y8a\",\n      \"requestId\": \"cmvz9uv1ocez97l8f8u6rslmn\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvxhfppgajje7l8flre9v9sc\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"failed\",\n      \"httpStatus\": 404,\n      \"durationMs\": 135,\n      \"at\": \"2026-11-02T13:05:35.152Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvxhfppgajje7l8flre9v9sc\\\",\\n    \\\"agentName\\\": \\\"Person 8\\\",\\n    \\\"agentNumber\\\": \\\"+910000000007\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000027\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 34,\\n    \\\"startedAt\\\": \\\"2026-11-01T06:56:04.785Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-01T07:03:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-01T07:02:13.037Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-01T07:03:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"No Opportunity owned by the agent found for 0000000027 in project \\\\\\\"acme-avantara\\\\\\\".\\\",\\n    \\\"code\\\": \\\"OPPORTUNITY_NOT_FOUND\\\"\\n  },\\n  \\\"success\\\": false\\n}\",\n      \"errorMessage\": \"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"No Opportunity owned by the agent found for 0000000027 in project \\\\\\\"acme-avantara\\\\\\\".\\\",\\n    \\\"code\\\": \\\"OPPORTUNITY_NOT_FOUND\\\"\\n  },\\n  \\\"success\\\": false\\n}\"\n    }\n  ],\n  \"teamMembers\": [],\n  \"dispositionSettings\": {\n    \"enabled\": true,\n    \"required\": true,\n    \"promptTiming\": \"immediate\",\n    \"allowSkip\": false,\n    \"skipRequiresReason\": true,\n    \"reminderIfIncomplete\": true,\n    \"maxPromptSeconds\": 0,\n    \"presetDispositions\": [\n      {\n        \"id\": \"interested\",\n        \"label\": \"Interested\",\n        \"enabled\": true,\n        \"description\": \"Prospect showed buying intent\"\n      },\n      {\n        \"id\": \"callback\",\n        \"label\": \"Callback scheduled\",\n        \"enabled\": true,\n        \"description\": \"Follow-up time agreed on the call\"\n      },\n      {\n        \"id\": \"not-interested\",\n        \"label\": \"Not interested\",\n        \"enabled\": true,\n        \"description\": \"Prospect declined or not a fit\"\n      },\n      {\n        \"id\": \"voicemail\",\n        \"label\": \"Voicemail\",\n        \"enabled\": true,\n        \"description\": \"Left a voicemail, no live conversation\"\n      },\n      {\n        \"id\": \"no-answer\",\n        \"label\": \"No answer\",\n        \"enabled\": true,\n        \"description\": \"Call rang out with no pickup\"\n      },\n      {\n        \"id\": \"wrong-number\",\n        \"label\": \"Wrong number\",\n        \"enabled\": false,\n        \"description\": \"Invalid or misdialed contact\"\n      },\n      {\n        \"id\": \"dnc\",\n        \"label\": \"Do not call\",\n        \"enabled\": true,\n        \"description\": \"Contact requested no further outreach\"\n      }\n    ],\n    \"allowLicenseOverride\": true\n  },\n  \"callCaptureSettings\": {\n    \"defaultPolicy\": \"default_business_allow_personal\",\n    \"allowLicenseOverride\": true,\n    \"recordingEnabled\": true,\n    \"deleteLocalRecording\": false\n  },\n  \"mobileAppSettings\": {\n    \"allowMobileLogout\": true,\n    \"allowLicenseOverride\": true\n  },\n  \"dataRetentionSettings\": {\n    \"preset\": \"day_1\",\n    \"customDays\": null\n  },\n  \"storageSettings\": {\n    \"mode\": \"trial_default\",\n    \"clientStatus\": \"trial\",\n    \"storageChoice\": \"default\",\n    \"ownProvider\": null,\n    \"provider\": \"platform_default\",\n    \"status\": \"draft\",\n    \"bucket\": \"\",\n    \"region\": \"\",\n    \"secretIdMasked\": \"\",\n    \"roleArnMasked\": \"\",\n    \"externalIdMasked\": \"\",\n    \"kmsKeyId\": \"\",\n    \"lastValidatedAt\": null,\n    \"lastError\": null,\n    \"migrationQueued\": 0,\n    \"migrationDone\": 0,\n    \"migrationFailed\": 0,\n    \"callAnchorAccountId\": \"YOUR_CALL_ANCHOR_AWS_ACCOUNT_ID\"\n  },\n  \"trialRecordedCalls\": 8,\n  \"trialPendingRecordings\": 2,\n  \"trialRecordingLimit\": 250,\n  \"trialPlatformSyncs\": 17,\n  \"trialPlatformSyncLimit\": 250,\n  \"trialRecordingAtLimit\": false,\n  \"trialExpiresAt\": \"2026-11-16T00:00:00.000Z\",\n  \"trialDaysRemaining\": 14,\n  \"trialExpired\": false,\n  \"contractRecordedCalls\": 8,\n  \"contractPendingRecordings\": 2,\n  \"contractRecordingLimit\": 250,\n  \"contractRecordingUnlimited\": false,\n  \"contractPlatformSyncs\": 17,\n  \"contractSyncLimit\": 250,\n  \"contractSyncUnlimited\": false,\n  \"contractRecordingAtLimit\": false,\n  \"contractLicenseCount\": 5,\n  \"contractLicenseActiveCount\": 5,\n  \"contractLicenseLimit\": 5,\n  \"contractLicenseUnlimited\": false,\n  \"contractLicenseAtLimit\": true,\n  \"contractLicenseOverCap\": false,\n  \"contractLicenseActivationLocked\": false,\n  \"contractLicenseOverBy\": 0,\n  \"contractSeatCompliancePhase\": \"compliant\",\n  \"contractSeatGraceEndsAt\": null,\n  \"contractSeatGracePeriodHours\": 24,\n  \"contractIntegrationCount\": 1,\n  \"contractIntegrationLimit\": 2,\n  \"contractIntegrationUnlimited\": false,\n  \"contractIntegrationAtLimit\": false,\n  \"trialRecordingRetentionHeld\": false,\n  \"trialRecordingDeletionDueAt\": \"2026-11-22T00:00:00.000Z\",\n  \"trialRecordingAccessRevoked\": false,\n  \"updatedAt\": \"2026-11-02T13:40:41.514Z\"\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -315,6 +590,37 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/integrations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "integrations"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"configs\": [\n    {\n      \"platformId\": \"salesforce\",\n      \"platformName\": \"Salesforce\",\n      \"active\": true,\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {\n        \"authorizationScheme\": \"Bearer\",\n        \"clientId\": \"\",\n        \"clientSecret\": \"\",\n        \"grantType\": \"refresh_token\",\n        \"tokenUrl\": \"https://login.salesforce.com/services/oauth2/token\",\n        \"refreshToken\": \"\",\n        \"accessToken\": \"\",\n        \"instanceUrl\": \"https://acme.my.salesforce.com\",\n        \"tokenIssuedAt\": \"1793624212006\"\n      },\n      \"authFieldMasks\": {\n        \"clientId\": \"•••\",\n        \"clientSecret\": \"•••\",\n        \"refreshToken\": \"•••\",\n        \"accessToken\": \"•••\"\n      },\n      \"isCustom\": true,\n      \"scheduler\": {\n        \"frequency\": \"realtime\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"connectedAt\": \"2026-10-26\",\n      \"lastHealthCheck\": \"2026-11-02T13:42:04.423Z\"\n    },\n    {\n      \"platformId\": \"zoho\",\n      \"platformName\": \"Zoho\",\n      \"active\": false,\n      \"endpoint\": \"https://hooks.callanchor.io/zoho\",\n      \"authMode\": \"oauth2\",\n      \"authFields\": {},\n      \"isCustom\": false,\n      \"scheduler\": {\n        \"frequency\": \"1h\",\n        \"enabled\": true\n      },\n      \"eventTypes\": [],\n      \"lastHealthCheck\": \"2026-11-02T13:42:39.865Z\"\n    }\n  ],\n  \"logs\": []\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -352,6 +658,37 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/disposition-form-fields",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "disposition-form-fields"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"fields\": [\n    {\n      \"id\": \"cmvqbp2f44n6q7l8fj031fdt1\",\n      \"slug\": \"project-name\",\n      \"label\": \"Project Name\",\n      \"type\": \"single_select\",\n      \"required\": false,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 0,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"ABHIMAAN HOMES\",\n            \"value\": \"abhimaan-homes\"\n          },\n          {\n            \"label\": \"Anarock Commercial\",\n            \"value\": \"anarock-commercial\"\n          },\n          {\n            \"label\": \"Anarock Residential\",\n            \"value\": \"anarock-residential\"\n          }\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvpbtntg4hbr7l8fhvia1hev\",\n      \"slug\": \"task-subject\",\n      \"label\": \"Task Subject\",\n      \"type\": \"single_select\",\n      \"required\": true,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 1,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"Virtual Meeting\",\n            \"value\": \"virtual-meeting\"\n          },\n          {\n            \"label\": \"Follow Up\",\n            \"value\": \"follow-up\"\n          },\n          {\n            \"label\": \"Outbound Call\",\n            \"value\": \"outbound-call\"\n          }\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvpbuhn64hc17l8fdkxg2ft6\",\n      \"slug\": \"call-meeting-status\",\n      \"label\": \"Call Meeting Status\",\n      \"type\": \"single_select\",\n      \"required\": true,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 2,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"Connected\",\n            \"value\": \"connected\"\n          },\n          {\n            \"label\": \"Not Connected\",\n            \"value\": \"not-connected\"\n          },\n          {\n            \"label\": \"Completed\",\n            \"value\": \"completed\"\n          }\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvpbv8q94hcb7l8fjn6s9d6q\",\n      \"slug\": \"priority\",\n      \"label\": \"Priority\",\n      \"type\": \"single_select\",\n      \"required\": true,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 3,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"Low\",\n            \"value\": \"low\"\n          },\n          {\n            \"label\": \"Medium\",\n            \"value\": \"medium\"\n          },\n          {\n            \"label\": \"High\",\n            \"value\": \"high\"\n          }\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvpbw6uy4hcl7l8fq2t6m6uy\",\n      \"slug\": \"next-action-status\",\n      \"label\": \"Next Action Status\",\n      \"type\": \"single_select\",\n      \"required\": true,\n      \"enabled\": true,\n      \"isDefault\": false,\n      \"sortOrder\": 4,\n      \"config\": {\n        \"options\": [\n          {\n            \"label\": \"No action needed\",\n            \"value\": \"no-action-needed\"\n          },\n          {\n            \"label\": \"Virtual Meeting\",\n            \"value\": \"virtual-meeting\"\n          },\n          {\n            \"label\": \"Follow Up\",\n            \"value\": \"follow-up\"\n          }\n        ]\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 154,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvp1b1fv43k17l8fmhu9tv1r\",\n      \"slug\": \"note\",\n      \"label\": \"Agent note\",\n      \"type\": \"textarea\",\n      \"required\": false,\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 5,\n      \"config\": {\n        \"placeholder\": \"Add context about this call…\"\n      },\n      \"archivedAt\": null,\n      \"usageCount\": 149,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvp1b1fv43k27l8fvvbvaa3q\",\n      \"slug\": \"scheduled-at\",\n      \"label\": \"Callback scheduled\",\n      \"type\": \"datetime\",\n      \"required\": true,\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 6,\n      \"config\": {},\n      \"archivedAt\": null,\n      \"usageCount\": 153,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    },\n    {\n      \"id\": \"cmvp1b1fv43k07l8fvgyx6af1\",\n      \"slug\": \"outcome\",\n      \"label\": \"Outcome\",\n      \"type\": \"preset\",\n      \"required\": true,\n      \"enabled\": false,\n      \"isDefault\": true,\n      \"sortOrder\": 7,\n      \"config\": null,\n      \"archivedAt\": null,\n      \"usageCount\": 0,\n      \"setMembershipCount\": 1,\n      \"setNames\": [\n        \"Org default\"\n      ]\n    }\n  ],\n  \"presets\": [\n    {\n      \"id\": \"cmvp1b1fv43jt7l8fqhuu5r1y\",\n      \"slug\": \"interested\",\n      \"label\": \"Interested\",\n      \"description\": \"Prospect showed buying intent\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 0\n    },\n    {\n      \"id\": \"cmvp1b1fv43ju7l8fx6muwoel\",\n      \"slug\": \"callback\",\n      \"label\": \"Callback scheduled\",\n      \"description\": \"Follow-up time agreed on the call\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 1\n    },\n    {\n      \"id\": \"cmvp1b1fv43jv7l8fjm4hwoeh\",\n      \"slug\": \"not-interested\",\n      \"label\": \"Not interested\",\n      \"description\": \"Prospect declined or not a fit\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 2\n    },\n    {\n      \"id\": \"cmvp1b1fv43jw7l8fdoa6lg43\",\n      \"slug\": \"voicemail\",\n      \"label\": \"Voicemail\",\n      \"description\": \"Left a voicemail, no live conversation\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 3\n    },\n    {\n      \"id\": \"cmvp1b1fv43jx7l8f0zcndwtz\",\n      \"slug\": \"no-answer\",\n      \"label\": \"No answer\",\n      \"description\": \"Call rang out with no pickup\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 4\n    },\n    {\n      \"id\": \"cmvp1b1fv43jy7l8fumtxletc\",\n      \"slug\": \"wrong-number\",\n      \"label\": \"Wrong number\",\n      \"description\": \"Invalid or misdialed contact\",\n      \"enabled\": false,\n      \"isDefault\": true,\n      \"sortOrder\": 5\n    },\n    {\n      \"id\": \"cmvp1b1fv43jz7l8fqqfg3dzz\",\n      \"slug\": \"dnc\",\n      \"label\": \"Do not call\",\n      \"description\": \"Contact requested no further outreach\",\n      \"enabled\": true,\n      \"isDefault\": true,\n      \"sortOrder\": 6\n    }\n  ]\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -360,6 +697,553 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"fields\",\"presets\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getOnboardingProgress",
+          "request": {
+            "method": "GET",
+            "description": "Onboarding steps a client has completed. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/onboarding-progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "onboarding-progress"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/onboarding-progress",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "onboarding-progress"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"steps\": [\n    {\n      \"stepKey\": \"mobile_login\",\n      \"completedAt\": \"2026-10-23T06:52:09.899Z\"\n    },\n    {\n      \"stepKey\": \"first_call\",\n      \"completedAt\": \"2026-10-23T06:56:46.861Z\"\n    },\n    {\n      \"stepKey\": \"first_recording_synced\",\n      \"completedAt\": \"2026-10-23T06:56:47.658Z\"\n    }\n  ],\n  \"welcomeDismissed\": false,\n  \"portalTourCompleted\": false,\n  \"termsAcceptedAt\": null\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"steps\",\"welcomeDismissed\",\"portalTourCompleted\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "listPortalAdmins",
+          "request": {
+            "method": "GET",
+            "description": "A client's customer-portal admins. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/portal-admins",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "portal-admins"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/portal-admins",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "portal-admins"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"admins\": [\n    {\n      \"portalUserId\": \"cmuvbsy3d0ii9bmk6w5qu044i\",\n      \"teamMemberId\": \"cmuvbsy3i0iibbmk6nbzn6ihg\",\n      \"name\": \"Person 53\",\n      \"email\": \"user53@example.test\",\n      \"mobile\": \"+910000009002\",\n      \"licenseNumber\": null,\n      \"isActive\": true,\n      \"lastLoginAt\": null,\n      \"createdAt\": \"2026-10-05T14:09:17.977Z\"\n    },\n    {\n      \"portalUserId\": \"cmuzm44sk0q6b8tpxnycdngly\",\n      \"teamMemberId\": \"cmuzm44sp0q6d8tpxposla2ip\",\n      \"name\": \"Person 54\",\n      \"email\": \"user54@example.test\",\n      \"mobile\": \"+910000009003\",\n      \"licenseNumber\": null,\n      \"isActive\": true,\n      \"lastLoginAt\": \"2026-11-04T11:25:39.860Z\",\n      \"createdAt\": \"2026-10-08T14:09:00.741Z\"\n    }\n  ]\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"admins\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "listNotifications",
+          "request": {
+            "method": "GET",
+            "description": "A client's portal notifications. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/notifications?page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/notifications?page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "disabled": false
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"notifications\": [],\n  \"unreadCount\": 0,\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 0,\n    \"totalPages\": 0,\n    \"hasMore\": false\n  }\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"notifications\",\"unreadCount\",\"pagination\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getAiCredits",
+          "request": {
+            "method": "GET",
+            "description": "AI credit balance, entitlements and purchase history. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/ai-credits?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "ai-credits"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{from}}",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "{{to}}",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{cursor}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/ai-credits?limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "ai-credits"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{from}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{to}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "cursor",
+                      "value": "{{cursor}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "disabled": false
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"balance\": 0,\n  \"purchasedCredits\": 0,\n  \"creditsUsed\": 0,\n  \"usagePercent\": null,\n  \"allotmentEpoch\": 1,\n  \"overdrawnBy\": 0,\n  \"licenses\": [],\n  \"entitlements\": {\n    \"aiInsightsOptIn\": false,\n    \"accountStatus\": \"purchased\",\n    \"isTrial\": false,\n    \"aiAllowed\": false\n  },\n  \"purchaseChanges\": [],\n  \"purchaseChangesNextCursor\": null\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "listDispositionSets",
+          "request": {
+            "method": "GET",
+            "description": "Disposition form sets, with field and license counts. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/disposition-sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "disposition-sets"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/disposition-sets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "disposition-sets"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"sets\": [\n    {\n      \"id\": \"c4771f8d3aee42c891631d98fe442a20\",\n      \"name\": \"Org default\",\n      \"tag\": null,\n      \"isDefault\": true,\n      \"sortOrder\": 0,\n      \"activeFieldCount\": 2,\n      \"licenseCount\": 0,\n      \"createdAt\": \"2026-11-03T17:39:35.770Z\",\n      \"updatedAt\": \"2026-11-03T17:39:35.770Z\"\n    }\n  ]\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"sets\"]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Licenses",
+      "item": [
+        {
+          "name": "getLicenseSeatCompliance",
+          "request": {
+            "method": "GET",
+            "description": "Whether active licenses are within the contracted seat limit. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/license-seat-compliance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "license-seat-compliance"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/license-seat-compliance",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "license-seat-compliance"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"phase\": \"compliant\",\n  \"total\": 0,\n  \"activeCount\": 0,\n  \"limit\": 5,\n  \"overBy\": 0,\n  \"overCap\": false,\n  \"activationLocked\": false,\n  \"seatGraceStartedAt\": null,\n  \"seatGraceEndsAt\": null,\n  \"seatGracePeriodHours\": 24,\n  \"recommendations\": []\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getLicenseSeatSettings",
+          "request": {
+            "method": "GET",
+            "description": "The grace period allowed when licenses exceed the seat limit. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/license-seat-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "license-seat-settings"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/license-seat-settings",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "license-seat-settings"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"seatGracePeriodHours\": 24,\n  \"seatGraceStartedAt\": null,\n  \"seatGraceEndsAt\": null,\n  \"minHours\": 1,\n  \"maxHours\": 168\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"seatGracePeriodHours\",\"minHours\",\"maxHours\"]));"
                 ]
               }
             }
@@ -406,6 +1290,49 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/call-contacts?page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "call-contacts"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "disabled": false
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"calleeId\": \"phone-0000000008\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000008\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:33\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 06:40 pm\",\n      \"lastDatetime\": \"2026-11-02T13:10:40.423Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000025\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000025\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"05:45\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 06:34 pm\",\n      \"lastDatetime\": \"2026-11-02T13:04:23.115Z\",\n      \"typesPresent\": [\n        \"Incoming\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000031\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000031\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:14\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:26 pm\",\n      \"lastDatetime\": \"2026-11-02T11:56:10.484Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000032\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000032\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:00\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:25 pm\",\n      \"lastDatetime\": \"2026-11-02T11:55:19.617Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000033\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000033\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:00\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:24 pm\",\n      \"lastDatetime\": \"2026-11-02T11:54:37.781Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000034\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000034\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:00\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:23 pm\",\n      \"lastDatetime\": \"2026-11-02T11:53:49.408Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000035\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000035\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:00\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:23 pm\",\n      \"lastDatetime\": \"2026-11-02T11:53:16.688Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000036\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000036\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:00\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:18 pm\",\n      \"lastDatetime\": \"2026-11-02T11:48:56.077Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000037\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000037\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:23\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:18 pm\",\n      \"lastDatetime\": \"2026-11-02T11:48:12.893Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    },\n    {\n      \"calleeId\": \"phone-0000000038\",\n      \"calleeName\": \"Unknown\",\n      \"calleePhone\": \"+910000000038\",\n      \"callCount\": 1,\n      \"lastAgent\": \"Person 1\",\n      \"lastDuration\": \"00:00\",\n      \"lastDatetimeLabel\": \"2 Nov 2026 · 05:17 pm\",\n      \"lastDatetime\": \"2026-11-02T11:47:24.098Z\",\n      \"typesPresent\": [\n        \"Outgoing\"\n      ],\n      \"latestAiInsightStatus\": null,\n      \"latestAiInsightErrorCode\": null,\n      \"latestAiOverallSentiment\": null,\n      \"latestAiCreditsUsed\": null\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 124,\n    \"totalPages\": 13,\n    \"hasMore\": true\n  },\n  \"stats\": {\n    \"totalCalls\": 155,\n    \"uniqueContacts\": 124,\n    \"incoming\": 15,\n    \"outgoing\": 133,\n    \"missed\": 7,\n    \"rejected\": 0,\n    \"answerRate\": 95,\n    \"missedRate\": 5,\n    \"rejectedRate\": 0\n  },\n  \"agents\": [\n    \"Person 8\",\n    \"Person 10\",\n    \"Person 7\",\n    \"Person 1\",\n    \"Person 12\",\n    \"Person 11\"\n  ]\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -444,6 +1371,39 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/calls/{{callId}}/recording-link",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "calls",
+                    "{{callId}}",
+                    "recording-link"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"callId\": \"cmvzbekinciv37l8fvzx1y6e0\",\n  \"recordingStatus\": \"synced\",\n  \"url\": \"https://recordings.example.test/file.m4a?X-Amz-Signature=REDACTED\",\n  \"expiresAt\": \"2026-11-02T13:54:31.739Z\"\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "prerequest",
@@ -461,6 +1421,148 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"callId\",\"recordingStatus\",\"url\",\"expiresAt\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getCallee",
+          "request": {
+            "method": "GET",
+            "description": "One contact with call stats and every call to or from them. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/callees/{{calleeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "callees",
+                "{{calleeId}}"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/callees/{{calleeId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "callees",
+                    "{{calleeId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"profile\": {\n    \"id\": \"phone-0000009004\",\n    \"name\": \"Person 55\",\n    \"phone\": \"+910000009004\",\n    \"stats\": {\n      \"total\": 1,\n      \"incoming\": 0,\n      \"missed\": 0,\n      \"outgoing\": 1,\n      \"rejected\": 0\n    },\n    \"logs\": [\n      {\n        \"id\": \"cmvkma22v1aei7l8fmykwby0c\",\n        \"time\": \"12:26 pm\",\n        \"date\": \"2026-10-23\",\n        \"dayLabel\": \"FRI\",\n        \"type\": \"Outgoing\",\n        \"agent\": \"Person 56\",\n        \"duration\": \"00:05\",\n        \"durationSeconds\": 5,\n        \"recordingStatus\": \"synced\",\n        \"platformSyncStatus\": \"synced\",\n        \"recordingUnavailableReason\": null,\n        \"recordingPermissionDisabledAt\": null,\n        \"dispositionLabel\": \"Interested\",\n        \"dispositionNote\": null,\n        \"dispositionScheduledAt\": null,\n        \"dispositionDisplayFields\": [\n          {\n            \"slug\": \"select-calling-agent\",\n            \"label\": \"Select Calling Agent\",\n            \"type\": \"single_select\",\n            \"displayValue\": \"test-1\"\n          },\n          {\n            \"slug\": \"outcome\",\n            \"label\": \"Outcome\",\n            \"type\": \"preset\",\n            \"displayValue\": \"Interested\"\n          }\n        ],\n        \"recordingSynced\": false,\n        \"recordingDeleted\": false,\n        \"recordingAvailable\": false,\n        \"aiInsightStatus\": null,\n        \"aiInsightErrorCode\": null,\n        \"aiOverallSentiment\": null,\n        \"aiSentimentScore\": null,\n        \"aiCreditsUsed\": null\n      }\n    ]\n  }\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"profile\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getCallAiInsights",
+          "request": {
+            "method": "GET",
+            "description": "A call's AI sentiment, summary and next actions. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/calls/{{callId}}/ai-insights",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}",
+                "calls",
+                "{{callId}}",
+                "ai-insights"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/calls/{{callId}}/ai-insights",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "calls",
+                    "{{callId}}",
+                    "ai-insights"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"callRecordId\": \"cmvkma22v1aei7l8fmykwby0c\",\n    \"status\": \"queued\",\n    \"overallSentiment\": null,\n    \"sentimentScore\": null,\n    \"customerTone\": null,\n    \"agentTone\": null,\n    \"sentimentTimeline\": [],\n    \"sentimentDrivers\": [],\n    \"momSummary\": null,\n    \"momKeyPoints\": [],\n    \"nextActions\": [],\n    \"languageCode\": null,\n    \"errorCode\": null,\n    \"errorMessage\": null,\n    \"completedAt\": null,\n    \"segments\": [],\n    \"agentName\": \"Person 56\",\n    \"calleeName\": \"Person 55\",\n    \"calleePhone\": \"+910000009004\",\n    \"durationLabel\": \"00:05\",\n    \"startedAt\": \"2026-10-23T06:56:20.470Z\",\n    \"missing\": true\n  }\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"data\"]));"
                 ]
               }
             }
@@ -507,6 +1609,49 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/callout-logs?page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "callout-logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "disabled": false
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"cmvzbpwf0cjmj7l8f73937y36\",\n      \"requestId\": \"cmvzbpwewcjmh7l8fy243yjmk\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzbpv0ccjkk7l8f20vo9j3m\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 973,\n      \"at\": \"2026-11-02T13:57:42.876Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbpv0ccjkk7l8f20vo9j3m\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000039\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 7,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:57:26.041Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:58:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:57:41.120Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:58:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000055\\\",\\n  \\\"activityId\\\": \\\"00T000000000000056\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000057\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000055\"\n    },\n    {\n      \"id\": \"cmvzbos88cjk37l8fsmg89ujf\",\n      \"requestId\": \"cmvzbos85cjk17l8fszc7082q\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzboqkhcjis7l8fmkluleyh\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1251,\n      \"at\": \"2026-11-02T13:56:50.793Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzboqkhcjis7l8fmkluleyh\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000040\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 15,\\n    \\\"startedAt\\\": \\\"2026-11-02T10:41:41.856Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:57:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:56:48.711Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:57:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000058\\\",\\n  \\\"activityId\\\": \\\"00T000000000000059\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000060\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000058\"\n    },\n    {\n      \"id\": \"cmvzbnyh7cjhf7l8f5nr7eh4t\",\n      \"requestId\": \"cmvzbnyh2cjhd7l8f2aexo3y2\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzbnwpqcjg67l8fgqzj90ui\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1329,\n      \"at\": \"2026-11-02T13:56:12.235Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbnwpqcjg67l8fgqzj90ui\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000031\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 14,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:56:10.484Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:57:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:56:10.018Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:57:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000061\\\",\\n  \\\"activityId\\\": \\\"00T000000000000062\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000063\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000061\"\n    },\n    {\n      \"id\": \"cmvzbngb2cjft7l8fkxhcd4b1\",\n      \"requestId\": \"cmvzbngaxcjfr7l8fhh28uu0d\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbnf7ccjex7l8f65bh9jfi\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 657,\n      \"at\": \"2026-11-02T13:55:48.686Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbnf7ccjex7l8f65bh9jfi\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000032\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:55:19.617Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:56:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:55:47.320Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:56:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000064\\\",\\n  \\\"activityId\\\": \\\"00T000000000000065\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000066\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000064\"\n    },\n    {\n      \"id\": \"cmvzbm344cjdz7l8f9g78mlbd\",\n      \"requestId\": \"cmvzbm341cjdx7l8fj4pk7yzp\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbm1u5cjd37l8f7zj593p4\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 849,\n      \"at\": \"2026-11-02T13:54:44.932Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbm1u5cjd37l8f7zj593p4\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000033\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:54:37.781Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:55:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:54:43.339Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:55:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000067\\\",\\n  \\\"activityId\\\": \\\"00T000000000000068\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000069\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000067\"\n    },\n    {\n      \"id\": \"cmvzbliuycjcq7l8fcte06pv2\",\n      \"requestId\": \"cmvzbliuvcjco7l8f7ysatgj8\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzblhjzcjbu7l8fyj2dr08p\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 824,\n      \"at\": \"2026-11-02T13:54:18.682Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzblhjzcjbu7l8fyj2dr08p\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000034\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:53:49.408Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:55:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:54:17.059Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:55:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000070\\\",\\n  \\\"activityId\\\": \\\"00T000000000000071\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000072\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000070\"\n    },\n    {\n      \"id\": \"cmvzbkzymcjbd7l8fob64z9qp\",\n      \"requestId\": \"cmvzbkzyicjbb7l8fmdubrpih\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbkyxncjah7l8flqarta0o\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 535,\n      \"at\": \"2026-11-02T13:53:54.191Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbkyxncjah7l8flqarta0o\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000035\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:53:16.688Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:54:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:53:52.915Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:54:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000073\\\",\\n  \\\"activityId\\\": \\\"00T000000000000074\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000075\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000073\"\n    },\n    {\n      \"id\": \"cmvzbka3dcj9y7l8fpuoou77h\",\n      \"requestId\": \"cmvzbka39cj9w7l8fzty5crk9\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbk93kcj927l8f0rag8fvz\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 480,\n      \"at\": \"2026-11-02T13:53:20.665Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbk93kcj927l8f0rag8fvz\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000036\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:48:56.077Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:54:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:53:19.438Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:54:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000076\\\",\\n  \\\"activityId\\\": \\\"00T000000000000077\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000078\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000076\"\n    },\n    {\n      \"id\": \"cmvzbjwvkcj897l8fke3s3kye\",\n      \"requestId\": \"cmvzbjwvhcj877l8facrs9w5z\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"recording.ready\",\n      \"callId\": \"cmvzbjuobcj707l8f58b43w3q\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 1226,\n      \"at\": \"2026-11-02T13:53:03.537Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"recording.ready\\\",\\n  \\\"hasRecording\\\": true,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbjuobcj707l8f58b43w3q\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000037\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 23,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:48:12.893Z\\\",\\n    \\\"recordingUrl\\\": \\\"https://app.360callanchor.com/api/public/recordings/play?t=REDACTED\\\",\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:53:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:53:00.750Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:53:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000079\\\",\\n  \\\"activityId\\\": \\\"00T000000000000080\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000081\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000079\"\n    },\n    {\n      \"id\": \"cmvzbjgj1cj6n7l8fpdo63ibj\",\n      \"requestId\": \"cmvzbjgixcj6l7l8fq2qu5ljd\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbjfprcj5r7l8fwlpkjwg8\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 652,\n      \"at\": \"2026-11-02T13:52:42.349Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbjfprcj5r7l8fwlpkjwg8\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000038\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:47:24.098Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-02T13:53:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:52:41.359Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"no-action-needed\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-02T13:53:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000082\\\",\\n  \\\"activityId\\\": \\\"00T000000000000083\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000084\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000082\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 253,\n    \"totalPages\": 26,\n    \"hasMore\": true\n  },\n  \"aggregate\": {\n    \"total\": 253,\n    \"delivered\": 109,\n    \"failed\": 144,\n    \"retrying\": 0,\n    \"queued\": 0,\n    \"successRate\": 43,\n    \"avgDurationMs\": 525\n  }\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -545,6 +1690,38 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/anchor-logs/{{requestId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "anchor-logs",
+                    "{{requestId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"request\": {\n    \"id\": \"cmvzbifjjcj4i7l8f1ech7djk\",\n    \"status\": \"delivered\",\n    \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n    \"payloadJson\": {\n      \"call\": {\n        \"id\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n        \"callType\": \"Outgoing\",\n        \"agentName\": \"Person 1\",\n        \"startedAt\": \"2026-11-02T11:46:15.010Z\",\n        \"calleeName\": \"Unknown\",\n        \"agentNumber\": \"+910000000003\",\n        \"calleePhone\": \"+910000000029\",\n        \"recordingUrl\": null,\n        \"dispositionNote\": \"<agent note>\",\n        \"durationSeconds\": 0,\n        \"dispositionLabel\": null,\n        \"dispositionScheduledAt\": \"2026-11-03T04:30:00.000Z\"\n      },\n      \"event\": \"call.completed\",\n      \"disposition\": {\n        \"fields\": {\n          \"note\": \"<agent note>\",\n          \"priority\": \"high\",\n          \"project-name\": \"acme-avantara\",\n          \"scheduled-at\": \"2026-11-03T04:30:00.000Z\",\n          \"task-subject\": \"follow-up\",\n          \"next-action-status\": \"follow-up\",\n          \"call-meeting-status\": \"not-connected\"\n        },\n        \"submittedAt\": \"2026-11-02T13:51:53.076Z\"\n      },\n      \"hasRecording\": false\n    },\n    \"attemptCount\": 1,\n    \"eventType\": \"call_completed\",\n    \"createdAt\": \"2026-11-02T13:51:54.415Z\",\n    \"completedAt\": \"2026-11-02T13:51:54.414Z\"\n  },\n  \"events\": [\n    {\n      \"id\": \"cmvzbifjncj4k7l8f17vznwjn\",\n      \"requestId\": \"cmvzbifjjcj4i7l8f1ech7djk\",\n      \"platformId\": \"salesforce\",\n      \"eventType\": \"call.completed\",\n      \"callId\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n      \"calleeName\": \"Unknown\",\n      \"attempt\": 1,\n      \"status\": \"delivered\",\n      \"httpStatus\": 201,\n      \"durationMs\": 627,\n      \"at\": \"2026-11-02T13:51:54.419Z\",\n      \"endpoint\": \"https://acme.my.salesforce.com/services/apexrest/CallAnchorWebhook\",\n      \"payloadPreview\": \"{\\n  \\\"event\\\": \\\"call.completed\\\",\\n  \\\"hasRecording\\\": false,\\n  \\\"call\\\": {\\n    \\\"id\\\": \\\"cmvzbiegfcj3o7l8fif9i8sfq\\\",\\n    \\\"agentName\\\": \\\"Person 1\\\",\\n    \\\"agentNumber\\\": \\\"+910000000003\\\",\\n    \\\"calleeName\\\": \\\"Unknown\\\",\\n    \\\"calleePhone\\\": \\\"+910000000029\\\",\\n    \\\"callType\\\": \\\"Outgoing\\\",\\n    \\\"durationSeconds\\\": 0,\\n    \\\"startedAt\\\": \\\"2026-11-02T11:46:15.010Z\\\",\\n    \\\"recordingUrl\\\": null,\\n    \\\"dispositionLabel\\\": null,\\n    \\\"dispositionNote\\\": \\\"<agent note>\\\",\\n    \\\"dispositionScheduledAt\\\": \\\"2026-11-03T04:30:00.000Z\\\"\\n  },\\n  \\\"disposition\\\": {\\n    \\\"submittedAt\\\": \\\"2026-11-02T13:51:53.076Z\\\",\\n    \\\"fields\\\": {\\n      \\\"project-name\\\": \\\"acme-avantara\\\",\\n      \\\"task-subject\\\": \\\"follow-up\\\",\\n      \\\"call-meeting-status\\\": \\\"not-connected\\\",\\n      \\\"priority\\\": \\\"high\\\",\\n      \\\"next-action-status\\\": \\\"follow-up\\\",\\n      \\\"note\\\": \\\"<agent note>\\\",\\n      \\\"scheduled-at\\\": \\\"2026-11-03T04:30:00.000Z\\\"\\n    }\\n  }\\n}\",\n      \"responsePreview\": \"{\\n  \\\"salesTaskId\\\": \\\"a0D000000000000052\\\",\\n  \\\"activityId\\\": \\\"00T000000000000053\\\",\\n  \\\"opportunityId\\\": \\\"006000000000000054\\\",\\n  \\\"success\\\": true\\n}\",\n      \"externalRecordId\": \"a0D000000000000052\"\n    }\n  ],\n  \"call\": {\n    \"callRecordId\": \"cmvzbiegfcj3o7l8fif9i8sfq\",\n    \"calleeId\": \"phone-0000000029\",\n    \"calleeName\": \"Unknown\",\n    \"calleePhone\": \"+910000000029\",\n    \"agentName\": \"Person 1\",\n    \"callType\": \"Outgoing\",\n    \"durationLabel\": \"00:00\",\n    \"callRecordAvailable\": true\n  },\n  \"platform\": {\n    \"slug\": \"salesforce\",\n    \"name\": \"Salesforce\",\n    \"isCustom\": true\n  }\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -602,6 +1779,53 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/support/logs?page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "support",
+                    "logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "disabled": false
+                    },
+                    {
+                      "key": "clientId",
+                      "value": "{{clientId}}",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"cmvzb7bp9chd67l8f0i1a0ial\",\n      \"occurredAt\": \"2026-11-02T13:43:16.221Z\",\n      \"category\": \"mobile\",\n      \"severity\": \"info\",\n      \"source\": \"mobile.recording.upload-init\",\n      \"clientId\": \"cmt1mg1rf00v9caa5hlyidcvb\",\n      \"actorType\": \"mobile\",\n      \"actorId\": \"cmu1b7jge2ggmewwgk4a1xzw1\",\n      \"actorEmail\": null,\n      \"correlationId\": \"dedff484-667d-4baf-a7b9-f2b3d8b2aa11\",\n      \"resourceType\": \"call_record\",\n      \"resourceId\": \"cmvzb7beochcs7l8fbd9svwlm\",\n      \"httpMethod\": null,\n      \"httpPath\": null,\n      \"httpStatus\": null,\n      \"durationMs\": null,\n      \"message\": \"Recording upload session initialized\",\n      \"metadata\": {\n        \"s3Key\": \"client/cmt1mg1rf00v9caa5hlyidcvb/team/cmu1b7jgb2ggkewwgbgyah8ip/call/cmvzb7beochcs7l8fbd9svwlm/1793626996155-1cabd951.mp3\",\n        \"fileSizeBytes\": 334176,\n        \"uploadSessionId\": \"ddf1f0b4-61f4-49ff-a69e-74bfba72ed93\"\n      },\n      \"ipAddress\": \"203.0.113.1\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 14629,\n    \"totalPages\": 293,\n    \"hasMore\": true\n  }\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -655,6 +1879,53 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/support/audit-logs?page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "support",
+                    "audit-logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "disabled": false
+                    },
+                    {
+                      "key": "clientId",
+                      "value": "{{clientId}}",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"cmvz9uv29cezh7l8f5jgukrjk\",\n      \"clientId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n      \"actorUserId\": \"cmv7oet8a41au11mm8r3llkmf\",\n      \"actorEmail\": \"user8@example.test\",\n      \"actorType\": \"support\",\n      \"actorDisplayName\": \"Person 25\",\n      \"action\": \"sync\",\n      \"resourceType\": \"integration\",\n      \"resourceId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n      \"correlationId\": \"7f5ec7fd-76dc-41ca-96dc-60305fe139d4\",\n      \"metadata\": {\n        \"event\": \"manual_sync_all\",\n        \"totals\": {\n          \"failed\": 19,\n          \"synced\": 0,\n          \"blocked\": 0,\n          \"processed\": 19\n        },\n        \"platforms\": [\n          \"salesforce\"\n        ]\n      },\n      \"ipAddress\": \"203.0.113.3\",\n      \"occurredAt\": \"2026-11-02T13:05:35.169Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 50,\n    \"total\": 79,\n    \"totalPages\": 2,\n    \"hasMore\": true\n  }\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -663,6 +1934,73 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"items\",\"pagination\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getAuditLog",
+          "request": {
+            "method": "GET",
+            "description": "One audit log entry. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/support/audit-logs/{{auditLogId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "support",
+                "audit-logs",
+                "{{auditLogId}}"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/support/audit-logs/{{auditLogId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "support",
+                    "audit-logs",
+                    "{{auditLogId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"cmw2162e12n18gem6a3y5mhkm\",\n  \"clientId\": \"cmus74leshej2ewwgii5qaycf\",\n  \"actorUserId\": \"cmuzm44sk0q6b8tpxnycdngly\",\n  \"actorEmail\": \"user54@example.test\",\n  \"actorType\": null,\n  \"actorDisplayName\": null,\n  \"action\": \"login\",\n  \"resourceType\": \"portal_user\",\n  \"resourceId\": \"cmuzm44sk0q6b8tpxnycdngly\",\n  \"correlationId\": null,\n  \"metadata\": null,\n  \"ipAddress\": null,\n  \"occurredAt\": \"2026-11-04T11:25:39.865Z\"\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -698,6 +2036,38 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/oneapi/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "oneapi",
+                    "status"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"linked\": true,\n  \"oneApiClientId\": \"6adf188fcdc09b4011badea5\",\n  \"assignProductStatus\": \"completed\",\n  \"cachedLicenseSeats\": -1,\n  \"licenseSeatsFetchedAt\": \"2026-11-02T13:49:40.632Z\",\n  \"cachedTrialExpiresAt\": \"2026-11-16T00:00:00.000Z\",\n  \"licenseCount\": 5,\n  \"accountStatus\": \"trial\",\n  \"clientStatus\": \"trial\",\n  \"backfillRecommended\": false\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "test",
@@ -735,6 +2105,38 @@
               ]
             }
           },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/clients/{{clientId}}/oneapi/backfill",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "clients",
+                    "{{clientId}}",
+                    "oneapi",
+                    "backfill"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"action\": \"refreshed\",\n  \"clientId\": \"cmvp1b1fu43jk7l8f88qbvkov\",\n  \"oneApiClientId\": \"6adf188fcdc09b4011badea5\",\n  \"assignProductStatus\": \"completed\",\n  \"assignSucceeded\": true,\n  \"licenseSeats\": -1,\n  \"licenseCount\": 5\n}\n"
+            }
+          ],
           "event": [
             {
               "listen": "prerequest",
@@ -751,6 +2153,77 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "App",
+      "item": [
+        {
+          "name": "getLatestAppBuild",
+          "request": {
+            "method": "GET",
+            "description": "The active Android app release. Safety: read.",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "callanchor_portal_session={{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/app-build/latest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "app-build",
+                "latest"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sample (redacted)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/app-build/latest",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "app-build",
+                    "latest"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"release\": {\n    \"id\": \"cmtv7z3s907zvewwgn4ger641\",\n    \"version\": \"1.0.6\",\n    \"downloadUrl\": \"https://downloads.example.test/callanchor.apk\",\n    \"qrImageUrl\": \"https://downloads.example.test/callanchor-qr.png\",\n    \"notes\": null,\n    \"isActive\": true,\n    \"createdAt\": \"2026-09-10T07:42:24.490Z\",\n    \"uploadedBy\": {\n      \"id\": \"cmrajg5ki001pct84lxmtpl6v\",\n      \"email\": \"user52@example.test\",\n      \"name\": \"Person 52\"\n    }\n  }\n}\n"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has required fields\", () => pm.expect(pm.response.json()).to.include.keys([\"release\"]));"
                 ]
               }
             }

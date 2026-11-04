@@ -32,8 +32,8 @@ export default async function CallAnchorApisPage() {
           : "CallAnchor can't be reached right now."}
       </p>
       <ApiConsole
-        operations={operations.map(({ id, method, path, tag, summary, safety, verified, params }) => ({
-          id, method, path, tag, summary, safety, verified, params,
+        operations={operations.map(({ id, method, path, tag, summary, safety, verified, params, curl, sample }) => ({
+          id, method, path, tag, summary, safety, verified, params, curl, sample,
         }))}
         clients={clients}
       />

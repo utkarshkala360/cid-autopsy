@@ -1,0 +1,16 @@
+{
+  "release": {
+    "id": "cmtv7z3s907zvewwgn4ger641",
+    "version": "1.0.6",
+    "downloadUrl": "https://downloads.example.test/callanchor.apk",
+    "qrImageUrl": "https://downloads.example.test/callanchor-qr.png",
+    "notes": null,
+    "isActive": true,
+    "createdAt": "2026-09-10T07:42:24.490Z",
+    "uploadedBy": {
+      "id": "cmrajg5ki001pct84lxmtpl6v",
+      "email": "user52@example.test",
+      "name": "Person 52"
+    }
+  }
+}

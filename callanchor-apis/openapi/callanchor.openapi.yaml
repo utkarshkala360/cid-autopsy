@@ -23,6 +23,8 @@ tags:
   - name: Sync
   - name: Logs
   - name: OneAPI
+  - name: Licenses
+  - name: App
 security:
   - portalSession: []
 paths:
@@ -376,6 +378,275 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/AuditLog' }
                   pagination: { $ref: '#/components/schemas/Pagination' }
+  /api/support/audit-logs/{auditLogId}:
+    parameters:
+      - name: auditLogId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getAuditLog
+      tags: [Logs]
+      summary: One audit log entry
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Audit log entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLog' }
+  /api/auth/me:
+    get:
+      operationId: getAuthMe
+      tags: [Auth]
+      summary: The signed-in user, with role, permissions and log access
+      description: The portal calls this on every page. Support users see `kind` support.
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Signed-in user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated, profile]
+                properties:
+                  authenticated: { type: boolean }
+                  profile: { $ref: '#/components/schemas/PortalUser' }
+  /api/app-build/latest:
+    get:
+      operationId: getLatestAppBuild
+      tags: [App]
+      summary: The active Android app release
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Latest release
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [release]
+                properties:
+                  release: { $ref: '#/components/schemas/AppRelease' }
+  /api/clients/{clientId}/onboarding-progress:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+    get:
+      operationId: getOnboardingProgress
+      tags: [Clients]
+      summary: Onboarding steps a client has completed
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Progress
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [steps, welcomeDismissed, portalTourCompleted]
+                properties:
+                  steps:
+                    type: array
+                    items:
+                      type: object
+                      required: [stepKey]
+                      properties:
+                        stepKey: { type: string, description: 'Seen: mobile_login' }
+                        completedAt: { type: [string, 'null'], format: date-time }
+                  welcomeDismissed: { type: boolean }
+                  portalTourCompleted: { type: boolean }
+                  termsAcceptedAt: { type: [string, 'null'] }
+  /api/clients/{clientId}/portal-admins:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+    get:
+      operationId: listPortalAdmins
+      tags: [Clients]
+      summary: A client's customer-portal admins
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Admins
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admins]
+                properties:
+                  admins:
+                    type: array
+                    items: { $ref: '#/components/schemas/PortalAdmin' }
+  /api/clients/{clientId}/notifications:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+      - $ref: '#/components/parameters/page'
+      - $ref: '#/components/parameters/limit'
+    get:
+      operationId: listNotifications
+      tags: [Clients]
+      summary: A client's portal notifications
+      description: The sample was empty, so the shape of a notification is unknown.
+      x-safety: read
+      x-verified: 2026-11-05
+      x-paginated: true
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notifications, unreadCount, pagination]
+                properties:
+                  notifications:
+                    type: array
+                    items: {}
+                  unreadCount: { type: integer }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
+  /api/clients/{clientId}/ai-credits:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+      - name: from
+        in: query
+        schema: { type: string }
+      - name: to
+        in: query
+        schema: { type: string }
+      - name: cursor
+        in: query
+        description: The previous page's `purchaseChangesNextCursor`.
+        schema: { type: string }
+      - $ref: '#/components/parameters/limit'
+    get:
+      operationId: getAiCredits
+      tags: [Clients]
+      summary: AI credit balance, entitlements and purchase history
+      description: The sample had no licenses or purchase changes, so their item shapes are unknown.
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Credits
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiCredits' }
+  /api/clients/{clientId}/disposition-sets:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+    get:
+      operationId: listDispositionSets
+      tags: [Clients]
+      summary: Disposition form sets, with field and license counts
+      description: Pass a set's `id` as `setId` to the disposition form fields endpoint.
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Sets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sets]
+                properties:
+                  sets:
+                    type: array
+                    items: { $ref: '#/components/schemas/DispositionSet' }
+  /api/clients/{clientId}/license-seat-compliance:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+    get:
+      operationId: getLicenseSeatCompliance
+      tags: [Licenses]
+      summary: Whether active licenses are within the contracted seat limit
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Compliance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SeatCompliance' }
+  /api/clients/{clientId}/license-seat-settings:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+    get:
+      operationId: getLicenseSeatSettings
+      tags: [Licenses]
+      summary: The grace period allowed when licenses exceed the seat limit
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [seatGracePeriodHours, minHours, maxHours]
+                properties:
+                  seatGracePeriodHours: { type: integer }
+                  seatGraceStartedAt: { type: [string, 'null'] }
+                  seatGraceEndsAt: { type: [string, 'null'] }
+                  minHours: { type: integer }
+                  maxHours: { type: integer }
+  /api/clients/{clientId}/callees/{calleeId}:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+      - name: calleeId
+        in: path
+        required: true
+        description: A `calleeId` from call-contacts, for example `phone-<digits>`.
+        schema: { type: string }
+    get:
+      operationId: getCallee
+      tags: [Calls]
+      summary: One contact with call stats and every call to or from them
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Contact
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile]
+                properties:
+                  profile: { $ref: '#/components/schemas/Callee' }
+  /api/clients/{clientId}/calls/{callId}/ai-insights:
+    parameters:
+      - $ref: '#/components/parameters/clientId'
+      - name: callId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getCallAiInsights
+      tags: [Calls]
+      summary: A call's AI sentiment, summary and next actions
+      description: |
+        Reading is free. The portal's POST to the same path generates insights and
+        likely spends AI credits, so it isn't in this contract. The sample was
+        `queued`, so the shapes of the filled arrays are unknown.
+      x-safety: read
+      x-verified: 2026-11-05
+      responses:
+        '200':
+          description: Insights
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/CallAiInsights' }
 components:
   securitySchemes:
     portalSession:
@@ -519,12 +790,20 @@ components:
         agent: { type: string }
         teamMemberId: { type: string }
         duration: { type: string, description: 'mm:ss' }
+        durationSeconds: { type: integer }
         datetime: { type: string, format: date-time }
         datetimeLabel: { type: string, description: Display label in IST }
         type: { type: string, description: 'Seen: Incoming, Outgoing' }
         recordingStatus: { type: string }
         platformSyncStatus: { type: string }
+        recordingUnavailableReason: { type: [string, 'null'] }
+        recordingPermissionDisabledAt: { type: [string, 'null'] }
         anyIntegrationSynced: { type: boolean }
+        aiInsightStatus: { type: [string, 'null'] }
+        aiInsightErrorCode: { type: [string, 'null'] }
+        aiOverallSentiment: { type: [string, 'null'] }
+        aiSentimentScore: { type: [number, 'null'] }
+        aiCreditsUsed: { type: [number, 'null'] }
         dispositionLabel: { type: [string, 'null'] }
         dispositionNote: { type: [string, 'null'] }
         dispositionScheduledAt: { type: [string, 'null'] }
@@ -680,6 +959,10 @@ components:
           description: Options or placeholder, depending on type.
         archivedAt: { type: [string, 'null'] }
         usageCount: { type: integer }
+        setMembershipCount: { type: integer, description: How many disposition sets include this field }
+        setNames:
+          type: array
+          items: { type: string }
     Tenant:
       type: object
       required: [clientId, callRecords, licenses, integrations, callAnchorLogs, updatedAt]
@@ -712,6 +995,7 @@ components:
             skipRequiresReason: { type: boolean }
             reminderIfIncomplete: { type: boolean }
             maxPromptSeconds: { type: integer }
+            allowLicenseOverride: { type: boolean }
             presetDispositions:
               type: array
               items: { $ref: '#/components/schemas/DispositionPreset' }
@@ -721,6 +1005,7 @@ components:
             defaultPolicy: { type: string }
             allowLicenseOverride: { type: boolean }
             recordingEnabled: { type: boolean }
+            deleteLocalRecording: { type: boolean }
         mobileAppSettings:
           type: object
           properties:
@@ -808,6 +1093,10 @@ components:
               typesPresent:
                 type: array
                 items: { type: string }
+              latestAiInsightStatus: { type: [string, 'null'] }
+              latestAiInsightErrorCode: { type: [string, 'null'] }
+              latestAiOverallSentiment: { type: [string, 'null'] }
+              latestAiCreditsUsed: { type: [number, 'null'] }
         pagination: { $ref: '#/components/schemas/Pagination' }
         stats:
           type: object
@@ -976,3 +1265,167 @@ components:
           type: [object, 'null']
         ipAddress: { type: [string, 'null'] }
         occurredAt: { type: string, format: date-time }
+    AppRelease:
+      type: object
+      required: [id, version, downloadUrl, isActive, createdAt]
+      properties:
+        id: { type: string }
+        version: { type: string }
+        downloadUrl: { type: string }
+        qrImageUrl: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        uploadedBy:
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string }
+            name: { type: string }
+    PortalAdmin:
+      type: object
+      required: [portalUserId, name, email, isActive]
+      properties:
+        portalUserId: { type: string }
+        teamMemberId: { type: [string, 'null'] }
+        name: { type: string }
+        email: { type: string }
+        mobile: { type: [string, 'null'] }
+        licenseNumber: { type: [string, 'null'] }
+        isActive: { type: boolean }
+        lastLoginAt: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+    AiCredits:
+      type: object
+      required: [balance, purchasedCredits, creditsUsed, entitlements]
+      properties:
+        balance: { type: number }
+        purchasedCredits: { type: number }
+        creditsUsed: { type: number }
+        usagePercent: { type: [number, 'null'] }
+        allotmentEpoch: { type: integer }
+        overdrawnBy: { type: number }
+        licenses:
+          type: array
+          items: {}
+        entitlements:
+          type: object
+          properties:
+            aiInsightsOptIn: { type: boolean }
+            accountStatus: { type: string, description: 'Seen: purchased' }
+            isTrial: { type: boolean }
+            aiAllowed: { type: boolean }
+        purchaseChanges:
+          type: array
+          items: {}
+        purchaseChangesNextCursor: { type: [string, 'null'] }
+    DispositionSet:
+      type: object
+      required: [id, name, isDefault]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        tag: { type: [string, 'null'] }
+        isDefault: { type: boolean }
+        sortOrder: { type: integer }
+        activeFieldCount: { type: integer }
+        licenseCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SeatCompliance:
+      type: object
+      required: [phase, total, activeCount, limit, overBy, overCap, activationLocked]
+      properties:
+        phase: { type: string, description: 'Seen: compliant' }
+        total: { type: integer }
+        activeCount: { type: integer }
+        limit: { type: [integer, 'null'] }
+        overBy: { type: integer }
+        overCap: { type: boolean }
+        activationLocked: { type: boolean }
+        seatGraceStartedAt: { type: [string, 'null'] }
+        seatGraceEndsAt: { type: [string, 'null'] }
+        seatGracePeriodHours: { type: integer }
+        recommendations:
+          type: array
+          items: {}
+    CalleeCall:
+      type: object
+      required: [id, type, agent, duration]
+      properties:
+        id: { type: string }
+        time: { type: string, description: Display label in IST }
+        date: { type: string, description: Display label in IST }
+        dayLabel: { type: string }
+        type: { type: string, description: 'Seen: Outgoing' }
+        agent: { type: string }
+        duration: { type: string, description: 'mm:ss' }
+        durationSeconds: { type: integer }
+        recordingStatus: { type: string }
+        platformSyncStatus: { type: string }
+        recordingUnavailableReason: { type: [string, 'null'] }
+        recordingPermissionDisabledAt: { type: [string, 'null'] }
+        dispositionLabel: { type: [string, 'null'] }
+        dispositionNote: { type: [string, 'null'] }
+        dispositionScheduledAt: { type: [string, 'null'] }
+        dispositionDisplayFields:
+          type: array
+          items:
+            type: object
+            properties:
+              slug: { type: string }
+              label: { type: string }
+              type: { type: string }
+              displayValue: { type: [string, 'null'] }
+        recordingSynced: { type: boolean }
+        recordingDeleted: { type: boolean }
+        recordingAvailable: { type: boolean }
+        aiInsightStatus: { type: [string, 'null'] }
+        aiInsightErrorCode: { type: [string, 'null'] }
+        aiOverallSentiment: { type: [string, 'null'] }
+        aiSentimentScore: { type: [number, 'null'] }
+        aiCreditsUsed: { type: [number, 'null'] }
+    Callee:
+      type: object
+      required: [id, name, phone, stats, logs]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        stats:
+          type: object
+          properties:
+            total: { type: integer }
+            incoming: { type: integer }
+            missed: { type: integer }
+            outgoing: { type: integer }
+            rejected: { type: integer }
+        logs:
+          type: array
+          items: { $ref: '#/components/schemas/CalleeCall' }
+    CallAiInsights:
+      type: object
+      required: [callRecordId, status, missing]
+      properties:
+        callRecordId: { type: string }
+        status: { type: string, description: 'Seen: queued' }
+        overallSentiment: { type: [string, 'null'] }
+        sentimentScore: { type: [number, 'null'] }
+        customerTone: { type: [string, 'null'] }
+        agentTone: { type: [string, 'null'] }
+        sentimentTimeline: { type: array, items: {} }
+        sentimentDrivers: { type: array, items: {} }
+        momSummary: { type: [string, 'null'], description: Minutes of the meeting }
+        momKeyPoints: { type: array, items: {} }
+        nextActions: { type: array, items: {} }
+        languageCode: { type: [string, 'null'] }
+        errorCode: { type: [string, 'null'] }
+        errorMessage: { type: [string, 'null'] }
+        completedAt: { type: [string, 'null'] }
+        segments: { type: array, items: {} }
+        agentName: { type: string }
+        calleeName: { type: string }
+        calleePhone: { type: string }
+        durationLabel: { type: string }
+        startedAt: { type: string, format: date-time }
+        missing: { type: boolean }

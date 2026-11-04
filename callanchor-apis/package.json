@@ -11,6 +11,7 @@
     "import:sheet": "node scripts/import-sheet.ts",
     "generate:postman": "node scripts/generate-collection.ts",
     "generate:contract": "node scripts/generate-contract.ts",
+    "generate:reference": "node scripts/generate-reference.ts",
     "test": "node --test test/*.test.ts"
   },
   "dependencies": {

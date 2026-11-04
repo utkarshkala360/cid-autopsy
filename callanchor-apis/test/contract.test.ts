@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { rendered } from "../scripts/generate-collection.ts";
 import { renderedContract } from "../scripts/generate-contract.ts";
+import { renderedReference } from "../scripts/generate-reference.ts";
 import { operation, operations, undocumented, validate } from "../src/spec.ts";
 
 const fixtures = readdirSync("fixtures").filter((f) => f.endsWith(".json"));
@@ -43,4 +44,9 @@ test("the app's copy of the contract is up to date", () => {
 test("the Postman collection is up to date", () => {
   const committed = readFileSync("postman/callanchor.postman_collection.json", "utf8");
   assert.equal(committed, rendered, "Run: npm run generate:postman");
+});
+
+test("the curl reference is up to date", () => {
+  const committed = readFileSync("docs/api-reference.md", "utf8");
+  assert.equal(committed, renderedReference, "Run: npm run generate:reference");
 });

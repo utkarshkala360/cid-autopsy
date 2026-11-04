@@ -11,7 +11,11 @@
       "lastDatetime": "2026-11-02T13:10:40.423Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000025",
@@ -24,7 +28,11 @@
       "lastDatetime": "2026-11-02T13:04:23.115Z",
       "typesPresent": [
         "Incoming"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000031",
@@ -37,7 +45,11 @@
       "lastDatetime": "2026-11-02T11:56:10.484Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000032",
@@ -50,7 +62,11 @@
       "lastDatetime": "2026-11-02T11:55:19.617Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000033",
@@ -63,7 +79,11 @@
       "lastDatetime": "2026-11-02T11:54:37.781Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000034",
@@ -76,7 +96,11 @@
       "lastDatetime": "2026-11-02T11:53:49.408Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000035",
@@ -89,7 +113,11 @@
       "lastDatetime": "2026-11-02T11:53:16.688Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000036",
@@ -102,7 +130,11 @@
       "lastDatetime": "2026-11-02T11:48:56.077Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000037",
@@ -115,7 +147,11 @@
       "lastDatetime": "2026-11-02T11:48:12.893Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     },
     {
       "calleeId": "phone-0000000038",
@@ -128,7 +164,11 @@
       "lastDatetime": "2026-11-02T11:47:24.098Z",
       "typesPresent": [
         "Outgoing"
-      ]
+      ],
+      "latestAiInsightStatus": null,
+      "latestAiInsightErrorCode": null,
+      "latestAiOverallSentiment": null,
+      "latestAiCreditsUsed": null
     }
   ],
   "pagination": {

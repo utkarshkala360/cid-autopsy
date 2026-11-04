@@ -11,8 +11,10 @@ responses, and `ca check` tells you when production no longer matches it.
 
 | Path | What it is |
 | --- | --- |
-| [openapi/callanchor.openapi.yaml](openapi/callanchor.openapi.yaml) | The contract: 17 operations. Edit this. |
-| [postman/](postman/) | Collection generated from the contract, plus an environment |
+| [openapi/callanchor.openapi.yaml](openapi/callanchor.openapi.yaml) | The contract: 29 operations. Edit this. |
+| [postman/](postman/) | Collection generated from the contract, with a sample response per request, plus an environment |
+| [docs/api-reference.md](docs/api-reference.md) | Generated curl command and redacted sample response for every operation |
+| [docs/endpoint-inventory.md](docs/endpoint-inventory.md) | Every endpoint the portal's front end calls, reads and writes split |
 | [Web console](../app/dashboard/(app)/call_anchor_config/apis/) | Browse and run these APIs at `/dashboard/call_anchor_config/apis` |
 | [src/](src/) | Typed client, the `ca` CLI and a mock server |
 | [fixtures/](fixtures/) | Redacted sample responses |
@@ -67,8 +69,8 @@ collection. Set it to `true` only for the one request you mean to send, includin
 
 1. Update `openapi/callanchor.openapi.yaml`. When `ca check` passes for an operation, change its
    `x-verified` from `sample` to that date.
-2. Run `npm run generate:postman` and `npm run generate:contract`. The second updates the copy the
-   app's API console uses.
+2. Run `npm run generate:postman`, `npm run generate:contract` and `npm run generate:reference`.
+   The second updates the copy the app's API console uses; the third rebuilds the curl reference.
 3. Add or refresh a redacted fixture in `fixtures/`, named `<operationId>.json`.
 4. Run `npm test`.
 

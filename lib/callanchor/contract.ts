@@ -17,6 +17,10 @@ export type Operation = {
   verified: string;
   params: { name: string; in: string }[];
   schema: Schema;
+  /** curl command with shell variables for ids and the session. */
+  curl: string;
+  /** Redacted, trimmed sample response as JSON text. */
+  sample: string;
 };
 
 export type ContractResult =

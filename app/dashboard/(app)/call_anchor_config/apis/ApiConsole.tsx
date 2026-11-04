@@ -131,6 +131,23 @@ export function ApiConsole({
               </button>
             </form>
           )}
+
+          <div className="mt-6 space-y-3 border-t border-slate-100 pt-5">
+            <div>
+              <p className={labelClass}>curl</p>
+              <pre className="mt-1 overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">{op.curl}</pre>
+              <p className="mt-1 text-xs text-slate-500">
+                Set <code className="font-mono">CALLANCHOR_SESSION</code> to your session cookie and each id variable
+                before running it.
+              </p>
+            </div>
+            <details key={op.id}>
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">Sample response (redacted)</summary>
+              <pre className="mt-2 max-h-[32rem] overflow-auto rounded-lg bg-slate-50 p-4 text-xs text-slate-700">
+                {op.sample}
+              </pre>
+            </details>
+          </div>
         </div>
 
         {shown?.error && <FormMessage state={{ error: shown.error }} />}

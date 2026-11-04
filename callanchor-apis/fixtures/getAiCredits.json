@@ -1,0 +1,17 @@
+{
+  "balance": 0,
+  "purchasedCredits": 0,
+  "creditsUsed": 0,
+  "usagePercent": null,
+  "allotmentEpoch": 1,
+  "overdrawnBy": 0,
+  "licenses": [],
+  "entitlements": {
+    "aiInsightsOptIn": false,
+    "accountStatus": "purchased",
+    "isTrial": false,
+    "aiAllowed": false
+  },
+  "purchaseChanges": [],
+  "purchaseChangesNextCursor": null
+}

@@ -11,11 +11,14 @@
       "agent": "Person 1",
       "teamMemberId": "cmvs21lit5pja7l8flvsfgi3o",
       "duration": "00:33",
+      "durationSeconds": 33,
       "datetime": "2026-11-02T13:10:40.423Z",
       "datetimeLabel": "2 Nov 2026 · 06:40 pm",
       "type": "Outgoing",
       "recordingStatus": "synced",
       "platformSyncStatus": "synced",
+      "recordingUnavailableReason": null,
+      "recordingPermissionDisabledAt": null,
       "anyIntegrationSynced": true,
       "dispositionLabel": null,
       "dispositionNote": "<agent note>",
@@ -63,7 +66,12 @@
           "type": "datetime",
           "displayValue": "2 Nov 2026 · 06:53 pm"
         }
-      ]
+      ],
+      "aiInsightStatus": null,
+      "aiInsightErrorCode": null,
+      "aiOverallSentiment": null,
+      "aiSentimentScore": null,
+      "aiCreditsUsed": null
     }
   ],
   "licenses": [
@@ -771,12 +779,14 @@
         "enabled": true,
         "description": "Contact requested no further outreach"
       }
-    ]
+    ],
+    "allowLicenseOverride": true
   },
   "callCaptureSettings": {
     "defaultPolicy": "default_business_allow_personal",
     "allowLicenseOverride": true,
-    "recordingEnabled": true
+    "recordingEnabled": true,
+    "deleteLocalRecording": false
   },
   "mobileAppSettings": {
     "allowMobileLogout": true,
