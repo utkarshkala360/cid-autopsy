@@ -37,12 +37,30 @@ Rules already established in this repo.
   first (owner, 2026-11-03).
 - Never run `sendOtp`, a write operation or `getRecordingLink` against production unless the owner
   asked for that specific action. `sendOtp` calls a real phone.
+- When exploring the live CallAnchor app, act only on the client the owner names, for example
+  `/support/clients/cmus74leshej2ewwgii5qaycf?tab=calls`, so a mistaken update can't reach another
+  client (owner, 2026-11-05).
+- Never call `reveal-auth`: it returns a stored CRM credential. The full endpoint list, with reads
+  and writes split, is `callanchor-apis/docs/endpoint-inventory.md`.
 - CallAnchor data is stored, not re-pulled from scratch. Visits pull only what's new since each
   stream's saved milestone. The trailing 5 days are refreshed once a day, and every pull saves its new
   milestone (owner, 2026-11-03). See `lib/callanchor/store.ts`.
 - A CRM sync succeeded when the CRM replied 2xx, even if CallAnchor marked the callout failed.
   `call.completed` and `recording.ready` both count as the call reaching the CRM, so either one syncs
   its recording (owner, 2026-11-04). See `crmStatus` in `lib/callanchor/labels.ts`.
+- `recording.ready` and `call.completed` are both valid syncs: `recording.ready` is sent for a call
+  that connected and was recorded (a few seconds or more), `call.completed` for a missed incoming or
+  rejected outgoing call. A call that got either one reached the CRM (owner, 2026-11-05).
+- Health rules use plain elapsed time, judged day by day. No working-hours or working-day filter
+  (owner, 2026-11-05).
+- Health thresholds are configurable on the health Settings tab, fleet-wide. Defaults are `RULES` in
+  `lib/callanchor/issues.ts`; saved values live in `ca_health_settings` (owner, 2026-11-05).
+- Seat use (purchased, assigned, logged in, calling, unused) has its own Seats tab, not issue cards.
+  Unused seats aren't issues (owner, 2026-11-05).
+- CRM replies are custom code written per client, so their text is never a reliable error
+  identifier. Severity comes from CallAnchor and HTTP signals (status code, no response, retries,
+  missing events, timing). Reply text is shown as evidence only, until owner-curated suggestions and
+  a structured reply layout exist (owner, 2026-11-04).
 - Every error, flag and count on the health pages opens the items behind it, one row per item, down
   to a single call's timeline (owner, 2026-11-04).
 - Anything with metadata shows it in full next to the error: a callout's payload, endpoint, every
@@ -65,9 +83,29 @@ What a good change looks like here.
   lines are stored whole (`raw`), because CallAnchor drops them after about 3 days. Callout payloads
   and CRM replies are read live from `anchor-logs/{requestId}` when a call is opened, never stored.
   Summaries read `LOG_COLUMNS`, never `raw`.
+- Health rules live in `lib/callanchor/issues.ts`. A count and the call list it opens use the same
+  `CALL_STAGES` test, so they can't disagree. Add a stage there, not a second filter in SQL.
+- Per-call questions read `ca_calls`, which `ca_refresh_calls()` rebuilds after each save. Don't
+  rebuild call state from all logs on a page.
 - Link a health number to its items with a `Drill` and `itemsHref()`; the items page
   (`health/items`) reads the store with the same filters, and `health/calls/<id>` shows one call.
 - Run slow background work, like the 5-day refresh, with `after()`, so it doesn't block the page.
+- To make a threshold editable, add it to `SETTINGS` in `lib/callanchor/issues.ts`; every loader in
+  `health.ts` calls `loadSettings()` first, so pages and actions see the saved values.
+- Give every client and phone the same three numbers (`Pulse` in `lib/callanchor/issues.ts`): last good
+  CRM sync, synced days out of days with due calls (7 and 30 days, as a day strip), and the recording
+  chain. Judge each against its own history and absolute limits; other phones are only a hint.
+- "Reached the CRM" is delivered out of due (`CALL_STAGES.due`) everywhere. Day counts come from SQL
+  (`readDaily`), so `RECORDED_SQL` and `dueOf` must agree with the stage tests.
+- A drop that loses data (a recording not uploaded, verified but not synced, a call never sent) stays
+  flagged until it's fixed, back 30 days (`readOpenCalls`), not only for 24 hours. A rate problem says
+  how many days it has run.
+- Verify engine changes against the store with a read-only stand-in for `lib/db.ts` that refuses
+  anything but SELECT, and schema changes in an in-process Postgres (PGlite), never on the shared DB.
+- A new CallAnchor read goes: capture it live into `callanchor-apis/data/` (git-ignored), add it to
+  the contract, write a redacted fixture and add the real values to `.denylist`, run the three
+  `generate:*` scripts, then `ca check`. The curl reference and Postman samples come from the
+  fixtures, so they're never written by hand.
 
 ## Recommendations
 
@@ -75,11 +113,13 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-05 | Alerts for new critical issues and a phone with no sync, by Slack or email (QA O1) | Nobody is told until someone opens the page. Needs a channel and the scheduled pull | Awaiting owner |
+| 2026-11-05 | Get a CallAnchor role that can read `click-to-call-logs`, `bulk-dial-logs`, app builds, log retention and support users, and sample `licenses/{id}/history` on a client with licenses | Our `support_agent` login gets 403 on them, so they have no sample or contract entry. See "What our login can't read" in `callanchor-apis/docs/endpoint-inventory.md` | Awaiting owner |
 | 2026-11-04 | Limit who sees raw payloads and log metadata | They carry customer phone numbers, agents' notes, actor emails and IPs, and every member with a CallAnchor login can open them | Awaiting owner |
+| 2026-11-05 | Decide the open points in `docs/client-health-plan.md` section 10: whether license issues alert alone, acknowledge and notes, how suggestions get added | Working hours and thresholds are settled (no filter; Settings tab) | Awaiting owner |
 | 2026-11-03 | Give local dev its own Neon branch (set a branch `DATABASE_URL` in `.env.local` and Vercel's Development env) | Local, preview and production all use the same database, so a local visit moves the live milestones and writes live rows, and local schema changes hit production at once | Awaiting owner |
-| 2026-11-03 | Confirm the health thresholds: critical below 80% sync success, warning below 95%, critical at 3 stuck recordings, 30-minute grace for a pipeline stage | They decide what's flagged; they're starting guesses (`THRESHOLDS` in `lib/callanchor/health.ts`) | Awaiting owner |
 | 2026-11-03 | Raise the S3 purge failure with CallAnchor | Every post-sync S3 deletion failed (0 of 228 succeeded on 3 Nov): their AWS user lacks `s3:DeleteObject`, and the logs mark it `info`. Recordings stay in S3 longer than intended | Awaiting owner |
-| 2026-11-03 | Pull on a schedule (Vercel cron) as well as on visits | Data only moves when someone opens the dashboard, so quiet hours leave gaps beyond CallAnchor's ~3-day log retention. Needs unattended access (open question 1) | Awaiting owner |
+| 2026-11-03 | Pull on a schedule (Vercel cron) as well as on visits (QA D3) | Data only moves when someone opens the dashboard: 6.5 hours stale on 5 Nov, and an unvisited weekend loses logs for good beyond CallAnchor's ~3-day retention. Needs unattended access (open question 1) | Awaiting owner |
 | 2026-11-03 | Confirm 90-day retention for the stored health data | Older rows are deleted to keep the tables small | Awaiting owner |
 | 2026-11-03 | Review `OPPORTUNITY_NOT_FOUND` with the affected client | It was the top CRM error fleet-wide on 3 Nov, so data matching, not an outage, drives the worst sync rates (open question 5) | Awaiting owner |
 | 2026-11-02 | Rotate the session cookie exposed in the "CallAnchor x APIs" sheet and restrict access to the sheet | It also holds recording links, customer phone numbers and an AWS access key ID | Awaiting owner |
@@ -91,6 +131,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-05 | Owner's QA answers: both sync events valid (R3 note removed); no working-hours filter, elapsed time day by day; Settings tab for 13 thresholds; Seats tab with seat use per client and every unused seat since when (seat notes left the issue lists); Clients / Licenses / Seats / Settings tabs | Done; `ca_health_settings` applies on the next deploy. Not yet viewed signed in | `health/settings/`, `health/seats/`, `SETTINGS` in `lib/callanchor/issues.ts` |
+| 2026-11-05 | QA follow-up: last good sync, synced days and recording chain for every client and phone; one "reached the CRM" (delivered out of due); recordings and unsent calls flagged until fixed; 5-minute grace for server steps; "since" from the run of bad days; issue episodes tied to the data; phone rules that work with one phone; seat use; integration changes recorded and each integration checked alone; duplicate 2xx flagged; fleet stall; inactive clients muted; issue cards open their rows with the evidence above; "new since your last visit"; trials section; busy-client log streams chosen by stored calls | Done; schema applies on the next deploy. Not yet viewed signed in | `docs/client-health-qa.md` §14, `lib/callanchor/issues.ts` |
+| 2026-11-05 | CallAnchor contract 17 → 29 operations, checked live: 12 new reads (callee, AI insights, AI credits, seat compliance and settings, disposition sets, portal admins, notifications, onboarding, audit log entry, `auth/me`, latest app build) and new fields on tenant, call contacts and disposition fields. Every operation now has a generated curl and redacted sample (`docs/api-reference.md`), and every Postman request carries its sample response. The API console page shows each operation's curl and sample too (`src/reference.ts` feeds both) | Done; console not yet viewed signed in, not pushed | `callanchor-apis/openapi/`, `callanchor-apis/docs/api-reference.md` |
+| 2026-11-05 | Client health plan, all four phases: fixes A, E, F, J; calls linked to licenses through `metadata.licenseId`; `ca_calls`, `ca_licenses` (with change history), `ca_issue_state`, `ca_reply_suggestions`; issue engine; fleet triage, client page redesign, licenses, license and issue pages, call journey; coverage line; own log streams for the 3 busiest clients | Done, schema applied to the shared DB; not yet viewed signed in. License statuses fill in as new mobile logs are pulled | `docs/client-health-plan.md` §11, `lib/callanchor/issues.ts`, `app/dashboard/(app)/call_anchor_config/health/` |
 | 2026-11-04 | Full payloads and metadata: call pages read each CRM request live (payload, endpoint, attempts, replies, errors); log lines are stored whole and shown with their metadata; CRM sync log lines now join their call through `metadata.callRecordId` | Done, not yet viewed signed in. Older rows fill in on the next background 5-day refresh | `health/calls/[callId]/`, `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-04 | Item-level drill-down: every flag, error, outcome and count links to its rows (syncs, recordings, system logs), with per-call timelines | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor_config/health/items/`, `health/calls/[callId]/` |
 | 2026-11-04 | Count a 2xx CRM reply as success, and either `call.completed` or `recording.ready` as a synced recording | Done | `lib/callanchor/labels.ts`, `lib/callanchor/health.ts` |
@@ -101,9 +145,58 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-05: Answered the QA points: `recording.ready` (connected, recorded) and `call.completed`
+  (missed or rejected) are both valid; no working-time filter, daily basis; no-sync thresholds
+  fine but configurable; unused seats in a dedicated tab. Built all four and added them to the SOP.
+
+- 2026-11-05: Asked to read the QA report well and adapt the tracker to it. Built every finding that
+  doesn't need an owner decision; left R3, the working-time and seat thresholds, alerts and the
+  scheduled pull as recommendations. Status per finding is in `docs/client-health-qa.md` §14.
+
+- 2026-11-05: Asked to update the sample responses and curl for the CallAnchor APIs. Captured the
+  new reads live on the one named client (GET only), added 12 operations and the drifted fields to
+  the contract, redacted fixtures, and generated a curl reference and Postman sample responses.
+  Then asked for it on the portal's CallAnchor APIs page, and said they'll push when needed. Each
+  operation there now shows its curl and redacted sample. Not pushed.
+
+- 2026-11-05: Asked for one consolidated QA report. Wrote `docs/client-health-qa.md`, which merges
+  both reviews with an ID and severity per finding, an order of work and the owner's open points.
+
+- 2026-11-05: Asked to review from the license's view too: a purchased license should sync its calls
+  consistently, not only once, and any drop should be flagged. Also asked for every other angle.
+  Reviewed licenses, integrations, account, time, platform and operator angles with read-only
+  counts. No code was changed. Added a recommendation.
+
+- 2026-11-05: Asked for a full QA of the client health tool, as PM, UI expert, QA and user. The data
+  must be clear and the UI not too deeply nested. The core check: a recorded call must be uploaded,
+  have its recording and be synced to the CRM, and any drop along the way should be flagged early.
+  Reviewed the code and ran read-only counts on the store. No code was changed. Added two
+  recommendations.
+
+- 2026-11-05: Asked for every API app.360callanchor.com uses to pull data, and said to act only
+  under one named client's Call Records tab. No browser was connected, so the list came from the
+  app's public bundles, with no API calls. Wrote `callanchor-apis/docs/endpoint-inventory.md` and
+  added the one-client rule to the SOP.
+
+- 2026-11-05: Asked to execute `docs/client-health-plan.md`. Built all four phases; settled open
+  question 16 with live GETs (the license is `metadata.licenseId`); answered the follow-ups on open
+  questions 12 and 14 from the store. Section 11 of the plan lists where the build differs.
+
 - 2026-11-04: Wants payload data and all other metadata next to the error wherever an item has it.
   Call pages now read each CRM request live and show log metadata; added the rule to the SOP.
 
+- 2026-11-04: Asked how the agent knew "CallAnchor reports each license every 10 minutes". It
+  didn't: 10 minutes is our store's minimum gap between tenant reads, and reads happen only on
+  dashboard visits. Corrected the wording in the health plan.
+
+- 2026-11-04: Asked for status per license, not just per client, in the health plan. Added section
+  6 to `docs/client-health-plan.md` (statuses, roll-up, license pages) and open question 16, since
+  stored events don't yet record which license made a call.
+
+- 2026-11-04: Asked for a plan, not a build, to find critical issues in depth with a friendlier UI.
+  Said CRM replies are custom per client and aren't error identifiers, and that suggestions and a
+  structured reply layout will follow. Profiled the store, wrote `docs/client-health-plan.md`, added
+  the reply rule to the SOP and open questions 12–15.
 - 2026-11-04: Said `call.completed` and `recording.ready` are both successful sends to the CRM, and
   HTTP 200 is a CRM success. Applied both (4 callouts CallAnchor marked failed despite a 200 now count
   as delivered), answered open question 11 and dropped the two recommendations it replaced.

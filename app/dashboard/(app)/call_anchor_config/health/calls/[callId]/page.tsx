@@ -3,9 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { loadCall, type AnchorResult } from "@/lib/callanchor/health";
+import { crmStatus } from "@/lib/callanchor/labels";
 import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
-import { ago, formatTime, int } from "../../format";
-import { Json, Section, Table, td } from "../../parts";
+import { ago, formatTime, int, licenseHref } from "../../format";
+import { Json, Section, Stepper, Table, td } from "../../parts";
 
 export const metadata: Metadata = { title: "Call timeline" };
 
@@ -16,9 +17,15 @@ const ID_PATTERN = /^[\w-]{1,100}$/;
 
 const seconds = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default async function CallTimelinePage({ params }: PageProps<"/dashboard/call_anchor_config/health/calls/[callId]">) {
-  const { callId } = await params;
+// Why our status can differ from CallAnchor's portal, wherever it does (QA O4).
+const TWO_XX_NOTE =
+  "The CRM replied 2xx, so we count it delivered. CallAnchor marks a 2xx failed when the reply has no record id, and retries it (owner, 2026-11-04).";
+
+export default async function CallTimelinePage({ params, searchParams }: PageProps<"/dashboard/call_anchor_config/health/calls/[callId]">) {
+  const [{ callId }, query] = await Promise.all([params, searchParams]);
   if (!ID_PATTERN.test(callId)) notFound();
+  // The items list this call was opened from, for the breadcrumb (QA U3). Only our own items page.
+  const back = typeof query.back === "string" && query.back.startsWith(`${HEALTH_PATH}/items?`) && query.back.length <= 3000 ? query.back : null;
   const path = `${HEALTH_PATH}/calls/${callId}`;
   const { member, profile } = await requireCallAnchorSession(path);
   const cookie = profile ? await storedCookie(member.id) : null;
@@ -59,6 +66,7 @@ export default async function CallTimelinePage({ params }: PageProps<"/dashboard
           { href: CALLANCHOR_PATH, label: "CallAnchor Config" },
           { href: HEALTH_PATH, label: "Client health" },
           ...(call.clientId ? [{ href: `${HEALTH_PATH}/${call.clientId}`, label: call.companyName ?? call.clientId }] : []),
+          ...(back ? [{ href: back, label: "Items" }] : []),
         ]}
       />
       <h1 className="text-xl font-semibold text-slate-900">
@@ -75,19 +83,35 @@ export default async function CallTimelinePage({ params }: PageProps<"/dashboard
           {call.problem ? (
             <p className="text-amber-800">
               <span className="mr-1.5 text-xs font-semibold uppercase tracking-wide">Flagged</span>
-              {call.problem.stage}, since {formatTime(call.problem.since)} IST
+              {call.problem}
             </p>
           ) : (
-            <p className="text-slate-600">Not flagged by the recording pipeline.</p>
+            <p className="text-slate-600">Not flagged.</p>
           )}
-          {call.takesRecordings !== null && (
+          {call.license ? (
+            <p className="text-slate-600">
+              Made by phone{" "}
+              <Link href={licenseHref(HEALTH_PATH, call.license.licenseId)} className="font-mono text-indigo-700 hover:underline">…{call.license.last4}</Link>
+              {call.license.deviceModel && ` (${[call.license.deviceBrand, call.license.deviceModel].filter(Boolean).join(" ")}, app ${call.license.appVersion ?? "unknown"})`}
+            </p>
+          ) : (
+            <p className="text-slate-500">The phone that made this call isn&apos;t known: its ingest log was stored before licenses were linked, or wasn&apos;t stored.</p>
+          )}
+          {call.hasIntegration !== null && (
             <p className="text-slate-500">
-              {call.takesRecordings
-                ? `This client's integration takes recordings. ${reached.length ? `Reached the CRM: ${reached.join(", ")}.` : "Nothing reached the CRM for this call."}`
-                : "No active integration for this client takes recordings."}
+              {!call.hasIntegration
+                ? "This client has no active CRM integration, so nothing is sent for this call."
+                : `${call.takesRecordings ? "This client's integration takes recordings." : "This client's integration doesn't take recording.ready."} ${reached.length ? `Reached the CRM: ${reached.join(", ")}.` : "Nothing reached the CRM for this call."}`}
             </p>
           )}
+          {call.callouts.some((e) => e.status !== e.callAnchorStatus) && <p className="text-slate-500">{TWO_XX_NOTE}</p>}
         </div>
+      )}
+
+      {steps.length > 0 && (
+        <Section title="Journey" note="Each step the call should pass, with the time since the step before. Recording steps apply only to recorded calls.">
+          <Stepper steps={call.journey} />
+        </Section>
       )}
 
       <Section title="Timeline" note="Oldest first. The second column is the time since the first entry. Open a log's metadata, or jump to a callout's payload and replies.">
@@ -177,12 +201,15 @@ function Request({ result, retry }: { result: AnchorResult; retry: string }) {
   }
   const { request, events, platform } = log;
   const attempts = [...events].sort((a, b) => a.attempt - b.attempt || a.at.localeCompare(b.at));
+  // The CRM's outcome, by the 2xx rule, next to what CallAnchor recorded (QA N6).
+  const status = attempts.some((a) => crmStatus(a.status, a.httpStatus ?? null) === "delivered") ? "delivered" : request.status;
   return (
     <div id={`request-${result.requestId}`} className="scroll-mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="font-semibold text-slate-900">{request.eventType.replace("_", ".")}</h3>
-        <span className={`text-sm ${request.status === "failed" ? "font-medium text-red-700" : request.status === "delivered" ? "text-emerald-700" : "text-slate-600"}`}>
-          {request.status}
+        <span className={`text-sm ${status === "failed" ? "font-medium text-red-700" : status === "delivered" ? "text-emerald-700" : "text-slate-600"}`}>
+          {status}
+          {status !== request.status && <span className="font-normal text-slate-400"> (CallAnchor: {request.status})</span>}
         </span>
         <span className="text-sm text-slate-500">
           {platform?.name ?? attempts[0]?.platformId}
@@ -198,6 +225,7 @@ function Request({ result, retry }: { result: AnchorResult; retry: string }) {
         <dt className="text-slate-400">Completed</dt>
         <dd>{request.completedAt ? `${formatTime(request.completedAt)} IST` : "—"}</dd>
       </dl>
+      {status !== request.status && <p className="mt-1 text-xs text-slate-500">{TWO_XX_NOTE}</p>}
       <Json value={request.payloadJson ?? attempts[0]?.payloadPreview ?? null} label="Payload sent" open />
       {log.call && <Json value={log.call} label="Call record" />}
 
@@ -211,11 +239,16 @@ function Request({ result, retry }: { result: AnchorResult; retry: string }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {attempts.map((a) => (
+            {attempts.map((a) => {
+              const outcome = crmStatus(a.status, a.httpStatus ?? null);
+              return (
               <tr key={a.id}>
                 <td className={`${td} tabular-nums`}>{a.attempt}</td>
                 <td className={`${td} text-xs text-slate-500`}>{formatTime(a.at)}</td>
-                <td className={`${td} ${a.status === "failed" ? "font-medium text-red-700" : a.status === "delivered" ? "text-emerald-700" : ""}`}>{a.status}</td>
+                <td className={`${td} ${outcome === "failed" ? "font-medium text-red-700" : outcome === "delivered" ? "text-emerald-700" : ""}`}>
+                  {outcome}
+                  {outcome !== a.status && <p className="text-xs font-normal text-slate-400">CallAnchor: {a.status}</p>}
+                </td>
                 <td className={`${td} tabular-nums`}>{a.httpStatus ?? "—"}</td>
                 <td className={`${td} text-xs tabular-nums text-slate-500`}>{a.durationMs == null ? "—" : `${int(a.durationMs)} ms`}</td>
                 <td className={`${td} font-mono text-xs`}>{a.externalRecordId ?? "—"}</td>
@@ -225,7 +258,8 @@ function Request({ result, retry }: { result: AnchorResult; retry: string }) {
                   {!a.errorMessage && !a.responsePreview && <span className="text-xs text-slate-400">No reply recorded</span>}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

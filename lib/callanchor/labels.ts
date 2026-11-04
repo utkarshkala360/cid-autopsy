@@ -55,13 +55,22 @@ function replyLabel(event: Delivery) {
 export const deliveryLabel = (event: Delivery) => (event.status === "failed" ? errorLabel(event) : replyLabel(event));
 
 // A 2xx reply from the CRM is a success, even when CallAnchor marks the callout failed: it does
-// that when a reply lacks a record id, and retries (owner, 2026-11-04). CRM_STATUS_SQL must agree.
+// that when a reply lacks a record id, and retries (owner, 2026-11-04). CRM_STATUS_SQL, and
+// ca_refresh_calls in db/schema.sql, must agree.
 export const crmStatus = (status: string, httpStatus: number | null) =>
   httpStatus !== null && httpStatus >= 200 && httpStatus < 300 ? "delivered" : status;
 export const CRM_STATUS_SQL = "(CASE WHEN http_status BETWEEN 200 AND 299 THEN 'delivered' ELSE status END)";
 
-// Also matched in Postgres (`~*`), so it stays within syntax both understand.
-export const AUTH_PATTERN = "oauth|invalid_grant|invalid_token|unauthori[sz]ed|scope_mismatch|session expired|token (has )?expired";
-const AUTH_ERROR = new RegExp(AUTH_PATTERN, "i");
+// Only the HTTP code identifies a sign-in failure. Reply text is each client's own code, so words like
+// "unauthorized" in it aren't reliable (finding F, owner 2026-11-04).
+export const isAuthFailure = (httpStatus: number | null) => httpStatus === 401 || httpStatus === 403;
 
-export const isAuthFailure = (httpStatus: number | null, label: string) => httpStatus === 401 || AUTH_ERROR.test(label);
+// The trusted part of a CRM reply: its HTTP class.
+export type HttpClass = "2xx" | "4xx" | "5xx" | "no response" | "other";
+export function httpClass(httpStatus: number | null): HttpClass {
+  if (httpStatus === null) return "no response";
+  if (httpStatus >= 200 && httpStatus < 300) return "2xx";
+  if (httpStatus >= 400 && httpStatus < 500) return "4xx";
+  if (httpStatus >= 500) return "5xx";
+  return "other";
+}

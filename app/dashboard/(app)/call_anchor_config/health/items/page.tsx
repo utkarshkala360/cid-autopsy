@@ -3,19 +3,21 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { loadRecordingItems, RECORDING_STAGES, WINDOW_DAYS, type RecordingStage, type WindowDays } from "@/lib/callanchor/health";
+import { ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, WINDOW_DAYS, type WindowDays } from "@/lib/callanchor/health";
+import { isCallStage, type CallStage } from "@/lib/callanchor/issues";
 import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
 import {
   ITEMS_PER_PAGE,
   readCalloutPage,
   readClientNames,
+  readLicense,
   readLogPage,
   readStoreStatus,
   type CalloutFilter,
   type LogFilter,
 } from "@/lib/callanchor/store";
-import { ago, callHref, formatTime, int } from "../format";
-import { Json, LoadingNote, Table, td } from "../parts";
+import { ago, callHref, formatTime, int, issueHref, licenseHref } from "../format";
+import { IssuePanel, Json, LoadingNote, Table, td } from "../parts";
 
 export const metadata: Metadata = { title: "Health items" };
 
@@ -23,32 +25,34 @@ export const metadata: Metadata = { title: "Health items" };
 // from the store only: the dashboard that linked here has just pulled what's new.
 
 const ID_PATTERN = /^[\w-]{1,100}$/;
-const KINDS = ["syncs", "recordings", "logs"] as const;
+// "recordings" is the old name for recording stages, kept so older links still open.
+const KINDS = ["syncs", "calls", "recordings", "logs"] as const;
 type Kind = (typeof KINDS)[number];
 type Query = Record<string, string | string[] | undefined>;
 
 // The filters each kind takes, with how a chip names them.
 const FILTERS: Record<Kind, Record<string, string>> = {
   syncs: { status: "Status", event: "Event", platform: "Platform", http: "HTTP", label: "Reply or error", auth: "Sign-in failures" },
+  calls: { license: "Phone", licenses: "Phones" },
   recordings: {},
-  logs: { source: "Source", severity: "Severity", detail: "Detail", starts: "Message starts" },
-};
-
-const STAGE_TITLES: Record<RecordingStage, string> = {
-  stuck: "Recordings stuck or failed after the upload began",
-  waiting: "Recordings the phone hasn't uploaded after 30 minutes",
-  unsynced: "Uploaded recordings not synced to the CRM",
+  logs: { source: "Source", severity: "Severity", detail: "Detail", starts: "Message starts", problems: "Problems only" },
 };
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
 export default async function HealthItemsPage({ searchParams }: PageProps<"/dashboard/call_anchor_config/health/items">) {
   const query = (await searchParams) as Query;
-  const kind = KINDS.find((k) => k === one(query.kind));
+  const asked = KINDS.find((k) => k === one(query.kind));
+  const kind = asked === "recordings" ? "calls" : asked;
   const client = one(query.client);
   if (!kind || (client !== undefined && !ID_PATTERN.test(client))) notFound();
-  const stage = RECORDING_STAGES.find((s) => s === one(query.stage));
-  if (kind === "recordings" && !stage) notFound();
+  const askedStage = one(query.stage);
+  const stage: CallStage | undefined = isCallStage(askedStage) ? askedStage : undefined;
+  if (kind === "calls" && !stage) notFound();
+  if (one(query.license) !== undefined && !ID_PATTERN.test(one(query.license)!)) notFound();
+  // The issue these rows are behind, shown above them (QA U1).
+  const issueId = one(query.issue);
+  if (issueId !== undefined && !ISSUE_ID.test(issueId)) notFound();
   const days = (WINDOW_DAYS.find((d) => String(d) === one(query.window)) ?? 1) as WindowDays;
   const page = Math.max(1, Math.min(10_000, Number.parseInt(one(query.page) ?? "1", 10) || 1));
 
@@ -56,9 +60,11 @@ export default async function HealthItemsPage({ searchParams }: PageProps<"/dash
   const filters: Record<string, string> = {};
   for (const key of Object.keys(FILTERS[kind])) {
     const value = one(query[key]);
-    if (value !== undefined && value.length <= 300) filters[key] = value;
+    if (value !== undefined && value.length <= (key === "licenses" ? 2000 : 300)) filters[key] = value;
   }
-  const base = { kind, ...(stage ? { stage } : {}), ...(client ? { client } : {}), window: String(days), ...filters };
+  const phones = filters.licenses?.split(",") ?? [];
+  if (phones.length > 50 || phones.some((id) => !ID_PATTERN.test(id))) notFound();
+  const base = { kind, ...(stage ? { stage } : {}), ...(client ? { client } : {}), window: String(days), ...filters, ...(issueId ? { issue: issueId } : {}) };
   const href = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries({ ...base, ...changes })) if (value !== null) next.set(key, value);
@@ -67,11 +73,14 @@ export default async function HealthItemsPage({ searchParams }: PageProps<"/dash
 
   const path = href({ page: page > 1 ? String(page) : null });
   await requireCallAnchorSession(path);
-  const names = await readClientNames();
+  const [names, phone] = await Promise.all([readClientNames(), filters.license ? readLicense(filters.license) : Promise.resolve(null)]);
   const clientName = client ? (names.get(client) ?? client) : null;
+  // How a chip names a filter: a phone by its last four digits, never its raw id (QA U7).
+  const chipValue = (key: string, value: string) =>
+    key === "auth" || key === "problems" ? "yes" : key === "license" ? `…${phone?.last4 ?? "????"}` : key === "licenses" ? `${phones.length} phones` : value;
   const title =
-    kind === "recordings"
-      ? STAGE_TITLES[stage!]
+    kind === "calls"
+      ? "Calls"
       : kind === "syncs"
         ? filters.auth
           ? "CRM syncs rejected for credentials"
@@ -89,8 +98,15 @@ export default async function HealthItemsPage({ searchParams }: PageProps<"/dash
           { href: CALLANCHOR_PATH, label: "CallAnchor Config" },
           { href: HEALTH_PATH, label: "Client health" },
           ...(client ? [{ href: `${HEALTH_PATH}/${client}?window=${days}`, label: clientName! }] : []),
+          ...(phone ? [{ href: licenseHref(HEALTH_PATH, phone.licenseId), label: `Phone …${phone.last4 ?? "????"}` }] : []),
+          ...(issueId ? [{ href: issueHref(HEALTH_PATH, issueId), label: "Issue" }] : []),
         ]}
       />
+      {issueId && (
+        <Suspense fallback={<LoadingNote text="Reading the issue…" />}>
+          <IssueHeader issueId={issueId} />
+        </Suspense>
+      )}
       <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
       <p className="mt-1 text-sm text-slate-500">{clientName ?? "All clients"} · one row per item, newest first.</p>
 
@@ -112,14 +128,14 @@ export default async function HealthItemsPage({ searchParams }: PageProps<"/dash
           <Chip href={href({ client: null, page: null })} label="Client" value={clientName!} />
         )}
         {Object.entries(filters).map(([key, value]) => (
-          <Chip key={key} href={href({ [key]: null, page: null })} label={FILTERS[kind][key]} value={key === "auth" ? "yes" : value} />
+          <Chip key={key} href={href({ [key]: null, page: null })} label={FILTERS[kind][key]} value={chipValue(key, value)} />
         ))}
       </div>
 
       <Suspense key={path} fallback={<LoadingNote text="Reading the stored items…" />}>
         {kind === "syncs" && <SyncItems filter={calloutFilter(filters, client)} days={days} page={page} names={names} href={href} />}
-        {kind === "logs" && <LogItems filter={{ ...filters, clientId: client }} days={days} page={page} names={names} href={href} />}
-        {kind === "recordings" && <RecordingItems client={client ?? null} days={days} stage={stage!} page={page} href={href} />}
+        {kind === "logs" && <LogItems filter={{ ...filters, clientId: client, problems: filters.problems === "1" }} days={days} page={page} names={names} href={href} />}
+        {kind === "calls" && <CallItems client={client} license={filters.license} licenses={phones} days={days} stage={stage!} page={page} names={names} href={href} />}
       </Suspense>
     </div>
   );
@@ -147,15 +163,32 @@ function Chip({ href, label, value }: { href: string; label: string; value: stri
 
 type Href = (changes: Record<string, string | null>) => string;
 
+async function IssueHeader({ issueId }: { issueId: string }) {
+  const data = await loadIssue(issueId);
+  const now = Date.parse(data.loadedAt);
+  if (!data.issue) {
+    return (
+      <p className="mt-3 text-sm text-slate-600">
+        <span aria-hidden className="text-emerald-700">✓ </span>The issue behind these rows isn&apos;t open now.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3">
+      <IssuePanel issue={data.issue} checklist={data.checklist} suggestions={data.suggestions} now={now} compact />
+    </div>
+  );
+}
+
 async function StoreLine({ now }: { now: number }) {
   const store = await readStoreStatus(null);
   return <p className="mt-4 text-xs text-slate-400">From stored data. Latest changes pulled {ago(store.pulledAt, now)}.</p>;
 }
 
-function Pager({ page, total, href }: { page: number; total: number; href: Href }) {
-  const pages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
-  const from = total ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
-  const to = Math.min(total, page * ITEMS_PER_PAGE);
+function Pager({ page, total, href, perPage = ITEMS_PER_PAGE }: { page: number; total: number; href: Href; perPage?: number }) {
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const from = total ? (page - 1) * perPage + 1 : 0;
+  const to = Math.min(total, page * perPage);
   const link = "rounded border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50";
   return (
     <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
@@ -177,15 +210,15 @@ function ClientCell({ id, names }: { id: string | null; names: Map<string, strin
   );
 }
 
-function CallCell({ callId, requestId }: { callId: string | null; requestId?: string | null }) {
+function CallCell({ callId, requestId, back }: { callId: string | null; requestId?: string | null; back: string }) {
   if (!callId) return <span className="text-slate-400">—</span>;
   return (
     <>
-      <Link href={callHref(HEALTH_PATH, callId)} className="font-mono text-xs text-indigo-700 hover:underline">
+      <Link href={callHref(HEALTH_PATH, callId, back)} className="font-mono text-xs text-indigo-700 hover:underline">
         {callId}
       </Link>
       {requestId && (
-        <Link href={`${callHref(HEALTH_PATH, callId)}#request-${requestId}`} className="block text-xs font-medium text-indigo-700 hover:underline">
+        <Link href={`${callHref(HEALTH_PATH, callId, back)}#request-${requestId}`} className="block text-xs font-medium text-indigo-700 hover:underline">
           Payload and CRM reply
         </Link>
       )}
@@ -232,7 +265,7 @@ async function SyncItems({ filter, days, page, names, href }: { filter: CalloutF
               <td className="min-w-80 px-3 py-2 align-top text-slate-700">
                 <FilterLink href={href({ label: e.label, page: null })}>{e.label}</FilterLink>
               </td>
-              <td className={td}><CallCell callId={e.callId} requestId={e.requestId} /></td>
+              <td className={td}><CallCell callId={e.callId} requestId={e.requestId} back={href({})} /></td>
             </tr>
           ))}
         </Table>
@@ -269,7 +302,7 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
               <td className={`${td} text-xs`}>
                 {l.detail ? <FilterLink href={href({ detail: l.detail, page: null })}>{l.detail}</FilterLink> : <span className="text-slate-400">—</span>}
               </td>
-              <td className={td}><CallCell callId={l.callId} /></td>
+              <td className={td}><CallCell callId={l.callId} back={href({})} /></td>
             </tr>
           ))}
         </Table>
@@ -279,37 +312,73 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
   );
 }
 
-async function RecordingItems({ client, days, stage, page, href }: { client: string | null; days: WindowDays; stage: RecordingStage; page: number; href: Href }) {
-  const { items, loadedAt } = await loadRecordingItems(client, days, stage);
+async function CallItems({ client, license, licenses, days, stage, page, names, href }: {
+  client?: string;
+  license?: string;
+  licenses: string[];
+  days: WindowDays;
+  stage: CallStage;
+  page: number;
+  names: Map<string, string>;
+  href: Href;
+}) {
+  const { items, total, title, loadedAt } = await loadCallItems({ clientId: client, licenseId: license, licenseIds: licenses }, stage, days, page);
   const now = Date.parse(loadedAt);
-  const shown = items.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
   return (
     <>
+      <h2 className="mt-4 text-base font-semibold text-slate-900">{title}</h2>
       <StoreLine now={now} />
-      {stage === "unsynced" && (
-        <p className="mt-2 text-sm text-slate-500">
-          A recording counts as synced once call.completed or recording.ready reaches the CRM for its call (a 2xx reply).
-        </p>
-      )}
-      <Pager page={page} total={items.length} href={href} />
+      <p className="mt-1 text-sm text-slate-500">
+        One row per call, however many CRM attempts it had. A call counts as reached once any callout got a 2xx reply. A delivered recording.ready
+        counts its recording as uploaded and verified, even when those logs weren&apos;t stored. Its time is when it came in, or its first callout
+        when its ingest log wasn&apos;t stored.
+      </p>
+      <Pager page={page} total={total} href={href} perPage={CALLS_PER_PAGE} />
       <div className="mt-3">
-        <Table head={[...(client ? [] : ["Client"]), "Call", "Where it stopped", "Since", "CRM callouts for this call"]} empty={items.length ? undefined : "Nothing at this stage in the window."}>
-          {shown.map((r) => (
-            <tr key={`${r.clientId}|${r.callId}`}>
-              {!client && (
-                <td className={td}>
-                  <Link href={`${HEALTH_PATH}/${r.clientId}`} className="text-indigo-700 hover:underline">{r.companyName}</Link>
-                </td>
-              )}
-              <td className={td}><CallCell callId={r.callId} /></td>
-              <td className={td}>{r.stage}</td>
-              <td className={`${td} text-xs text-slate-500`}>{formatTime(r.since)} ({ago(r.since, now)})</td>
-              <td className={`${td} text-xs`}>{r.callouts.length ? r.callouts.join(", ") : <span className="text-slate-400">none</span>}</td>
+        <Table
+          head={["Came in", ...(client ? [] : ["Client"]), "Phone", "Call", "Recording", "CRM", "Attempts", "Last reply", "Where it stopped"]}
+          empty={items.length ? undefined : "No calls at this step in the window."}
+        >
+          {items.map((c) => (
+            <tr key={c.callId}>
+              <td className={`${td} text-xs text-slate-500`}>
+                {formatTime(c.ingestedAt ?? c.firstCalloutAt)}
+                {!c.ingestedAt && <p className="text-amber-700">no ingest log</p>}
+              </td>
+              {!client && <td className={td}><ClientCell id={c.clientId} names={names} /></td>}
+              <td className={`${td} font-mono text-xs`}>
+                {c.licenseId ? (
+                  <Link href={licenseHref(HEALTH_PATH, c.licenseId)} className="text-indigo-700 hover:underline">…{c.last4 ?? "????"}</Link>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </td>
+              <td className={td}><CallCell callId={c.callId} back={href({})} /></td>
+              <td className={`${td} text-xs`}>
+                {c.recordingDetail ?? "—"}
+                {c.verifiedAt || c.deliveredEvents.includes("recording.ready") ? (
+                  <p className="text-emerald-700">verified</p>
+                ) : c.uploadedAt ? (
+                  <p>uploaded</p>
+                ) : c.uploadFailedAt ? (
+                  <p className="text-red-700">upload failed</p>
+                ) : null}
+              </td>
+              <td className={`${td} text-xs ${c.firstDeliveredAt ? "text-emerald-700" : c.lastStatus === "failed" ? "font-medium text-red-700" : ""}`}>
+                {c.firstDeliveredAt ? `reached ${ago(c.firstDeliveredAt, now)}` : (c.lastStatus ?? "no callout")}
+                {c.deliveredEvents.length > 0 && <p className="text-slate-500">{c.deliveredEvents.join(", ")}</p>}
+              </td>
+              <td className={`${td} text-right tabular-nums`}>{int(c.attempts)}</td>
+              <td className="min-w-64 px-3 py-2 align-top text-xs text-slate-600">
+                {c.lastHttp !== null ? `HTTP ${c.lastHttp} · ` : c.attempts ? "No response · " : ""}
+                {c.lastLabel ?? ""}
+              </td>
+              <td className={`${td} text-xs ${c.problem ? "text-amber-800" : "text-slate-400"}`}>{c.problem ?? "—"}</td>
             </tr>
           ))}
         </Table>
       </div>
-      {items.length > ITEMS_PER_PAGE && <Pager page={page} total={items.length} href={href} />}
+      {total > CALLS_PER_PAGE && <Pager page={page} total={total} href={href} perPage={CALLS_PER_PAGE} />}
     </>
   );
 }
