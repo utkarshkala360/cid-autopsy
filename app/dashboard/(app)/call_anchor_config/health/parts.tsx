@@ -1,4 +1,5 @@
-import type { Flag, Level } from "@/lib/callanchor/health";
+import Link from "next/link";
+import type { Drill, Flag, Level } from "@/lib/callanchor/health";
 import type { StoreStatus } from "@/lib/callanchor/store";
 import { badgeClass, cardClass } from "@/components/ui";
 import { FLAG_TEXT, LEVELS, ago, formatDay, formatHour, formatTime, int } from "./format";
@@ -29,27 +30,54 @@ export function HealthBadge({ level }: { level: Level }) {
   );
 }
 
-export function Flags({ flags }: { flags: Flag[] }) {
+// A flag with items behind it links to them.
+export function FlagText({ flag, href }: { flag: Flag; href?: (drill: Drill) => string }) {
+  return flag.drill && href ? (
+    <Link href={href(flag.drill)} className="underline decoration-dotted underline-offset-2 hover:decoration-solid">
+      {flag.text}
+    </Link>
+  ) : (
+    flag.text
+  );
+}
+
+export function Flags({ flags, href }: { flags: Flag[]; href?: (drill: Drill) => string }) {
   if (flags.length === 0) return <p className="text-sm text-slate-500">Nothing needs attention.</p>;
   return (
     <ul className="space-y-1 text-sm">
       {flags.map((flag) => (
         <li key={flag.text} className={FLAG_TEXT[flag.level]}>
           <span className="mr-1.5 text-xs font-semibold uppercase tracking-wide">{flag.level}</span>
-          {flag.text}
+          <FlagText flag={flag} href={href} />
         </li>
       ))}
     </ul>
   );
 }
 
-export function Tile({ label, value, detail }: { label: string; value: React.ReactNode; detail?: React.ReactNode }) {
+// Text that opens the items behind it.
+export function ItemLink({ href, className = "", children }: { href: string; className?: string; children: React.ReactNode }) {
   return (
-    <div className={`${cardClass} p-4`}>
+    <Link href={href} className={`underline decoration-dotted underline-offset-2 hover:decoration-solid ${className}`}>
+      {children}
+    </Link>
+  );
+}
+
+export function Tile({ label, value, detail, href }: { label: string; value: React.ReactNode; detail?: React.ReactNode; href?: string }) {
+  const body = (
+    <>
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-      {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
-    </div>
+      <p className={`mt-1 text-2xl font-semibold ${href ? "text-indigo-700" : "text-slate-900"}`}>{value}</p>
+      {detail && <div className="mt-1 text-xs text-slate-500">{detail}</div>}
+    </>
+  );
+  return href ? (
+    <Link href={href} className={`${cardClass} block p-4 transition hover:border-indigo-300 hover:bg-indigo-50/40`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={`${cardClass} p-4`}>{body}</div>
   );
 }
 

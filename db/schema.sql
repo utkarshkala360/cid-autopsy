@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS ca_callout_events (
 
 CREATE INDEX IF NOT EXISTS ca_callout_events_client_at_idx ON ca_callout_events (client_id, at DESC);
 CREATE INDEX IF NOT EXISTS ca_callout_events_at_idx ON ca_callout_events (at DESC);
+CREATE INDEX IF NOT EXISTS ca_callout_events_call_idx ON ca_callout_events (call_id);
 
 -- System logs (support/logs). CallAnchor keeps about 3 days; this keeps them longer.
 CREATE TABLE IF NOT EXISTS ca_system_logs (
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS ca_system_logs (
 
 CREATE INDEX IF NOT EXISTS ca_system_logs_client_at_idx ON ca_system_logs (client_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS ca_system_logs_at_idx ON ca_system_logs (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS ca_system_logs_resource_idx ON ca_system_logs (resource_id);
 
 -- Latest per-client state: fleet metrics, tenant counts, OneAPI status and the lifetime sync aggregate.
 CREATE TABLE IF NOT EXISTS ca_client_snapshots (

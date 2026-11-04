@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { loadClientHealth, WINDOW_DAYS, type WindowDays } from "@/lib/callanchor/health";
+import { loadClientHealth, PURGE_FAILURES, WINDOW_DAYS, type Drill, type WindowDays } from "@/lib/callanchor/health";
 import { PortalError } from "@/lib/callanchor/portal";
 import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
-import { ago, formatTime, int, pct, rateClass } from "../format";
-import { Flags, HealthBadge, LoadingNote, Section, StoreNote, SyncTrend, Table, Tile, td } from "../parts";
+import { ago, callHref, formatTime, int, itemsHref, pct, rateClass } from "../format";
+import { Flags, HealthBadge, ItemLink, LoadingNote, Section, StoreNote, SyncTrend, Table, Tile, td } from "../parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores this client's last 5 days, and the daily refresh runs after the response.
@@ -79,6 +79,13 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
   const settled = sync.delivered + sync.failed;
   // Stored history can start after the window does: the store only holds what it has pulled.
   const shortBy = (from: string | null) => from !== null && Date.parse(from) - Date.parse(data.since) > 60 * 60_000;
+  const items = (drill: Drill) => itemsHref(HEALTH_PATH, drill, { client: clientId, window: days });
+  const logs = (source: string) => items({ kind: "logs", source });
+  const stages = [
+    { stage: "stuck", rows: pipeline.stuck },
+    { stage: "unsynced", rows: pipeline.unsynced },
+    { stage: "waiting", rows: pipeline.waiting },
+  ] as const;
 
   return (
     <>
@@ -92,7 +99,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
       <StoreNote store={store} pullErrors={data.pullErrors} now={now} tookMs={data.tookMs} />
 
       <div className="mt-4">
-        <Flags flags={data.flags} />
+        <Flags flags={data.flags} href={items} />
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -112,6 +119,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         />
         <Tile
           label={`CRM syncs, ${data.windowLabel.replace("the last ", "")}`}
+          href={items({ kind: "syncs" })}
           value={<span className={rateClass(sync.successRate)}>{pct(sync.successRate)}</span>}
           detail={`${int(sync.delivered)} delivered · ${int(sync.failed)} failed${sync.inFlight ? ` · ${int(sync.inFlight)} in flight` : ""}`}
         />
@@ -144,23 +152,60 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         }
       >
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Tile label="Calls ingested" value={int(pipeline.callsIngested)} detail={`${int(pipeline.expectingRecording)} to record · ${int(pipeline.notRecorded)} not recorded`} />
-          <Tile label="Upload started" value={int(pipeline.uploadsStarted)} />
-          <Tile label="Uploaded" value={int(pipeline.uploadsCompleted)} detail={pipeline.uploadsFailed ? `${int(pipeline.uploadsFailed)} failed` : undefined} />
-          <Tile label="Verified" value={int(pipeline.uploadsVerified)} />
+          <Tile
+            label="Calls ingested"
+            value={int(pipeline.callsIngested)}
+            href={logs("mobile.call.create")}
+            detail={`${int(pipeline.expectingRecording)} to record · ${int(pipeline.notRecorded)} not recorded`}
+          />
+          <Tile label="Upload started" value={int(pipeline.uploadsStarted)} href={logs("mobile.recording.upload-init")} />
+          <Tile
+            label="Uploaded"
+            value={int(pipeline.uploadsCompleted)}
+            href={logs("mobile.recording.upload-complete")}
+            detail={pipeline.uploadsFailed ? <ItemLink href={logs("mobile.recording.upload-failed")}>{int(pipeline.uploadsFailed)} failed</ItemLink> : undefined}
+          />
+          <Tile label="Verified" value={int(pipeline.uploadsVerified)} href={logs("mobile.recording.job-processed")} />
           <Tile
             label="Synced to CRM"
             value={int(sync.recordingsSynced)}
-            detail={tenant.takesRecordings ? `${int(sync.recordingsFailed)} recording syncs failed` : "No integration takes recordings"}
+            href={items({ kind: "syncs", event: "recording.ready", status: "delivered" })}
+            detail={
+              tenant.takesRecordings ? (
+                <ItemLink href={items({ kind: "syncs", event: "recording.ready", status: "failed" })}>{int(sync.recordingsFailed)} recording syncs failed</ItemLink>
+              ) : (
+                "No integration takes recordings"
+              )
+            }
           />
-          <Tile label="Removed from S3" value={int(pipeline.purged)} detail={pipeline.purgeFailed ? `${int(pipeline.purgeFailed)} failed to delete` : undefined} />
+          <Tile
+            label="Removed from S3"
+            value={int(pipeline.purged)}
+            href={logs("platform-recording-cleanup")}
+            detail={pipeline.purgeFailed ? <ItemLink href={items(PURGE_FAILURES)}>{int(pipeline.purgeFailed)} failed to delete</ItemLink> : undefined}
+          />
         </div>
         {(pipeline.stuck.length > 0 || pipeline.waiting.length > 0 || pipeline.unsynced.length > 0) && (
           <div className="mt-3">
+            <p className="mb-2 text-sm text-slate-500">
+              The newest 50 are listed. All of them:{" "}
+              {stages
+                .filter((g) => g.rows.length > 0)
+                .map((g, i) => (
+                  <span key={g.stage}>
+                    {i > 0 && " · "}
+                    <ItemLink href={items({ kind: "recordings", stage: g.stage })}>
+                      {int(g.rows.length)} {g.stage === "stuck" ? "stuck" : g.stage === "unsynced" ? "not synced" : "not uploaded"}
+                    </ItemLink>
+                  </span>
+                ))}
+            </p>
             <Table head={["Call", "Where it stopped", "Since"]}>
               {[...pipeline.stuck, ...pipeline.unsynced, ...pipeline.waiting].slice(0, 50).map((s) => (
                 <tr key={`${s.callId}|${s.stage}`}>
-                  <td className={`${td} font-mono text-xs`}>{s.callId}</td>
+                  <td className={td}>
+                    <Link href={callHref(HEALTH_PATH, s.callId)} className="font-mono text-xs text-indigo-700 hover:underline">{s.callId}</Link>
+                  </td>
                   <td className={td}>{s.stage}</td>
                   <td className={`${td} text-xs text-slate-500`}>{formatTime(s.since)} ({ago(s.since, now)})</td>
                 </tr>
@@ -170,23 +215,40 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         )}
       </Section>
 
-      <Section title="What the CRM sent back" note={`Every reply in ${data.windowLabel}, grouped. Successes by reply shape, failures by error, with ids and numbers masked.`}>
+      <Section title="What the CRM sent back" note={`Every reply in ${data.windowLabel}, grouped. Successes by reply shape, failures by error, with ids and numbers masked. Open one for each sync behind it.`}>
         <Table head={["Outcome", "Platform", "HTTP", "Reply or error", "Events", "Count", "Latest"]} empty={sync.outcomes.length ? undefined : "No CRM syncs in this window."}>
-          {sync.outcomes.slice(0, 40).map((o) => (
-            <tr key={`${o.status}|${o.platform}|${o.httpStatus}|${o.label}`}>
-              <td className={`${td} ${o.status === "failed" ? "font-medium text-red-700" : o.status === "delivered" ? "text-emerald-700" : ""}`}>{o.status}</td>
-              <td className={td}>{o.platform}</td>
-              <td className={`${td} tabular-nums`}>{o.httpStatus ?? "—"}</td>
-              <td className="min-w-80 px-3 py-2 align-top text-slate-700">{o.label}</td>
-              <td className={`${td} text-xs text-slate-500`}>{o.eventTypes.join(", ")}</td>
-              <td className={`${td} text-right tabular-nums`}>{int(o.count)}</td>
-              <td className={`${td} text-xs text-slate-500`}>{formatTime(o.lastAt)}</td>
-            </tr>
-          ))}
+          {sync.outcomes.slice(0, 40).map((o) => {
+            const href = items({ kind: "syncs", status: o.status, platform: o.platform, http: o.httpStatus === null ? "none" : String(o.httpStatus), label: o.label });
+            return (
+              <tr key={`${o.status}|${o.platform}|${o.httpStatus}|${o.label}`}>
+                <td className={`${td} ${o.status === "failed" ? "font-medium text-red-700" : o.status === "delivered" ? "text-emerald-700" : ""}`}>{o.status}</td>
+                <td className={td}>{o.platform}</td>
+                <td className={`${td} tabular-nums`}>{o.httpStatus ?? "—"}</td>
+                <td className="min-w-80 px-3 py-2 align-top text-slate-700">
+                  <ItemLink href={href}>{o.label}</ItemLink>
+                </td>
+                <td className={`${td} text-xs text-slate-500`}>{o.eventTypes.join(", ")}</td>
+                <td className={`${td} text-right tabular-nums`}>
+                  <ItemLink href={href}>{int(o.count)}</ItemLink>
+                </td>
+                <td className={`${td} text-xs text-slate-500`}>{formatTime(o.lastAt)}</td>
+              </tr>
+            );
+          })}
         </Table>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {Object.entries(sync.byEvent).map(([event, c]) => (
-            <Tile key={event} label={event} value={int(c.delivered)} detail={`delivered · ${int(c.failed)} failed`} />
+            <Tile
+              key={event}
+              label={event}
+              value={int(c.delivered)}
+              href={items({ kind: "syncs", event, status: "delivered" })}
+              detail={
+                <>
+                  delivered · <ItemLink href={items({ kind: "syncs", event, status: "failed" })}>{int(c.failed)} failed</ItemLink>
+                </>
+              }
+            />
           ))}
           <Tile
             label="CRM response time"
@@ -196,7 +258,16 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         </div>
       </Section>
 
-      <Section title="Latest failed syncs" note={settled ? `${int(sync.failed)} failed in ${data.windowLabel}. The newest 25 are listed.` : undefined}>
+      <Section
+        title="Latest failed syncs"
+        note={
+          settled ? (
+            <>
+              <ItemLink href={items({ kind: "syncs", status: "failed" })}>{int(sync.failed)} failed</ItemLink> in {data.windowLabel}. The newest 25 are listed.
+            </>
+          ) : undefined
+        }
+      >
         <Table head={["When", "Event", "Platform", "HTTP", "Attempt", "Error", "Call"]} empty={sync.recentFailures.length ? undefined : "No failed syncs in this window."}>
           {sync.recentFailures.map((f) => (
             <tr key={f.id}>
@@ -205,8 +276,12 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
               <td className={td}>{f.platformId}</td>
               <td className={`${td} tabular-nums`}>{f.httpStatus ?? "—"}</td>
               <td className={`${td} tabular-nums`}>{f.attempt}</td>
-              <td className="min-w-80 px-3 py-2 align-top text-slate-700">{f.label}</td>
-              <td className={`${td} font-mono text-xs text-slate-400`}>{f.callId}</td>
+              <td className="min-w-80 px-3 py-2 align-top text-slate-700">
+                <ItemLink href={items({ kind: "syncs", status: "failed", platform: f.platformId, label: f.label })}>{f.label}</ItemLink>
+              </td>
+              <td className={td}>
+                <Link href={callHref(HEALTH_PATH, f.callId)} className="font-mono text-xs text-indigo-700 hover:underline">{f.callId}</Link>
+              </td>
             </tr>
           ))}
         </Table>
@@ -267,11 +342,13 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         </div>
       </Section>
 
-      <Section title="System log sources" note={`Everything CallAnchor logged for this client in the window, by source and severity.`}>
+      <Section title="System log sources" note="Everything CallAnchor logged for this client in the window, by source and severity. Open a source for its log lines.">
         <Table head={["Source", "Severity", "Events", "Latest", "Example message"]} empty={pipeline.sources.length ? undefined : "No system logs in this window."}>
           {pipeline.sources.map((s) => (
             <tr key={`${s.severity}|${s.source}`}>
-              <td className={td}>{s.source}</td>
+              <td className={td}>
+                <ItemLink href={items({ kind: "logs", source: s.source, severity: s.severity })}>{s.source}</ItemLink>
+              </td>
               <td className={`${td} ${s.severity === "info" ? "" : "font-medium text-red-700"}`}>{s.severity}</td>
               <td className={`${td} text-right tabular-nums`}>{int(s.count)}</td>
               <td className={`${td} text-xs text-slate-500`}>{formatTime(s.lastAt)}</td>

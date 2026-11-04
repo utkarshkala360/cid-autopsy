@@ -77,6 +77,18 @@ ever differ?
 - Status: Open
 - Answer:
 
+### 11. Missing `recording.ready` when the upload beats `call.completed`
+
+On one client, uploaded and verified recordings got no `recording.ready` webhook whenever
+`call.completed` went out before, or within ~0.1 s of, the upload finishing (6 calls, 31 Oct to
+4 Nov 2026). When `call.completed` went out 0.1 s or more after the upload finished, `recording.ready`
+always followed (18 calls). Is this a race on CallAnchor's side? Or does `call.completed` carry the
+recording in that case, so no separate event is sent?
+
+- Status: Answered
+- Answer: Either event reaching the CRM counts as a successful sync (owner, 4 Nov 2026), so the
+  dashboard no longer flags these calls. Why CallAnchor skips `recording.ready` is still unknown.
+
 ## To confirm with live data
 
 The read operations were checked live on 2 Nov 2026, across all 47 clients for the per-client ones.

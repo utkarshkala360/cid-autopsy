@@ -40,6 +40,11 @@ Rules already established in this repo.
 - CallAnchor data is stored, not re-pulled from scratch. Visits pull only what's new since each
   stream's saved milestone. The trailing 5 days are refreshed once a day, and every pull saves its new
   milestone (owner, 2026-11-03). See `lib/callanchor/store.ts`.
+- A CRM sync succeeded when the CRM replied 2xx, even if CallAnchor marked the callout failed.
+  `call.completed` and `recording.ready` both count as the call reaching the CRM, so either one syncs
+  its recording (owner, 2026-11-04). See `crmStatus` in `lib/callanchor/labels.ts`.
+- Every error, flag and count on the health pages opens the items behind it, one row per item, down
+  to a single call's timeline (owner, 2026-11-04).
 - Commit only redacted fixtures. `npm test` in `callanchor-apis/` must pass before a commit there.
 
 ## Happy implementation
@@ -56,6 +61,8 @@ What a good change looks like here.
   Raw errors can contain phone numbers and agents' free-text notes.
 - Store derived, masked data rather than raw CallAnchor responses. The health store keeps labels and
   ids, never payloads or CRM replies.
+- Link a health number to its items with a `Drill` and `itemsHref()`; the items page
+  (`health/items`) reads the store with the same filters, and `health/calls/<id>` shows one call.
 - Run slow background work, like the 5-day refresh, with `after()`, so it doesn't block the page.
 
 ## Recommendations
@@ -64,6 +71,7 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-03 | Give local dev its own Neon branch (set a branch `DATABASE_URL` in `.env.local` and Vercel's Development env) | Local, preview and production all use the same database, so a local visit moves the live milestones and writes live rows, and local schema changes hit production at once | Awaiting owner |
 | 2026-11-03 | Confirm the health thresholds: critical below 80% sync success, warning below 95%, critical at 3 stuck recordings, 30-minute grace for a pipeline stage | They decide what's flagged; they're starting guesses (`THRESHOLDS` in `lib/callanchor/health.ts`) | Awaiting owner |
 | 2026-11-03 | Raise the S3 purge failure with CallAnchor | Every post-sync S3 deletion failed (0 of 228 succeeded on 3 Nov): their AWS user lacks `s3:DeleteObject`, and the logs mark it `info`. Recordings stay in S3 longer than intended | Awaiting owner |
 | 2026-11-03 | Pull on a schedule (Vercel cron) as well as on visits | Data only moves when someone opens the dashboard, so quiet hours leave gaps beyond CallAnchor's ~3-day log retention. Needs unattended access (open question 1) | Awaiting owner |
@@ -78,12 +86,25 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
-| 2026-11-03 | Store health data in Postgres and pull only what's new from each stream's milestone; refresh the last 5 days once a day | Done; tables not yet migrated in production (applied on the next deploy) | `lib/callanchor/store.ts`, `db/schema.sql` |
+| 2026-11-04 | Item-level drill-down: every flag, error, outcome and count links to its rows (syncs, recordings, system logs), with per-call timelines | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor_config/health/items/`, `health/calls/[callId]/` |
+| 2026-11-04 | Count a 2xx CRM reply as success, and either `call.completed` or `recording.ready` as a synced recording | Done | `lib/callanchor/labels.ts`, `lib/callanchor/health.ts` |
+| 2026-11-03 | Store health data in Postgres and pull only what's new from each stream's milestone; refresh the last 5 days once a day | Done; tables exist in the shared Neon DB (local `predev` migrated them) | `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-03 | Client health dashboard: consolidated and per-client view of calls, recordings, uploads, CRM syncs, CRM replies and errors | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor_config/health/` |
 
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-04: Said `call.completed` and `recording.ready` are both successful sends to the CRM, and
+  HTTP 200 is a CRM success. Applied both (4 callouts CallAnchor marked failed despite a 200 now count
+  as delivered), answered open question 11 and dropped the two recommendations it replaced.
+- 2026-11-04: Asked for every error on the health pages to be clickable down to the individual items.
+  Built the items page and call timeline, and linked every flag, error and count to them.
+- 2026-11-04: Asked why a call that shows success in CallAnchor's portal is flagged "Uploaded, not
+  synced to the CRM". Its success was `call.completed`; no `recording.ready` was ever sent (a race
+  with the upload). Added open question 11 and two recommendations.
+- 2026-11-03: Asked whether the local and live health dashboards share a database. They do (same
+  Neon endpoint in `.env.local` and every Vercel env). Recommended a separate dev branch.
 
 - 2026-11-03: Doesn't want data pulled from scratch on each visit. Store it, pull only the latest in
   real time, refresh the last 5 days once, and save a milestone on every pull to keep batches small.

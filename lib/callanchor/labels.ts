@@ -54,6 +54,14 @@ function replyLabel(event: Delivery) {
 // Failures by their error, everything else by the shape of the reply.
 export const deliveryLabel = (event: Delivery) => (event.status === "failed" ? errorLabel(event) : replyLabel(event));
 
-const AUTH_ERROR = /oauth|invalid_grant|invalid_token|unauthori[sz]ed|scope_mismatch|session expired|token (has )?expired/i;
+// A 2xx reply from the CRM is a success, even when CallAnchor marks the callout failed: it does
+// that when a reply lacks a record id, and retries (owner, 2026-11-04). CRM_STATUS_SQL must agree.
+export const crmStatus = (status: string, httpStatus: number | null) =>
+  httpStatus !== null && httpStatus >= 200 && httpStatus < 300 ? "delivered" : status;
+export const CRM_STATUS_SQL = "(CASE WHEN http_status BETWEEN 200 AND 299 THEN 'delivered' ELSE status END)";
+
+// Also matched in Postgres (`~*`), so it stays within syntax both understand.
+export const AUTH_PATTERN = "oauth|invalid_grant|invalid_token|unauthori[sz]ed|scope_mismatch|session expired|token (has )?expired";
+const AUTH_ERROR = new RegExp(AUTH_PATTERN, "i");
 
 export const isAuthFailure = (httpStatus: number | null, label: string) => httpStatus === 401 || AUTH_ERROR.test(label);

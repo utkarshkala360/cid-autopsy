@@ -1,4 +1,4 @@
-import type { Level } from "@/lib/callanchor/health";
+import type { Drill, Level } from "@/lib/callanchor/health";
 
 // Times show in IST, the zone CallAnchor's own labels use.
 const dateTime = new Intl.DateTimeFormat("en-IN", {
@@ -44,3 +44,11 @@ export function rateClass(rate: number | null) {
   if (rate < 95) return "font-semibold text-amber-800";
   return "text-slate-700";
 }
+
+// Links into the item views. `scope` narrows to one client and sets the window, in days.
+export function itemsHref(basePath: string, drill: Drill, scope: { client?: string; window?: number } = {}) {
+  const query = new URLSearchParams({ ...drill, ...(scope.client ? { client: scope.client } : {}), window: String(scope.window ?? 1) });
+  return `${basePath}/items?${query}`;
+}
+
+export const callHref = (basePath: string, callId: string) => `${basePath}/calls/${encodeURIComponent(callId)}`;

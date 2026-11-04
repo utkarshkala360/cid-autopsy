@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { FleetRow, Level } from "@/lib/callanchor/health";
+import type { Drill, FleetRow, Level } from "@/lib/callanchor/health";
 import { cardClass, inputClass } from "@/components/ui";
-import { FLAG_TEXT, LEVELS, int, pct, rateClass } from "./format";
+import { FLAG_TEXT, LEVELS, int, itemsHref, pct, rateClass } from "./format";
+import { FlagText, ItemLink } from "./parts";
 
 // Times are formatted on the server, so the client doesn't re-render them in another zone.
 export type FleetTableRow = FleetRow & { lastCallLabel: string; lastDeliveredLabel: string };
@@ -64,59 +65,75 @@ export function FleetTable({ rows, basePath }: { rows: FleetTableRow[]; basePath
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {shown.map((r) => (
-              <tr key={r.clientId} className="hover:bg-slate-50">
-                <td className={td}>
-                  <Link href={`${basePath}/${r.clientId}`} className="font-medium text-indigo-700 hover:underline">
-                    {r.companyName}
-                  </Link>
-                  <p className="text-xs text-slate-500">
-                    {r.status} · {r.licenses} licenses logged in{r.integrations.length ? ` · ${r.integrations.join(", ")}` : ""}
-                  </p>
-                </td>
-                <td className={td}>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${LEVELS[r.level].className}`}>
-                    <span aria-hidden>{LEVELS[r.level].icon}</span>
-                    {LEVELS[r.level].label}
-                  </span>
-                </td>
-                <td className={`${td} text-right tabular-nums`}>
-                  {int(r.callsToday)} <span className="text-slate-400">/ {int(r.totalCalls)}</span>
-                </td>
-                <td className={`${td} text-right tabular-nums`}>
-                  {int(r.uploadsVerified)}
-                  {r.stuckRecordings > 0 && <p className="text-xs text-red-700">{r.stuckRecordings} stuck</p>}
-                  {r.waitingRecordings > 0 && <p className="text-xs text-amber-800">{r.waitingRecordings} not uploaded</p>}
-                </td>
-                <td className={`${td} text-right tabular-nums`}>
-                  {int(r.recordingsSynced)}
-                  {r.unsyncedRecordings > 0 && <p className="text-xs text-amber-800">{r.unsyncedRecordings} not synced</p>}
-                </td>
-                <td className={`${td} text-right tabular-nums`}>
-                  {int(r.syncDelivered)}
-                  {r.syncFailed > 0 && <span className="text-red-700"> + {int(r.syncFailed)} failed</span>}
-                </td>
-                <td className={`${td} text-right tabular-nums ${rateClass(r.successRate)}`}>{pct(r.successRate)}</td>
-                <td className={`${td} text-right tabular-nums ${rateClass(r.lifetimeSuccessRate)}`}>
-                  {pct(r.lifetimeSuccessRate)}
-                  <p className="text-xs font-normal text-slate-400">{int(r.lifetimeEvents)} events</p>
-                </td>
-                <td className={`${td} text-right tabular-nums`}>{int(r.pendingRecordings)}</td>
-                <td className={`${td} text-xs text-slate-500`}>
-                  {r.lastCallLabel}
-                  <br />
-                  {r.lastDeliveredLabel}
-                </td>
-                <td className="min-w-72 px-3 py-2 align-top text-xs">
-                  {r.error && <p className="text-red-700">{r.error}</p>}
-                  {r.flags.filter((f) => f.level !== "info").slice(0, 3).map((f) => (
-                    <p key={f.text} className={FLAG_TEXT[f.level]}>{f.text}</p>
-                  ))}
-                  {r.topError && <p className="mt-0.5 text-slate-500" title={r.topError.label}>Top error: {r.topError.label.slice(0, 90)}</p>}
-                  {!r.error && r.flags.every((f) => f.level === "info") && !r.topError && <p className="text-slate-400">—</p>}
-                </td>
-              </tr>
-            ))}
+            {shown.map((r) => {
+              const items = (drill: Drill) => itemsHref(basePath, drill, { client: r.clientId });
+              return (
+                <tr key={r.clientId} className="hover:bg-slate-50">
+                  <td className={td}>
+                    <Link href={`${basePath}/${r.clientId}`} className="font-medium text-indigo-700 hover:underline">
+                      {r.companyName}
+                    </Link>
+                    <p className="text-xs text-slate-500">
+                      {r.status} · {r.licenses} licenses logged in{r.integrations.length ? ` · ${r.integrations.join(", ")}` : ""}
+                    </p>
+                  </td>
+                  <td className={td}>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${LEVELS[r.level].className}`}>
+                      <span aria-hidden>{LEVELS[r.level].icon}</span>
+                      {LEVELS[r.level].label}
+                    </span>
+                  </td>
+                  <td className={`${td} text-right tabular-nums`}>
+                    {int(r.callsToday)} <span className="text-slate-400">/ {int(r.totalCalls)}</span>
+                  </td>
+                  <td className={`${td} text-right tabular-nums`}>
+                    {int(r.uploadsVerified)}
+                    {r.stuckRecordings > 0 && (
+                      <p className="text-xs text-red-700"><ItemLink href={items({ kind: "recordings", stage: "stuck" })}>{r.stuckRecordings} stuck</ItemLink></p>
+                    )}
+                    {r.waitingRecordings > 0 && (
+                      <p className="text-xs text-amber-800"><ItemLink href={items({ kind: "recordings", stage: "waiting" })}>{r.waitingRecordings} not uploaded</ItemLink></p>
+                    )}
+                  </td>
+                  <td className={`${td} text-right tabular-nums`}>
+                    {int(r.recordingsSynced)}
+                    {r.unsyncedRecordings > 0 && (
+                      <p className="text-xs text-amber-800"><ItemLink href={items({ kind: "recordings", stage: "unsynced" })}>{r.unsyncedRecordings} not synced</ItemLink></p>
+                    )}
+                  </td>
+                  <td className={`${td} text-right tabular-nums`}>
+                    {int(r.syncDelivered)}
+                    {r.syncFailed > 0 && (
+                      <span className="text-red-700"> + <ItemLink href={items({ kind: "syncs", status: "failed" })}>{int(r.syncFailed)} failed</ItemLink></span>
+                    )}
+                  </td>
+                  <td className={`${td} text-right tabular-nums ${rateClass(r.successRate)}`}>{pct(r.successRate)}</td>
+                  <td className={`${td} text-right tabular-nums ${rateClass(r.lifetimeSuccessRate)}`}>
+                    {pct(r.lifetimeSuccessRate)}
+                    <p className="text-xs font-normal text-slate-400">{int(r.lifetimeEvents)} events</p>
+                  </td>
+                  <td className={`${td} text-right tabular-nums`}>{int(r.pendingRecordings)}</td>
+                  <td className={`${td} text-xs text-slate-500`}>
+                    {r.lastCallLabel}
+                    <br />
+                    {r.lastDeliveredLabel}
+                  </td>
+                  <td className="min-w-72 px-3 py-2 align-top text-xs">
+                    {r.error && <p className="text-red-700">{r.error}</p>}
+                    {r.flags.filter((f) => f.level !== "info").slice(0, 3).map((f) => (
+                      <p key={f.text} className={FLAG_TEXT[f.level]}><FlagText flag={f} href={items} /></p>
+                    ))}
+                    {r.topError && (
+                      <p className="mt-0.5 text-slate-500" title={r.topError.label}>
+                        Top error:{" "}
+                        <ItemLink href={items({ kind: "syncs", status: "failed", label: r.topError.label })}>{r.topError.label.slice(0, 90)}</ItemLink>
+                      </p>
+                    )}
+                    {!r.error && r.flags.every((f) => f.level === "info") && !r.topError && <p className="text-slate-400">—</p>}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {shown.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">No clients match.</p>}

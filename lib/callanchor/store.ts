@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { deliveryLabel, mask } from "@/lib/callanchor/labels";
+import { AUTH_PATTERN, CRM_STATUS_SQL, crmStatus, deliveryLabel, mask } from "@/lib/callanchor/labels";
 import { getJson, PortalError } from "@/lib/callanchor/portal";
 import { db } from "@/lib/db";
 
@@ -118,7 +118,9 @@ export type StoredCallout = {
   eventType: string;
   callId: string;
   attempt: number;
+  // The CRM's outcome (see crmStatus); `callAnchorStatus` is what CallAnchor recorded.
   status: string;
+  callAnchorStatus: string;
   httpStatus: number | null;
   durationMs: number | null;
   at: string;
@@ -511,24 +513,42 @@ export async function pullClient(cookie: string, clientId: string): Promise<Pull
 
 // ---- Reading ----
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the shape the Neon driver returns
+type Row = Record<string, any>;
+
+const toCallout = (r: Row): StoredCallout => ({
+  id: r.id,
+  clientId: r.client_id,
+  platformId: r.platform_id,
+  eventType: r.event_type,
+  callId: r.call_id,
+  attempt: r.attempt,
+  status: crmStatus(r.status, r.http_status),
+  callAnchorStatus: r.status,
+  httpStatus: r.http_status,
+  durationMs: r.duration_ms,
+  at: iso(r.at),
+  label: r.label,
+});
+
+const toLog = (r: Row): StoredLog => ({
+  id: r.id,
+  clientId: r.client_id,
+  occurredAt: iso(r.occurred_at),
+  category: r.category,
+  severity: r.severity,
+  source: r.source,
+  resourceId: r.resource_id,
+  message: r.message,
+  detail: r.detail,
+});
+
 export async function readCallouts(clientId: string | null, since: number): Promise<StoredCallout[]> {
   const from = new Date(since).toISOString();
   const rows = clientId
     ? await db()`SELECT * FROM ca_callout_events WHERE client_id = ${clientId} AND at >= ${from} ORDER BY at DESC`
     : await db()`SELECT * FROM ca_callout_events WHERE at >= ${from} ORDER BY at DESC`;
-  return rows.map((r) => ({
-    id: r.id,
-    clientId: r.client_id,
-    platformId: r.platform_id,
-    eventType: r.event_type,
-    callId: r.call_id,
-    attempt: r.attempt,
-    status: r.status,
-    httpStatus: r.http_status,
-    durationMs: r.duration_ms,
-    at: iso(r.at),
-    label: r.label,
-  }));
+  return rows.map(toCallout);
 }
 
 export async function readLogs(clientId: string | null, since: number): Promise<StoredLog[]> {
@@ -536,17 +556,98 @@ export async function readLogs(clientId: string | null, since: number): Promise<
   const rows = clientId
     ? await db()`SELECT * FROM ca_system_logs WHERE client_id = ${clientId} AND occurred_at >= ${from} ORDER BY occurred_at DESC`
     : await db()`SELECT * FROM ca_system_logs WHERE occurred_at >= ${from} ORDER BY occurred_at DESC`;
-  return rows.map((r) => ({
-    id: r.id,
-    clientId: r.client_id,
-    occurredAt: iso(r.occurred_at),
-    category: r.category,
-    severity: r.severity,
-    source: r.source,
-    resourceId: r.resource_id,
-    message: r.message,
-    detail: r.detail,
-  }));
+  return rows.map(toLog);
+}
+
+// ---- Item lists, for debugging one row at a time ----
+
+export const ITEMS_PER_PAGE = 100;
+
+export type CalloutFilter = {
+  clientId?: string;
+  status?: string;
+  platform?: string;
+  event?: string;
+  // "none" is a callout that got no HTTP response.
+  http?: number | "none";
+  label?: string;
+  auth?: boolean;
+};
+
+export type LogFilter = {
+  clientId?: string;
+  // Also matches the sources under it: "mobile" covers "mobile.call.create".
+  source?: string;
+  severity?: string;
+  detail?: string;
+  // The masked message starts with this.
+  starts?: string;
+};
+
+// Builds a WHERE clause with numbered parameters, since the filters are all optional.
+function conditions() {
+  const params: unknown[] = [];
+  const parts: string[] = [];
+  return {
+    params,
+    add(sql: string, ...values: unknown[]) {
+      parts.push(sql.replace(/\?/g, () => `$${params.push(values.shift())}`));
+    },
+    get where() {
+      return parts.length ? `WHERE ${parts.join(" AND ")}` : "";
+    },
+  };
+}
+
+const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
+
+export async function readCalloutPage(filter: CalloutFilter, days: number, page: number) {
+  const now = Date.now();
+  const c = conditions();
+  c.add("at >= ?", new Date(now - days * DAY).toISOString());
+  if (filter.clientId) c.add("client_id = ?", filter.clientId);
+  if (filter.status) c.add(`${CRM_STATUS_SQL} = ?`, filter.status);
+  if (filter.platform) c.add("platform_id = ?", filter.platform);
+  if (filter.event) c.add("event_type = ?", filter.event);
+  if (filter.http === "none") c.add("http_status IS NULL");
+  else if (filter.http !== undefined) c.add("http_status = ?", filter.http);
+  if (filter.label !== undefined) c.add("label = ?", filter.label);
+  if (filter.auth) c.add("(http_status = 401 OR label ~* ?)", AUTH_PATTERN);
+  const rows = await db().query(
+    `SELECT *, count(*) OVER () AS total FROM ca_callout_events ${c.where} ORDER BY at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
+    c.params,
+  );
+  return { items: rows.map(toCallout), total: Number(rows[0]?.total ?? 0), now };
+}
+
+export async function readLogPage(filter: LogFilter, days: number, page: number) {
+  const now = Date.now();
+  const c = conditions();
+  c.add("occurred_at >= ?", new Date(now - days * DAY).toISOString());
+  if (filter.clientId) c.add("client_id = ?", filter.clientId);
+  if (filter.source) c.add("(source = ? OR source LIKE ?)", filter.source, `${escapeLike(filter.source)}.%`);
+  if (filter.severity) c.add("severity = ?", filter.severity);
+  if (filter.detail) c.add("detail = ?", filter.detail);
+  if (filter.starts) c.add("message LIKE ?", `${escapeLike(filter.starts)}%`);
+  const rows = await db().query(
+    `SELECT *, count(*) OVER () AS total FROM ca_system_logs ${c.where} ORDER BY occurred_at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
+    c.params,
+  );
+  return { items: rows.map(toLog), total: Number(rows[0]?.total ?? 0), now };
+}
+
+// Everything stored about one call: its CRM callouts, and the system logs about it.
+export async function readCall(callId: string) {
+  const [callouts, logs] = await Promise.all([
+    db()`SELECT * FROM ca_callout_events WHERE call_id = ${callId} ORDER BY at`,
+    db()`SELECT * FROM ca_system_logs WHERE resource_id = ${callId} ORDER BY occurred_at`,
+  ]);
+  return { callouts: callouts.map(toCallout), logs: logs.map(toLog) };
+}
+
+export async function readClientNames() {
+  const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots`;
+  return new Map<string, string>(rows.map((r) => [r.client_id, r.company_name ?? r.client_id]));
 }
 
 export async function readSnapshots(clientId?: string): Promise<Snapshot[]> {

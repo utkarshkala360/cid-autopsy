@@ -4,6 +4,7 @@ import { getJson } from "@/lib/callanchor/portal";
 import {
   optional,
   pullClient,
+  readCall,
   pullFleet,
   readCallouts,
   readLogs,
@@ -92,7 +93,8 @@ export function summarizeSync(events: StoredCallout[]) {
     if (ok) {
       delivered++;
       type.delivered++;
-      if (event.eventType === "recording.ready") syncedRecordingIds.add(event.callId);
+      // Either event reaching the CRM counts as the call's recording synced (owner, 2026-11-04).
+      if (event.eventType === "recording.ready" || event.eventType === "call.completed") syncedRecordingIds.add(event.callId);
       if (!lastDeliveredAt || event.at > lastDeliveredAt) lastDeliveredAt = event.at;
     }
     if (bad) {
@@ -148,10 +150,13 @@ export function summarizeSync(events: StoredCallout[]) {
 }
 
 export type StuckRecording = { callId: string; stage: string; since: string };
+export const RECORDING_STAGES = ["stuck", "waiting", "unsynced"] as const;
+export type RecordingStage = (typeof RECORDING_STAGES)[number];
 export type PipelineSummary = ReturnType<typeof summarizePipeline>;
 
 // Follows each call through the system log: ingested, upload started, uploaded, verified, synced.
-// `syncedRecordingIds` is null when no active integration takes recording.ready.
+// `syncedRecordingIds` (calls with a delivered call.completed or recording.ready) is null when no
+// active integration takes recording.ready.
 export function summarizePipeline(logs: StoredLog[], syncedRecordingIds: Set<string> | null, now: number) {
   type Call = { expectingAt?: string; startedAt?: string; completedAt?: string; verifiedAt?: string; failedAt?: string };
   const calls = new Map<string, Call>();
@@ -262,10 +267,15 @@ export function summarizePipeline(logs: StoredLog[], syncedRecordingIds: Set<str
   };
 }
 
+// Matches what summarizePipeline counts as a failed S3 deletion.
+export const PURGE_FAILURES: Drill = { kind: "logs", source: "platform-recording-cleanup", starts: "Failed" };
+
 // ---- Scoring ----
 
 export type Level = "critical" | "warning" | "healthy" | "idle" | "unknown";
-export type Flag = { level: "critical" | "warning" | "info"; text: string };
+// Where a flag leads: a filtered list of the stored items behind it (health/items).
+export type Drill = { kind: "syncs" | "recordings" | "logs" } & Record<string, string>;
+export type Flag = { level: "critical" | "warning" | "info"; text: string; drill?: Drill };
 
 const LEVEL_RANK: Record<Level, number> = { critical: 0, warning: 1, unknown: 2, healthy: 3, idle: 4 };
 export const byLevel = (a: Level, b: Level) => LEVEL_RANK[a] - LEVEL_RANK[b];
@@ -282,28 +292,29 @@ function evaluate(input: {
 }): { level: Level; flags: Flag[] } {
   const { sync, pipeline, tenant, oneApi, windowLabel } = input;
   const flags: Flag[] = [];
-  const add = (level: Flag["level"], text: string) => flags.push({ level, text });
+  const add = (level: Flag["level"], text: string, drill?: Drill) => flags.push({ level, text, drill });
+  const failedSyncs: Drill = { kind: "syncs", status: "failed" };
   const settled = sync.delivered + sync.failed;
   const n = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString("en-IN")} ${count === 1 ? one : many}`;
 
-  if (sync.authFailures > 0) add("critical", `CRM sign-in failing: ${n(sync.authFailures, "sync")} rejected for credentials in ${windowLabel}`);
+  if (sync.authFailures > 0) add("critical", `CRM sign-in failing: ${n(sync.authFailures, "sync")} rejected for credentials in ${windowLabel}`, { ...failedSyncs, auth: "1" });
   if (sync.successRate !== null && settled >= THRESHOLDS.minEventsForRate) {
     const failedShare = Math.round((100 - sync.successRate) * 10) / 10;
-    if (sync.successRate < THRESHOLDS.criticalSuccessRate) add("critical", `${failedShare}% of CRM syncs failed (${sync.failed} of ${settled}) in ${windowLabel}`);
-    else if (sync.successRate < THRESHOLDS.warningSuccessRate) add("warning", `${failedShare}% of CRM syncs failed (${sync.failed} of ${settled}) in ${windowLabel}`);
+    if (sync.successRate < THRESHOLDS.criticalSuccessRate) add("critical", `${failedShare}% of CRM syncs failed (${sync.failed} of ${settled}) in ${windowLabel}`, failedSyncs);
+    else if (sync.successRate < THRESHOLDS.warningSuccessRate) add("warning", `${failedShare}% of CRM syncs failed (${sync.failed} of ${settled}) in ${windowLabel}`, failedSyncs);
   } else if (sync.failed > 0) {
-    add("warning", `${n(sync.failed, "CRM sync")} failed in ${windowLabel}`);
+    add("warning", `${n(sync.failed, "CRM sync")} failed in ${windowLabel}`, failedSyncs);
   }
   if (tenant && tenant.activeIntegrations.length > 0 && input.callsRecently > 0 && sync.delivered === 0) {
-    add("critical", `${n(input.callsRecently, "call")} came in during ${windowLabel} but nothing reached the CRM`);
+    add("critical", `${n(input.callsRecently, "call")} came in during ${windowLabel} but nothing reached the CRM`, { kind: "logs", source: "mobile.call.create" });
   }
   if (pipeline.stuck.length > 0) {
-    add(pipeline.stuck.length >= THRESHOLDS.criticalStuckRecordings ? "critical" : "warning", `${n(pipeline.stuck.length, "recording")} stuck or failed after the upload began`);
+    add(pipeline.stuck.length >= THRESHOLDS.criticalStuckRecordings ? "critical" : "warning", `${n(pipeline.stuck.length, "recording")} stuck or failed after the upload began`, { kind: "recordings", stage: "stuck" });
   }
-  if (pipeline.waiting.length > 0) add("warning", `${n(pipeline.waiting.length, "recording")} not uploaded by the phone after 30 minutes`);
-  if (pipeline.unsynced.length > 0) add("warning", `${n(pipeline.unsynced.length, "uploaded recording")} not synced to the CRM`);
+  if (pipeline.waiting.length > 0) add("warning", `${n(pipeline.waiting.length, "recording")} not uploaded by the phone after 30 minutes`, { kind: "recordings", stage: "waiting" });
+  if (pipeline.unsynced.length > 0) add("warning", `${n(pipeline.unsynced.length, "uploaded recording")} not synced to the CRM`, { kind: "recordings", stage: "unsynced" });
   // A platform-wide CallAnchor fault, so it's shown once on the fleet page and only noted here.
-  if (pipeline.purgeFailed > 0) add("info", `${n(pipeline.purgeFailed, "recording")} not deleted from CallAnchor's S3 after syncing`);
+  if (pipeline.purgeFailed > 0) add("info", `${n(pipeline.purgeFailed, "recording")} not deleted from CallAnchor's S3 after syncing`, PURGE_FAILURES);
   if (tenant) {
     // A limit hurts a client that is still calling, and may explain why a trial went quiet.
     if (tenant.recordingAtLimit) {
@@ -441,14 +452,13 @@ export async function loadFleetHealth(cookie: string) {
 
   // Fleet-wide view of failures: which errors hit how many clients.
   const names = new Map(rows.map((r) => [r.clientId, r.companyName]));
-  const errors = new Map<string, { platform: string; label: string; count: number; clients: string[] }>();
+  const errors = new Map<string, { platform: string; label: string; count: number; clients: { id: string; name: string }[] }>();
   for (const event of events) {
     if (event.status !== "failed") continue;
     const key = `${event.platformId}|${event.label}`;
     const entry = errors.get(key) ?? { platform: event.platformId, label: event.label, count: 0, clients: [] };
     entry.count++;
-    const name = names.get(event.clientId) ?? event.clientId;
-    if (!entry.clients.includes(name)) entry.clients.push(name);
+    if (!entry.clients.some((c) => c.id === event.clientId)) entry.clients.push({ id: event.clientId, name: names.get(event.clientId) ?? event.clientId });
     errors.set(key, entry);
   }
 
@@ -533,5 +543,49 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     store,
     loadedAt: new Date(now).toISOString(),
     tookMs: Date.now() - started,
+  };
+}
+
+// ---- Items behind a flag ----
+
+// Recordings at one stage, fleet-wide or for one client, each with the CRM callouts sent for its call.
+export async function loadRecordingItems(clientId: string | null, days: WindowDays, stage: RecordingStage) {
+  const now = Date.now();
+  const since = now - days * DAY;
+  const [events, logs, snapshots] = await Promise.all([readCallouts(clientId, since), readLogs(clientId, since), readSnapshots(clientId ?? undefined)]);
+  const eventsByClient = groupBy(events, (e) => e.clientId);
+  const logsByClient = groupBy(logs, (l) => l.clientId);
+  const eventsByCall = groupBy(events, (e) => e.callId);
+
+  const items = snapshots.flatMap((s) => {
+    const sync = summarizeSync(eventsByClient.get(s.clientId) ?? []);
+    const pipeline = summarizePipeline(logsByClient.get(s.clientId) ?? [], s.tenant?.takesRecordings ? sync.syncedRecordingIds : null, now);
+    return pipeline[stage].map((r) => ({
+      ...r,
+      clientId: s.clientId,
+      companyName: s.companyName ?? s.clientId,
+      callouts: (eventsByCall.get(r.callId) ?? []).map((e) => `${e.eventType} ${e.status}`),
+    }));
+  });
+  return { items: items.sort((a, b) => b.since.localeCompare(a.since)), loadedAt: new Date(now).toISOString() };
+}
+
+// One call's stored history, and where its recording stands.
+export async function loadCall(callId: string) {
+  const now = Date.now();
+  const { callouts, logs } = await readCall(callId);
+  const clientId = logs.find((l) => l.clientId)?.clientId ?? callouts[0]?.clientId ?? null;
+  const [snapshot] = clientId ? await readSnapshots(clientId) : [];
+  const sync = summarizeSync(callouts);
+  const pipeline = summarizePipeline(logs, snapshot?.tenant?.takesRecordings ? sync.syncedRecordingIds : null, now);
+  const problem = pipeline.stuck[0] ?? pipeline.unsynced[0] ?? pipeline.waiting[0] ?? null;
+  return {
+    clientId,
+    companyName: snapshot?.companyName ?? clientId,
+    takesRecordings: snapshot?.tenant?.takesRecordings ?? null,
+    callouts,
+    logs,
+    problem,
+    loadedAt: new Date(now).toISOString(),
   };
 }
