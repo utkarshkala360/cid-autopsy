@@ -1,6 +1,6 @@
 import "server-only";
 import { isAuthFailure } from "@/lib/callanchor/labels";
-import { getJson } from "@/lib/callanchor/portal";
+import { getJson, PortalError } from "@/lib/callanchor/portal";
 import {
   optional,
   pullClient,
@@ -12,6 +12,7 @@ import {
   readStoreStatus,
   summarizeTenant,
   type Aggregate,
+  type AnchorLog,
   type License,
   type OneApiStatus,
   type Snapshot,
@@ -570,8 +571,13 @@ export async function loadRecordingItems(clientId: string | null, days: WindowDa
   return { items: items.sort((a, b) => b.since.localeCompare(a.since)), loadedAt: new Date(now).toISOString() };
 }
 
-// One call's stored history, and where its recording stands.
-export async function loadCall(callId: string) {
+export type AnchorResult = { requestId: string; log: AnchorLog | null; error: string | null };
+
+const REQUEST_ID = /^[\w-]{1,100}$/;
+
+// One call's stored history, where its recording stands, and, with a CallAnchor cookie, each CRM
+// request read live: the payload sent and every reply. Payloads aren't stored.
+export async function loadCall(callId: string, cookie: string | null) {
   const now = Date.now();
   const { callouts, logs } = await readCall(callId);
   const clientId = logs.find((l) => l.clientId)?.clientId ?? callouts[0]?.clientId ?? null;
@@ -579,6 +585,18 @@ export async function loadCall(callId: string) {
   const sync = summarizeSync(callouts);
   const pipeline = summarizePipeline(logs, snapshot?.tenant?.takesRecordings ? sync.syncedRecordingIds : null, now);
   const problem = pipeline.stuck[0] ?? pipeline.unsynced[0] ?? pipeline.waiting[0] ?? null;
+  const requestIds = [...new Set(callouts.map((e) => e.requestId).filter((id): id is string => !!id && REQUEST_ID.test(id)))];
+  const requests: AnchorResult[] =
+    cookie && clientId
+      ? await Promise.all(
+          requestIds.map((requestId) =>
+            getJson<AnchorLog>(cookie, `/api/clients/${clientId}/anchor-logs/${requestId}`).then(
+              (log) => ({ requestId, log, error: null }),
+              (error: unknown) => ({ requestId, log: null, error: error instanceof PortalError ? `HTTP ${error.status}` : "no response" }),
+            ),
+          ),
+        )
+      : [];
   return {
     clientId,
     companyName: snapshot?.companyName ?? clientId,
@@ -586,6 +604,8 @@ export async function loadCall(callId: string) {
     callouts,
     logs,
     problem,
+    requests,
+    missingRequestIds: callouts.filter((e) => !e.requestId).length,
     loadedAt: new Date(now).toISOString(),
   };
 }

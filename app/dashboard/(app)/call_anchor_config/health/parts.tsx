@@ -179,3 +179,24 @@ export function SyncTrend({ buckets, hourly }: { buckets: { start: string; deliv
     </div>
   );
 }
+
+// Raw CallAnchor data, pretty-printed. JSON sent as text (payload and reply previews) is parsed first.
+export function Json({ value, label, open = false }: { value: unknown; label: string; open?: boolean }) {
+  let shown = value;
+  if (typeof value === "string") {
+    try {
+      shown = JSON.parse(value);
+    } catch {
+      // Not JSON, or cut short by CallAnchor's preview: show the text as it is.
+    }
+  }
+  const text = typeof shown === "string" ? shown : JSON.stringify(shown, null, 2);
+  return (
+    <details open={open} className="mt-1 text-xs">
+      <summary className="cursor-pointer select-none font-medium text-indigo-700">{label}</summary>
+      <pre className="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-3 font-mono text-[11px] leading-relaxed text-slate-800 ring-1 ring-slate-200">
+        {text}
+      </pre>
+    </details>
+  );
+}

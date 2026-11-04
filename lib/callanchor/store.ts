@@ -35,6 +35,7 @@ type Paged<T> = { items: T[]; pagination: Pagination };
 
 type CalloutEvent = {
   id: string;
+  requestId: string;
   platformId: string;
   eventType: string;
   callId: string;
@@ -59,6 +60,14 @@ type SystemLog = {
   resourceId: string | null;
   message: string;
   metadata: Record<string, unknown> | null;
+};
+
+// GET anchor-logs/{requestId}: one delivery request, its payload and every attempt.
+export type AnchorLog = {
+  request: { id: string; status: string; endpoint: string; payloadJson?: unknown; attemptCount?: number; eventType: string; createdAt?: string; completedAt?: string | null };
+  events: (CalloutEvent & { endpoint?: string; payloadPreview?: string; externalRecordId?: string; calleeName?: string })[];
+  call?: Record<string, unknown>;
+  platform?: { slug: string; name: string; isCustom?: boolean };
 };
 
 export type License = {
@@ -121,6 +130,7 @@ export type StoredCallout = {
   // The CRM's outcome (see crmStatus); `callAnchorStatus` is what CallAnchor recorded.
   status: string;
   callAnchorStatus: string;
+  requestId: string | null;
   httpStatus: number | null;
   durationMs: number | null;
   at: string;
@@ -135,8 +145,11 @@ export type StoredLog = {
   severity: string;
   source: string;
   resourceId: string | null;
+  callId: string | null;
   message: string;
   detail: string | null;
+  // The log line as CallAnchor sent it. Read only for item views, never for summaries.
+  raw?: Record<string, unknown> | null;
 };
 
 export type TenantSummary = ReturnType<typeof summarizeTenant>;
@@ -248,7 +261,7 @@ function chunks<T>(rows: T[]) {
 async function saveCallouts(clientId: string, events: CalloutEvent[]) {
   for (const rows of chunks(events)) {
     await db()`
-      INSERT INTO ca_callout_events (id, client_id, platform_id, event_type, call_id, attempt, status, http_status, duration_ms, at, label)
+      INSERT INTO ca_callout_events (id, client_id, platform_id, event_type, call_id, attempt, status, http_status, duration_ms, at, label, request_id)
       SELECT * FROM unnest(
         ${rows.map((e) => e.id)}::text[],
         ${rows.map(() => clientId)}::text[],
@@ -260,11 +273,12 @@ async function saveCallouts(clientId: string, events: CalloutEvent[]) {
         ${rows.map((e) => e.httpStatus ?? null)}::int[],
         ${rows.map((e) => e.durationMs ?? null)}::int[],
         ${rows.map((e) => e.at)}::timestamptz[],
-        ${rows.map((e) => deliveryLabel(e))}::text[]
+        ${rows.map((e) => deliveryLabel(e))}::text[],
+        ${rows.map((e) => e.requestId ?? null)}::text[]
       )
       ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status, http_status = EXCLUDED.http_status,
-        duration_ms = EXCLUDED.duration_ms, label = EXCLUDED.label
+        duration_ms = EXCLUDED.duration_ms, label = EXCLUDED.label, request_id = EXCLUDED.request_id
     `;
   }
 }
@@ -275,10 +289,16 @@ const logDetail = (meta: Record<string, unknown> | null) => {
   return typeof value === "string" ? value : null;
 };
 
+// The call a log line is about. CRM sync lines name a callout request as their resource.
+const logCallId = (log: SystemLog) => {
+  const id = log.metadata?.callRecordId;
+  return typeof id === "string" ? id : log.resourceId;
+};
+
 async function saveLogs(logs: SystemLog[]) {
   for (const rows of chunks(logs)) {
     await db()`
-      INSERT INTO ca_system_logs (id, client_id, occurred_at, category, severity, source, resource_id, message, detail)
+      INSERT INTO ca_system_logs (id, client_id, occurred_at, category, severity, source, resource_id, message, detail, call_id, raw)
       SELECT * FROM unnest(
         ${rows.map((l) => l.id)}::text[],
         ${rows.map((l) => l.clientId)}::text[],
@@ -288,9 +308,11 @@ async function saveLogs(logs: SystemLog[]) {
         ${rows.map((l) => l.source)}::text[],
         ${rows.map((l) => l.resourceId)}::text[],
         ${rows.map((l) => mask(l.message).slice(0, 300))}::text[],
-        ${rows.map((l) => logDetail(l.metadata))}::text[]
+        ${rows.map((l) => logDetail(l.metadata))}::text[],
+        ${rows.map((l) => logCallId(l))}::text[],
+        ${rows.map((l) => JSON.stringify(l))}::jsonb[]
       )
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (id) DO UPDATE SET call_id = EXCLUDED.call_id, raw = EXCLUDED.raw WHERE ca_system_logs.raw IS NULL
     `;
   }
 }
@@ -525,6 +547,7 @@ const toCallout = (r: Row): StoredCallout => ({
   attempt: r.attempt,
   status: crmStatus(r.status, r.http_status),
   callAnchorStatus: r.status,
+  requestId: r.request_id ?? null,
   httpStatus: r.http_status,
   durationMs: r.duration_ms,
   at: iso(r.at),
@@ -539,9 +562,14 @@ const toLog = (r: Row): StoredLog => ({
   severity: r.severity,
   source: r.source,
   resourceId: r.resource_id,
+  callId: r.call_id ?? null,
   message: r.message,
   detail: r.detail,
+  raw: r.raw,
 });
+
+// Summaries read every log in a window, so they leave out `raw`.
+const LOG_COLUMNS = "id, client_id, occurred_at, category, severity, source, resource_id, call_id, message, detail";
 
 export async function readCallouts(clientId: string | null, since: number): Promise<StoredCallout[]> {
   const from = new Date(since).toISOString();
@@ -554,8 +582,8 @@ export async function readCallouts(clientId: string | null, since: number): Prom
 export async function readLogs(clientId: string | null, since: number): Promise<StoredLog[]> {
   const from = new Date(since).toISOString();
   const rows = clientId
-    ? await db()`SELECT * FROM ca_system_logs WHERE client_id = ${clientId} AND occurred_at >= ${from} ORDER BY occurred_at DESC`
-    : await db()`SELECT * FROM ca_system_logs WHERE occurred_at >= ${from} ORDER BY occurred_at DESC`;
+    ? await db().query(`SELECT ${LOG_COLUMNS} FROM ca_system_logs WHERE client_id = $1 AND occurred_at >= $2 ORDER BY occurred_at DESC`, [clientId, from])
+    : await db().query(`SELECT ${LOG_COLUMNS} FROM ca_system_logs WHERE occurred_at >= $1 ORDER BY occurred_at DESC`, [from]);
   return rows.map(toLog);
 }
 
@@ -640,7 +668,7 @@ export async function readLogPage(filter: LogFilter, days: number, page: number)
 export async function readCall(callId: string) {
   const [callouts, logs] = await Promise.all([
     db()`SELECT * FROM ca_callout_events WHERE call_id = ${callId} ORDER BY at`,
-    db()`SELECT * FROM ca_system_logs WHERE resource_id = ${callId} ORDER BY occurred_at`,
+    db()`SELECT * FROM ca_system_logs WHERE call_id = ${callId} ORDER BY occurred_at`,
   ]);
   return { callouts: callouts.map(toCallout), logs: logs.map(toLog) };
 }

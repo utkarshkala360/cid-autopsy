@@ -99,6 +99,9 @@ CREATE INDEX IF NOT EXISTS ca_callout_events_client_at_idx ON ca_callout_events 
 CREATE INDEX IF NOT EXISTS ca_callout_events_at_idx ON ca_callout_events (at DESC);
 CREATE INDEX IF NOT EXISTS ca_callout_events_call_idx ON ca_callout_events (call_id);
 
+-- Keys GET anchor-logs/{requestId}, which the call page reads live for the payload and CRM replies.
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS request_id TEXT;
+
 -- System logs (support/logs). CallAnchor keeps about 3 days; this keeps them longer.
 CREATE TABLE IF NOT EXISTS ca_system_logs (
   id          TEXT        PRIMARY KEY,
@@ -115,7 +118,14 @@ CREATE TABLE IF NOT EXISTS ca_system_logs (
 
 CREATE INDEX IF NOT EXISTS ca_system_logs_client_at_idx ON ca_system_logs (client_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS ca_system_logs_at_idx ON ca_system_logs (occurred_at DESC);
-CREATE INDEX IF NOT EXISTS ca_system_logs_resource_idx ON ca_system_logs (resource_id);
+DROP INDEX IF EXISTS ca_system_logs_resource_idx;
+
+-- The whole log line as CallAnchor sent it, metadata included, since it can't be fetched again after
+-- about 3 days (owner, 2026-11-04). `call_id` is metadata.callRecordId, else resource_id.
+ALTER TABLE ca_system_logs ADD COLUMN IF NOT EXISTS raw JSONB;
+ALTER TABLE ca_system_logs ADD COLUMN IF NOT EXISTS call_id TEXT;
+CREATE INDEX IF NOT EXISTS ca_system_logs_call_idx ON ca_system_logs (call_id);
+UPDATE ca_system_logs SET call_id = resource_id WHERE call_id IS NULL AND raw IS NULL AND resource_id IS NOT NULL;
 
 -- Latest per-client state: fleet metrics, tenant counts, OneAPI status and the lifetime sync aggregate.
 CREATE TABLE IF NOT EXISTS ca_client_snapshots (
@@ -138,4 +148,16 @@ CREATE TABLE IF NOT EXISTS ca_sync_state (
   -- Held while a pull runs, so two viewers don't pull the same stream at once.
   lease_until  TIMESTAMPTZ,
   last_error   TEXT
+);
+
+-- Rows stored before request_id and raw existed get them from the 5-day refresh, made due now so it
+-- runs in the background after the next view. Once they're filled in, these match nothing.
+UPDATE ca_sync_state SET refreshed_at = now() - interval '2 days'
+WHERE stream LIKE 'callouts:%' AND refreshed_at IS NOT NULL AND EXISTS (
+  SELECT 1 FROM ca_callout_events e
+  WHERE e.client_id = substr(ca_sync_state.stream, 10) AND e.request_id IS NULL AND e.at > now() - interval '5 days'
+);
+UPDATE ca_sync_state SET refreshed_at = now() - interval '2 days'
+WHERE stream = 'logs' AND refreshed_at IS NOT NULL AND EXISTS (
+  SELECT 1 FROM ca_system_logs WHERE raw IS NULL AND occurred_at > now() - interval '2 days'
 );

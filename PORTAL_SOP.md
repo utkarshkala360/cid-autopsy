@@ -45,6 +45,8 @@ Rules already established in this repo.
   its recording (owner, 2026-11-04). See `crmStatus` in `lib/callanchor/labels.ts`.
 - Every error, flag and count on the health pages opens the items behind it, one row per item, down
   to a single call's timeline (owner, 2026-11-04).
+- Anything with metadata shows it in full next to the error: a callout's payload, endpoint, every
+  attempt and the CRM's reply, and a log line's metadata (owner, 2026-11-04).
 - Commit only redacted fixtures. `npm test` in `callanchor-apis/` must pass before a commit there.
 
 ## Happy implementation
@@ -59,8 +61,10 @@ What a good change looks like here.
 - Read CallAnchor through `getJson` in `lib/callanchor/portal.ts`, which can only send GET.
 - Show CRM errors grouped and masked with `mask()`/`deliveryLabel()` in `lib/callanchor/labels.ts`.
   Raw errors can contain phone numbers and agents' free-text notes.
-- Store derived, masked data rather than raw CallAnchor responses. The health store keeps labels and
-  ids, never payloads or CRM replies.
+- Store derived, masked data rather than raw CallAnchor responses, with one exception: system log
+  lines are stored whole (`raw`), because CallAnchor drops them after about 3 days. Callout payloads
+  and CRM replies are read live from `anchor-logs/{requestId}` when a call is opened, never stored.
+  Summaries read `LOG_COLUMNS`, never `raw`.
 - Link a health number to its items with a `Drill` and `itemsHref()`; the items page
   (`health/items`) reads the store with the same filters, and `health/calls/<id>` shows one call.
 - Run slow background work, like the 5-day refresh, with `after()`, so it doesn't block the page.
@@ -71,6 +75,7 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-04 | Limit who sees raw payloads and log metadata | They carry customer phone numbers, agents' notes, actor emails and IPs, and every member with a CallAnchor login can open them | Awaiting owner |
 | 2026-11-03 | Give local dev its own Neon branch (set a branch `DATABASE_URL` in `.env.local` and Vercel's Development env) | Local, preview and production all use the same database, so a local visit moves the live milestones and writes live rows, and local schema changes hit production at once | Awaiting owner |
 | 2026-11-03 | Confirm the health thresholds: critical below 80% sync success, warning below 95%, critical at 3 stuck recordings, 30-minute grace for a pipeline stage | They decide what's flagged; they're starting guesses (`THRESHOLDS` in `lib/callanchor/health.ts`) | Awaiting owner |
 | 2026-11-03 | Raise the S3 purge failure with CallAnchor | Every post-sync S3 deletion failed (0 of 228 succeeded on 3 Nov): their AWS user lacks `s3:DeleteObject`, and the logs mark it `info`. Recordings stay in S3 longer than intended | Awaiting owner |
@@ -86,6 +91,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-04 | Full payloads and metadata: call pages read each CRM request live (payload, endpoint, attempts, replies, errors); log lines are stored whole and shown with their metadata; CRM sync log lines now join their call through `metadata.callRecordId` | Done, not yet viewed signed in. Older rows fill in on the next background 5-day refresh | `health/calls/[callId]/`, `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-04 | Item-level drill-down: every flag, error, outcome and count links to its rows (syncs, recordings, system logs), with per-call timelines | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor_config/health/items/`, `health/calls/[callId]/` |
 | 2026-11-04 | Count a 2xx CRM reply as success, and either `call.completed` or `recording.ready` as a synced recording | Done | `lib/callanchor/labels.ts`, `lib/callanchor/health.ts` |
 | 2026-11-03 | Store health data in Postgres and pull only what's new from each stream's milestone; refresh the last 5 days once a day | Done; tables exist in the shared Neon DB (local `predev` migrated them) | `lib/callanchor/store.ts`, `db/schema.sql` |
@@ -94,6 +100,9 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-04: Wants payload data and all other metadata next to the error wherever an item has it.
+  Call pages now read each CRM request live and show log metadata; added the rule to the SOP.
 
 - 2026-11-04: Said `call.completed` and `recording.ready` are both successful sends to the CRM, and
   HTTP 200 is a CRM success. Applied both (4 callouts CallAnchor marked failed despite a 200 now count

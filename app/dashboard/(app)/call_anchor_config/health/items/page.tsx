@@ -15,7 +15,7 @@ import {
   type LogFilter,
 } from "@/lib/callanchor/store";
 import { ago, callHref, formatTime, int } from "../format";
-import { LoadingNote, Table, td } from "../parts";
+import { Json, LoadingNote, Table, td } from "../parts";
 
 export const metadata: Metadata = { title: "Health items" };
 
@@ -177,12 +177,19 @@ function ClientCell({ id, names }: { id: string | null; names: Map<string, strin
   );
 }
 
-function CallCell({ callId }: { callId: string | null }) {
+function CallCell({ callId, requestId }: { callId: string | null; requestId?: string | null }) {
   if (!callId) return <span className="text-slate-400">—</span>;
   return (
-    <Link href={callHref(HEALTH_PATH, callId)} className="font-mono text-xs text-indigo-700 hover:underline">
-      {callId}
-    </Link>
+    <>
+      <Link href={callHref(HEALTH_PATH, callId)} className="font-mono text-xs text-indigo-700 hover:underline">
+        {callId}
+      </Link>
+      {requestId && (
+        <Link href={`${callHref(HEALTH_PATH, callId)}#request-${requestId}`} className="block text-xs font-medium text-indigo-700 hover:underline">
+          Payload and CRM reply
+        </Link>
+      )}
+    </>
   );
 }
 
@@ -225,7 +232,7 @@ async function SyncItems({ filter, days, page, names, href }: { filter: CalloutF
               <td className="min-w-80 px-3 py-2 align-top text-slate-700">
                 <FilterLink href={href({ label: e.label, page: null })}>{e.label}</FilterLink>
               </td>
-              <td className={td}><CallCell callId={e.callId} /></td>
+              <td className={td}><CallCell callId={e.callId} requestId={e.requestId} /></td>
             </tr>
           ))}
         </Table>
@@ -244,7 +251,7 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
       <Pager page={page} total={total} href={href} />
       <div className="mt-3">
         <Table
-          head={["When", ...(allClients ? ["Client"] : []), "Source", "Severity", "Message", "Detail", "Call or resource"]}
+          head={["When", ...(allClients ? ["Client"] : []), "Source", "Severity", "Message", "Detail", "Call"]}
           empty={items.length ? undefined : "Nothing matches in this window. CallAnchor keeps system logs for about 3 days, so older ones exist only if they were stored."}
         >
           {items.map((l) => (
@@ -255,11 +262,14 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
               <td className={`${td} ${l.severity === "info" ? "" : "font-medium text-red-700"}`}>
                 <FilterLink href={href({ severity: l.severity, page: null })}>{l.severity}</FilterLink>
               </td>
-              <td className="min-w-80 px-3 py-2 align-top text-slate-700">{l.message}</td>
+              <td className="min-w-80 max-w-2xl px-3 py-2 align-top text-slate-700">
+                {l.message}
+                {l.raw && <Json value={l.raw} label="Metadata and full log line" />}
+              </td>
               <td className={`${td} text-xs`}>
                 {l.detail ? <FilterLink href={href({ detail: l.detail, page: null })}>{l.detail}</FilterLink> : <span className="text-slate-400">—</span>}
               </td>
-              <td className={td}><CallCell callId={l.resourceId} /></td>
+              <td className={td}><CallCell callId={l.callId} /></td>
             </tr>
           ))}
         </Table>
