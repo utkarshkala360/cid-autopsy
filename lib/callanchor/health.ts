@@ -33,6 +33,7 @@ import {
   optional,
   pullClient,
   pullFleet,
+  readAudit,
   readCall,
   readCallouts,
   readCalls,
@@ -733,11 +734,12 @@ export async function loadLicense(licenseId: string, cookie: string | null) {
   const now = Date.now();
   const stored = await readLicense(licenseId);
   if (!stored) return null;
-  const [[assessment], calls, changes, tenant] = await Promise.all([
+  const [[assessment], calls, changes, tenant, portal] = await Promise.all([
     assess(now, stored.clientId),
     readCalls({ licenseId }, now - ASSESS_DAYS * DAY),
     readLicenseChanges({ licenseId }, now - SYNC.retainDays * DAY),
     cookie ? optional(getJson<Tenant>(cookie, `/api/clients/${stored.clientId}/tenant`)) : Promise.resolve(null),
+    readAudit({ licenseId }, now - SYNC.retainDays * DAY),
   ]);
   const health = assessment?.licenses.find((h) => h.license.licenseId === licenseId) ?? null;
   const ctx = assessment?.ctx ?? clientContext(null);
@@ -770,6 +772,8 @@ export async function loadLicense(licenseId: string, cookie: string | null) {
           }
         : {}),
     })),
+    // Portal events naming this license: settings changes, activation, mobile logins and logouts.
+    portal,
     loadedAt: new Date(now).toISOString(),
   };
 }

@@ -4,15 +4,18 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 
 | URL | What it is | Who signs in |
 | --- | --- | --- |
-| `/admin` | Admin Console: create, disable, reset passwords for and delete agents/members | Admins (stored in the database) |
+| `/admin` | Admin Console: create, disable, reset passwords for, set roles and the auditor permission of, and delete agents/members | Admins (stored in the database) |
+| `/admin/audit-notes` | Notes auditors left on dashboard pages, with the page each was on; mark them done or won't fix | Admins |
 | `/dashboard` | Dashboard: home for sub apps | Agents/members created in the Admin Console |
 | `/dashboard/call_anchor_config` | CallAnchor Config sub app | Agents/members |
 | `/dashboard/call_anchor_config/health` | Client health: recordings, CRM syncs and errors for every client | Agents/members with a CallAnchor login |
 | `/dashboard/call_anchor_config/health/<clientId>` | One client's full health breakdown | Agents/members with a CallAnchor login |
-| `/dashboard/call_anchor_config/apis` | API console: run CallAnchor's APIs live | Agents/members with a CallAnchor login |
+| `/dashboard/call_anchor_config/apis` | API console: run CallAnchor's APIs live | Members with the Admin role and a CallAnchor login |
 | `/customers` | Customers | Agents/members |
 | `/customers/<id>` | A customer and its integrations | Agents/members |
 | `/customers/<id>/integrations/salesforce` | That customer's Salesforce orgs; **+ Connect Salesforce** adds one | Agents/members |
+
+**Audit notes.** Members with the auditor permission (set in the Admin Console, on top of their role) see an **Audit note** button on every dashboard and customer page. A note saves the comment and its type with the page's URL, title, heading, query params, any highlighted text, viewport and browser into `audit_notes`. Admins review them at `/admin/audit-notes`; `npm run audit:notes` prints the open ones as Markdown (`-- --days 7` for the last week, any status) for the weekly dashboard review.
 
 ## Security model
 
@@ -82,7 +85,7 @@ Every CallAnchor page needs a valid portal session, stored per member and encryp
 - A `401` or `403`, or no stored session, sends the member to **Validate OTP** at `/dashboard/call_anchor_config/verify`. After the OTP they return to the page they were on.
 - If CallAnchor is down the page stays open, because an OTP couldn't work anyway.
 
-The **API console** at `/dashboard/call_anchor_config/apis` runs any operation from the contract live with the member's own session and marks whether the response matches. Writes need a confirmation. Responses contain customer data, and every signed-in member with a CallAnchor login can use it.
+The **API console** at `/dashboard/call_anchor_config/apis` runs any operation from the contract live with the member's own session and marks whether the response matches. Writes need a confirmation. Responses contain customer data, so only members with the Admin role (set in the Admin Console) see it; anyone else gets a 404.
 
 **Client health** at `/dashboard/call_anchor_config/health` scores every client from data stored in Postgres, which each visit brings up to date with the member's session, using GET requests only.
 

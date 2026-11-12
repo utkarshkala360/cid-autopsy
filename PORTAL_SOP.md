@@ -31,6 +31,9 @@ Rules already established in this repo.
 - Commit and push straight to `main`, only when the owner asks. Vercel deploys from `main`.
 - Every page and server action re-checks the session, even though `proxy.ts` also checks it.
 - CallAnchor pages and actions call `requireCallAnchorSession()`.
+- The API console (`call_anchor_config/apis`) is for members with the Admin role only. Its page and
+  action call `requireApiConsoleAccess()`, others get a 404 and don't see the link. Roles are set in
+  the Admin Console (owner, 2026-11-05).
 - The CallAnchor contract changes in `callanchor-apis/openapi/callanchor.openapi.yaml` first, then
   gets regenerated. Generated files are never edited by hand.
 - CallAnchor GET APIs may be used freely to pull data. Any non-GET call needs the owner's approval
@@ -51,6 +54,13 @@ Rules already established in this repo.
 - `recording.ready` and `call.completed` are both valid syncs: `recording.ready` is sent for a call
   that connected and was recorded (a few seconds or more), `call.completed` for a missed incoming or
   rejected outgoing call. A call that got either one reached the CRM (owner, 2026-11-05).
+- A call that didn't connect isn't a recording risk: `hasRecording: false` with `durationSeconds: 0`
+  is a missed incoming or rejected outgoing call, with nothing to record. Such a call (0 seconds in its
+  CRM payload; without one, ingest `callType` missed or rejected, or synced only by `call.completed`)
+  stays out of "not recorded" and "Phone isn't recording calls" (owner, 2026-11-05). See
+  `isUnconnected` in `lib/callanchor/issues.ts`.
+- Mobile, CRM and portal events are stored linked to each other by client, license, call, CRM
+  platform and callout request, so they can be searched and analysed together (owner, 2026-11-05).
 - Health rules use plain elapsed time, judged day by day. No working-hours or working-day filter
   (owner, 2026-11-05).
 - Health thresholds are configurable on the health Settings tab, fleet-wide. Defaults are `RULES` in
@@ -65,6 +75,10 @@ Rules already established in this repo.
   to a single call's timeline (owner, 2026-11-04).
 - Anything with metadata shows it in full next to the error: a callout's payload, endpoint, every
   attempt and the CRM's reply, and a log line's metadata (owner, 2026-11-04).
+- Auditor is a member permission on top of the role, set in the Admin Console. Auditors leave notes
+  on any page through the Audit note button; each saves the page URL and context to `audit_notes`.
+  The owner reviews them with the agent weekly to improve the dashboard: start from
+  `npm run audit:notes`, and mark each note done or won't fix with what changed (owner, 2026-11-12).
 - Commit only redacted fixtures. `npm test` in `callanchor-apis/` must pass before a commit there.
 
 ## Happy implementation
@@ -100,6 +114,14 @@ What a good change looks like here.
 - A drop that loses data (a recording not uploaded, verified but not synced, a call never sent) stays
   flagged until it's fixed, back 30 days (`readOpenCalls`), not only for 24 hours. A rate problem says
   how many days it has run.
+- Link events through `lib/callanchor/links.ts`: `callFacts()` reads a callout's payload preview
+  (type, length, recording, start, agent last 4; never the recording URL) and `auditLinks()` finds the
+  license, platform and callout a portal event names. `ca_events` (`db/schema.sql`) is every stored
+  event in one shape with those keys; search and cross-stream views read it, not the three tables.
+- A call without a stored ingest log gets its phone from the payload's agent number, only when exactly
+  one of the client's licenses ends in those 4 digits. `license_via` says which way it was linked.
+- To fill a new column on stored rows, set `ca_sync_state.backfill_from` in the migration. The stream's
+  next background refresh reads back to it once, so no page waits on it.
 - Verify engine changes against the store with a read-only stand-in for `lib/db.ts` that refuses
   anything but SELECT, and schema changes in an in-process Postgres (PGlite), never on the shared DB.
 - A new CallAnchor read goes: capture it live into `callanchor-apis/data/` (git-ignored), add it to
@@ -123,7 +145,6 @@ Agent proposals awaiting the owner's decision. Newest first.
 | 2026-11-03 | Confirm 90-day retention for the stored health data | Older rows are deleted to keep the tables small | Awaiting owner |
 | 2026-11-03 | Review `OPPORTUNITY_NOT_FOUND` with the affected client | It was the top CRM error fleet-wide on 3 Nov, so data matching, not an outage, drives the worst sync rates (open question 5) | Awaiting owner |
 | 2026-11-02 | Rotate the session cookie exposed in the "CallAnchor x APIs" sheet and restrict access to the sheet | It also holds recording links, customer phone numbers and an AWS access key ID | Awaiting owner |
-| 2026-11-02 | Limit the API console to chosen members | Its responses contain customer data, and every member with a CallAnchor login can use it | Awaiting owner |
 
 ## Portal changes
 
@@ -131,6 +152,11 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-12 | Auditor permission: Admin Console checkbox on create and Make/Remove auditor per member; floating Audit note button on member pages (type, comment, highlighted text) saving URL, title, heading, query, viewport, browser and host to `audit_notes`; `/admin/audit-notes` review page with open/done/won't fix; `npm run audit:notes` for the weekly review | Done; checked in PGlite, applies on the next deploy. Not pushed, not yet viewed signed in | `components/AuditNoteButton.tsx`, `app/admin/(console)/audit-notes/`, `scripts/audit-notes.mjs` |
+| 2026-11-05 | Global search bar in CallAnchor Config over `ca_events`, for quick search and analysis | Planned; owner said it comes next | |
+| 2026-11-05 | Linked events: callouts keep their call's type, length, recording flag, start and agent last 4 from the payload; calls with no ingest log get their phone from the agent number; portal events (audit log) stored as a stream, linked to license, integration and callout; `ca_events` view joins all three; "didn't connect" now uses the real call length; call page shows the call facts, license page its portal events | Done in code, checked in PGlite; not applied to the shared DB (the agent's apply was blocked) and not pushed. Applies on the next deploy; the next dashboard visit then backfills stored callouts and 90 days of portal events in the background | `lib/callanchor/links.ts`, `db/schema.sql`, `lib/callanchor/store.ts` |
+| 2026-11-05 | Calls that didn't connect (missed, rejected, or synced only by `call.completed`) no longer count as "not recorded" or toward "Phone isn't recording calls"; new `notConnected` stage; `ca_calls.call_type` from the ingest log, shown on the items page | Done; column and backfill applied to the shared DB (not recorded: 4,372 → 109). Not pushed | `isUnconnected` in `lib/callanchor/issues.ts`, `db/schema.sql` |
+| 2026-11-05 | API console for admins only: new member role `admin`, settable on create and per member in the Admin Console; console page, run action and its link gated | Done; role constraint applies on the next deploy, then set your own role to Admin | `requireApiConsoleAccess` in `lib/callanchor/session.ts`, `app/admin/` |
 | 2026-11-05 | Owner's QA answers: both sync events valid (R3 note removed); no working-hours filter, elapsed time day by day; Settings tab for 13 thresholds; Seats tab with seat use per client and every unused seat since when (seat notes left the issue lists); Clients / Licenses / Seats / Settings tabs | Done; `ca_health_settings` applies on the next deploy. Not yet viewed signed in | `health/settings/`, `health/seats/`, `SETTINGS` in `lib/callanchor/issues.ts` |
 | 2026-11-05 | QA follow-up: last good sync, synced days and recording chain for every client and phone; one "reached the CRM" (delivered out of due); recordings and unsent calls flagged until fixed; 5-minute grace for server steps; "since" from the run of bad days; issue episodes tied to the data; phone rules that work with one phone; seat use; integration changes recorded and each integration checked alone; duplicate 2xx flagged; fleet stall; inactive clients muted; issue cards open their rows with the evidence above; "new since your last visit"; trials section; busy-client log streams chosen by stored calls | Done; schema applies on the next deploy. Not yet viewed signed in | `docs/client-health-qa.md` §14, `lib/callanchor/issues.ts` |
 | 2026-11-05 | CallAnchor contract 17 → 29 operations, checked live: 12 new reads (callee, AI insights, AI credits, seat compliance and settings, disposition sets, portal admins, notifications, onboarding, audit log entry, `auth/me`, latest app build) and new fields on tenant, call contacts and disposition fields. Every operation now has a generated curl and redacted sample (`docs/api-reference.md`), and every Postman request carries its sample response. The API console page shows each operation's curl and sample too (`src/reference.ts` feeds both) | Done; console not yet viewed signed in, not pushed | `callanchor-apis/openapi/`, `callanchor-apis/docs/api-reference.md` |
@@ -145,6 +171,22 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-12: Asked for an auditor permission that lets members enter comments saved in the DB with
+  the page URL and metadata, to be reviewed with the agent weekly to optimise the dashboard. Built it
+  as a permission on top of the role, with an admin review page and a Markdown export; added the
+  weekly review to the SOP.
+
+- 2026-11-05: Asked for better correlation between mobile, portal and CRM events, properly linked and
+  structured, ahead of a global search bar in CallAnchor Config. Found that the callout list already
+  carries each call's payload (length, type, agent number) and that half the stored calls had no
+  phone; linked all three streams and stored portal events. Added the linking rule to the SOP.
+
+- 2026-11-05: Pointed at a call with `hasRecording: false`, `durationSeconds: 0`: a rejected outgoing
+  or missed incoming call is good behaviour, not a risk; fix it for new and stored data. Added the
+  "didn't connect" test, stored `callType`, backfilled the shared DB and added the rule to the SOP.
+
+- 2026-11-05: "The API console should only be visible to admins." Added an Admin member role that
+  gates the console, its action and its link; closed the matching recommendation.
 - 2026-11-05: Answered the QA points: `recording.ready` (connected, recorded) and `call.completed`
   (missed or rejected) are both valid; no working-time filter, daily basis; no-sync thresholds
   fine but configurable; unused seats in a dedicated tab. Built all four and added them to the SOP.

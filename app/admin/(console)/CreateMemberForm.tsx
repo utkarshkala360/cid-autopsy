@@ -38,8 +38,16 @@ export function CreateMemberForm() {
         <select id="role" name="role" defaultValue="agent" className={inputClass}>
           <option value="agent">Agent</option>
           <option value="member">Member</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
+      <label className="flex items-start gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="auditor" className="mt-0.5" />
+        <span>
+          Auditor
+          <span className="block text-xs text-slate-500">Can leave notes on any dashboard page for review.</span>
+        </span>
+      </label>
       <div>
         <label htmlFor="new-password" className={labelClass}>Password</label>
         <input

@@ -17,7 +17,8 @@ export type Member = {
   id: string;
   username: string;
   fullName: string;
-  role: "agent" | "member";
+  role: "agent" | "member" | "admin";
+  isAuditor: boolean;
 };
 
 // Compared against when the username doesn't exist, so response timing doesn't reveal valid usernames.
@@ -146,12 +147,18 @@ export const getMember = cache(async (): Promise<Member | null> => {
   if (!session) return null;
 
   const [row] = await db()`
-    SELECT id, username, full_name, role
+    SELECT id, username, full_name, role, is_auditor
     FROM members
     WHERE id = ${session.sub} AND is_active = TRUE AND session_version = ${session.sv}
   `;
   if (!row) return null;
-  return { id: String(row.id), username: row.username, fullName: row.full_name, role: row.role };
+  return {
+    id: String(row.id),
+    username: row.username,
+    fullName: row.full_name,
+    role: row.role,
+    isAuditor: row.is_auditor,
+  };
 });
 
 export async function requireMember() {

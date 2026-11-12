@@ -2,6 +2,7 @@ import { requireMember } from "@/lib/auth";
 import { SUB_APPS } from "@/lib/sub-apps";
 import { ConsoleHeader } from "@/components/ConsoleHeader";
 import { memberLogoutAction } from "@/app/dashboard/actions";
+import { AuditNoteButton } from "@/components/AuditNoteButton";
 
 // Header and page frame for everything members sign in to: the dashboard and customers.
 export async function MemberShell({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export async function MemberShell({ children }: { children: React.ReactNode }) {
         ]}
       />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      {member.isAuditor && <AuditNoteButton />}
     </>
   );
 }

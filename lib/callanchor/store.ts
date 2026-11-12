@@ -1,6 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { CRM_STATUS_SQL, crmStatus, deliveryLabel, mask } from "@/lib/callanchor/labels";
+import { auditLinks, callFacts, type AuditEntry } from "@/lib/callanchor/links";
 import { getJson, PortalError } from "@/lib/callanchor/portal";
 import { db } from "@/lib/db";
 
@@ -51,6 +52,8 @@ type CalloutEvent = {
   at: string;
   responsePreview?: string;
   errorMessage?: string;
+  // The payload as a JSON string, possibly cut short. Only callFacts() reads it; it isn't stored.
+  payloadPreview?: string;
 };
 
 export type Aggregate = { total: number; delivered: number; failed: number; retrying: number; queued: number; successRate: number };
@@ -281,8 +284,10 @@ function chunks<T>(rows: T[]) {
 
 async function saveCallouts(clientId: string, events: CalloutEvent[]) {
   for (const rows of chunks(events)) {
+    const facts = rows.map((e) => callFacts(e.payloadPreview));
     await db()`
-      INSERT INTO ca_callout_events (id, client_id, platform_id, event_type, call_id, attempt, status, http_status, duration_ms, at, label, request_id)
+      INSERT INTO ca_callout_events (id, client_id, platform_id, event_type, call_id, attempt, status, http_status, duration_ms, at, label, request_id,
+        has_recording, call_type, call_seconds, call_started_at, agent_last4, facts_read)
       SELECT * FROM unnest(
         ${rows.map((e) => e.id)}::text[],
         ${rows.map(() => clientId)}::text[],
@@ -295,11 +300,23 @@ async function saveCallouts(clientId: string, events: CalloutEvent[]) {
         ${rows.map((e) => e.durationMs ?? null)}::int[],
         ${rows.map((e) => e.at)}::timestamptz[],
         ${rows.map((e) => deliveryLabel(e))}::text[],
-        ${rows.map((e) => e.requestId ?? null)}::text[]
+        ${rows.map((e) => e.requestId ?? null)}::text[],
+        ${facts.map((f) => f?.hasRecording ?? null)}::boolean[],
+        ${facts.map((f) => f?.callType ?? null)}::text[],
+        ${facts.map((f) => f?.seconds ?? null)}::int[],
+        ${facts.map((f) => f?.startedAt ?? null)}::timestamptz[],
+        ${facts.map((f) => f?.agentLast4 ?? null)}::text[],
+        ${facts.map((f) => f !== null)}::boolean[]
       )
       ON CONFLICT (id) DO UPDATE SET
         attempt = EXCLUDED.attempt, status = EXCLUDED.status, http_status = EXCLUDED.http_status,
-        duration_ms = EXCLUDED.duration_ms, label = EXCLUDED.label, request_id = EXCLUDED.request_id
+        duration_ms = EXCLUDED.duration_ms, label = EXCLUDED.label, request_id = EXCLUDED.request_id,
+        has_recording = coalesce(EXCLUDED.has_recording, ca_callout_events.has_recording),
+        call_type = coalesce(EXCLUDED.call_type, ca_callout_events.call_type),
+        call_seconds = coalesce(EXCLUDED.call_seconds, ca_callout_events.call_seconds),
+        call_started_at = coalesce(EXCLUDED.call_started_at, ca_callout_events.call_started_at),
+        agent_last4 = coalesce(EXCLUDED.agent_last4, ca_callout_events.agent_last4),
+        facts_read = EXCLUDED.facts_read OR coalesce(ca_callout_events.facts_read, false)
     `;
   }
   await refreshCalls(events.map((e) => e.callId));
@@ -357,6 +374,32 @@ async function saveLogs(logs: SystemLog[]) {
     `;
   }
   await refreshCalls(logs.map(logCallId));
+}
+
+// Portal events, stored whole with the license, integration and callout each one names.
+async function saveAudit(entries: AuditEntry[]) {
+  for (const rows of chunks(entries)) {
+    const links = rows.map(auditLinks);
+    await db()`
+      INSERT INTO ca_audit_logs (id, client_id, occurred_at, action, resource_type, resource_id, actor_type, license_id, platform_id,
+        callout_log_id, correlation_id, raw)
+      SELECT * FROM unnest(
+        ${rows.map((a) => a.id)}::text[],
+        ${rows.map((a) => a.clientId ?? null)}::text[],
+        ${rows.map((a) => a.occurredAt)}::timestamptz[],
+        ${rows.map((a) => a.action)}::text[],
+        ${rows.map((a) => a.resourceType)}::text[],
+        ${rows.map((a) => a.resourceId ?? null)}::text[],
+        ${rows.map((a) => a.actorType ?? null)}::text[],
+        ${links.map((l) => l.licenseId)}::text[],
+        ${links.map((l) => l.platformId)}::text[],
+        ${links.map((l) => l.calloutLogId)}::text[],
+        ${rows.map((a) => a.correlationId ?? null)}::text[],
+        ${rows.map((a) => JSON.stringify(a))}::jsonb[]
+      )
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
 }
 
 // The fields of a license whose changes are kept, as text. Agent names and full numbers aren't stored.
@@ -492,23 +535,30 @@ export async function saveIntegrations(clientId: string, integrations: Integrati
 
 // ---- Streams and milestones ----
 
-type StreamState = { milestoneAt: number | null; pulledAt: number | null; refreshedAt: number | null };
+// backfillFrom: the next pull also reads back to here, once (ca_sync_state.backfill_from).
+type StreamState = { milestoneAt: number | null; pulledAt: number | null; refreshedAt: number | null; backfillFrom: number | null };
 type Mode = "latest" | "refresh";
 
 const time = (value: unknown) => (value ? new Date(value as string).getTime() : null);
 const iso = (value: unknown) => new Date(value as string).toISOString();
 
 async function readStates() {
-  const rows = await db()`SELECT stream, milestone_at, pulled_at, refreshed_at FROM ca_sync_state`;
-  return new Map<string, StreamState>(
-    rows.map((r) => [r.stream, { milestoneAt: time(r.milestone_at), pulledAt: time(r.pulled_at), refreshedAt: time(r.refreshed_at) }]),
-  );
+  const rows = await db()`SELECT stream, milestone_at, pulled_at, refreshed_at, backfill_from FROM ca_sync_state`;
+  return new Map<string, StreamState>(rows.map((r) => [r.stream, toState(r)]));
 }
 
-// Whether a stream has work to do. Its first pull is always the 5-day read.
+const toState = (r: Record<string, unknown>): StreamState => ({
+  milestoneAt: time(r.milestone_at),
+  pulledAt: time(r.pulled_at),
+  refreshedAt: time(r.refreshed_at),
+  backfillFrom: time(r.backfill_from),
+});
+
+// Whether a stream has work to do. Its first pull is always the 5-day read. A pending backfill runs
+// with the background refresh, so it never holds up a page.
 function isDue(state: StreamState | undefined, mode: Mode, now = Date.now()) {
   if (!state?.refreshedAt) return true;
-  if (mode === "refresh") return now - state.refreshedAt >= SYNC.refreshEveryMs;
+  if (mode === "refresh") return state.backfillFrom !== null || now - state.refreshedAt >= SYNC.refreshEveryMs;
   return !state.pulledAt || now - state.pulledAt >= SYNC.pullEveryMs;
 }
 
@@ -519,12 +569,15 @@ async function claim(stream: string): Promise<StreamState | null> {
     VALUES (${stream}, now() + ${`${SYNC.leaseMs} milliseconds`}::interval)
     ON CONFLICT (stream) DO UPDATE SET lease_until = EXCLUDED.lease_until
       WHERE ca_sync_state.lease_until IS NULL OR ca_sync_state.lease_until < now()
-    RETURNING milestone_at, pulled_at, refreshed_at
+    RETURNING milestone_at, pulled_at, refreshed_at, backfill_from
   `;
-  return row ? { milestoneAt: time(row.milestone_at), pulledAt: time(row.pulled_at), refreshedAt: time(row.refreshed_at) } : null;
+  return row ? toState(row) : null;
 }
 
-async function release(stream: string, done: { milestoneAt?: string | null; refreshed?: boolean; incomplete?: boolean; error?: string }) {
+async function release(
+  stream: string,
+  done: { milestoneAt?: string | null; refreshed?: boolean; incomplete?: boolean; backfilled?: boolean; error?: string },
+) {
   await db()`
     UPDATE ca_sync_state SET
       lease_until = NULL,
@@ -534,6 +587,7 @@ async function release(stream: string, done: { milestoneAt?: string | null; refr
         WHEN ${done.incomplete ?? false}::boolean THEN NULL
         WHEN ${done.refreshed ?? false}::boolean THEN now()
         ELSE refreshed_at END,
+      backfill_from = CASE WHEN ${done.backfilled ?? false}::boolean THEN NULL ELSE backfill_from END,
       last_error = ${done.error ?? null}
     WHERE stream = ${stream}
   `;
@@ -559,11 +613,14 @@ async function runStream(
   const fiveDaysAgo = now - SYNC.refreshDays * DAY;
   const milestone = (state.milestoneAt ?? state.refreshedAt ?? fiveDaysAgo) - SYNC.overlapMs;
   // A refresh also covers any gap since the milestone, if nobody looked for longer than 5 days.
-  const since = refresh ? Math.max(Math.min(fiveDaysAgo, milestone), now - SYNC.retainDays * DAY) : milestone;
+  const window = refresh ? Math.max(Math.min(fiveDaysAgo, milestone), now - SYNC.retainDays * DAY) : milestone;
+  // A one-time backfill reads further back, never past retention.
+  const backfill = refresh && state.backfillFrom !== null;
+  const since = backfill ? Math.max(Math.min(window, state.backfillFrom!), now - SYNC.retainDays * DAY) : window;
   try {
     const { newestAt, complete } = await pull(since);
     // A pull that ran out of pages leaves a gap, so the next one does the 5-day read instead.
-    await release(stream, { milestoneAt: newestAt, refreshed: refresh, incomplete: !refresh && !complete });
+    await release(stream, { milestoneAt: newestAt, refreshed: refresh, incomplete: !refresh && !complete, backfilled: backfill });
   } catch (error) {
     await release(stream, { error: describe(error) });
     throw error;
@@ -601,6 +658,18 @@ const pullLogs = (cookie: string, mode: Mode, clientId?: string) =>
     return result;
   });
 
+// One stream for every client's portal events. A few hundred in all, so one page usually covers it.
+const pullAudit = (cookie: string, mode: Mode) =>
+  runStream("audit", mode, async (since) => {
+    const result = await pagesSince(
+      (page) => getJson<Paged<AuditEntry>>(cookie, `/api/support/audit-logs?page=${page}&limit=${PAGE_SIZE}`),
+      (entry) => entry.occurredAt,
+      since,
+    );
+    await saveAudit(result.items);
+    return result;
+  });
+
 // The clients busy enough to need their own log stream, by stored calls over the last 24 hours.
 // CallAnchor's calls-today count restarts at midnight IST, which dropped every client from this list
 // each morning (QA finding D2). Calls are counted from callouts too, so this doesn't need the logs.
@@ -620,6 +689,7 @@ async function prune() {
   await db()`DELETE FROM ca_system_logs WHERE occurred_at < now() - ${cutoff}::interval`;
   await db()`DELETE FROM ca_calls WHERE coalesce(ingested_at, first_callout_at) < now() - ${cutoff}::interval`;
   await db()`DELETE FROM ca_license_changes WHERE at < now() - ${cutoff}::interval`;
+  await db()`DELETE FROM ca_audit_logs WHERE occurred_at < now() - ${cutoff}::interval`;
 }
 
 // Fleet metrics, tenant counts and OneAPI status for every client. Not paged, so no milestone.
@@ -684,6 +754,7 @@ function refreshLater(cookie: string, streams: string[], states: Map<string, Str
     await mapLimit(due, CONCURRENCY, async (stream) => {
       try {
         if (stream === "logs") await pullLogs(cookie, "refresh");
+        else if (stream === "audit") await pullAudit(cookie, "refresh");
         else if (stream.startsWith("logs:")) await pullLogs(cookie, "refresh", stream.slice("logs:".length));
         else await pullCallouts(cookie, stream.slice("callouts:".length), "refresh");
       } catch {
@@ -700,6 +771,7 @@ export async function pullFleet(cookie: string): Promise<PullReport> {
   const states = await readStates();
   const snapshots = states.get("snapshots");
   const logs = attempt(report, "System logs", () => (isDue(states.get("logs"), "latest") ? pullLogs(cookie, "latest") : Promise.resolve()));
+  const audit = attempt(report, "Portal events", () => (isDue(states.get("audit"), "latest") ? pullAudit(cookie, "latest") : Promise.resolve()));
 
   if (!snapshots?.refreshedAt) {
     await attempt(report, "Client list", () => pullSnapshots(cookie));
@@ -717,8 +789,8 @@ export async function pullFleet(cookie: string): Promise<PullReport> {
       attempt(report, "System logs", () => (isDue(states.get(`logs:${clientId}`), "latest") ? pullLogs(cookie, "latest", clientId) : Promise.resolve())),
     ),
   ]);
-  await logs;
-  refreshLater(cookie, ["logs", ...busy.map((c) => `logs:${c}`), ...clients.map((c) => `callouts:${c}`)], states);
+  await Promise.all([logs, audit]);
+  refreshLater(cookie, ["logs", "audit", ...busy.map((c) => `logs:${c}`), ...clients.map((c) => `callouts:${c}`)], states);
   return report;
 }
 
@@ -732,8 +804,9 @@ export async function pullClient(cookie: string, clientId: string): Promise<Pull
     attempt(report, "System logs", () => (isDue(states.get("logs"), "latest") ? pullLogs(cookie, "latest") : Promise.resolve())),
     attempt(report, "CRM syncs", () => (isDue(states.get(stream), "latest") ? pullCallouts(cookie, clientId, "latest") : Promise.resolve())),
     own ? attempt(report, "System logs", () => (isDue(states.get(own), "latest") ? pullLogs(cookie, "latest", clientId) : Promise.resolve())) : null,
+    attempt(report, "Portal events", () => (isDue(states.get("audit"), "latest") ? pullAudit(cookie, "latest") : Promise.resolve())),
   ]);
-  refreshLater(cookie, ["logs", stream, ...(own ? [own] : [])], states);
+  refreshLater(cookie, ["logs", "audit", stream, ...(own ? [own] : [])], states);
   return report;
 }
 
@@ -880,6 +953,46 @@ export async function readCall(callId: string) {
   return { callouts: callouts.map(toCallout), logs: logs.map(toLog) };
 }
 
+// A portal event as pages show it. `raw` holds actor emails, IPs and numbers, like log metadata.
+export type StoredAudit = {
+  id: string;
+  clientId: string | null;
+  occurredAt: string;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  actorType: string | null;
+  licenseId: string | null;
+  platformId: string | null;
+  calloutLogId: string | null;
+  raw: Record<string, unknown> | null;
+};
+
+const toAudit = (r: Row): StoredAudit => ({
+  id: r.id,
+  clientId: r.client_id,
+  occurredAt: iso(r.occurred_at),
+  action: r.action,
+  resourceType: r.resource_type,
+  resourceId: r.resource_id,
+  actorType: r.actor_type,
+  licenseId: r.license_id,
+  platformId: r.platform_id,
+  calloutLogId: r.callout_log_id,
+  raw: r.raw,
+});
+
+// Portal events for a client or one license, newest first.
+export async function readAudit(scope: { clientId?: string | null; licenseId?: string | null }, since: number, limit = 200): Promise<StoredAudit[]> {
+  const c = conditions();
+  c.add("occurred_at >= ?", new Date(since).toISOString());
+  if (scope.clientId) c.add("client_id = ?", scope.clientId);
+  if (scope.licenseId) c.add("license_id = ?", scope.licenseId);
+  c.params.push(limit);
+  const rows = await db().query(`SELECT * FROM ca_audit_logs ${c.where} ORDER BY occurred_at DESC LIMIT $${c.params.length}`, c.params);
+  return rows.map(toAudit);
+}
+
 export async function readClientNames() {
   const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots`;
   return new Map<string, string>(rows.map((r) => [r.client_id, r.company_name ?? r.client_id]));
@@ -951,6 +1064,8 @@ export type StoredCall = {
   ingestedAt: string | null;
   // mobile.call.create's recordingStatus: pending_upload, not_recorded or skipped_trial_limit.
   recordingDetail: string | null;
+  // mobile.call.create's callType: outgoing, incoming, missed or rejected.
+  callType: string | null;
   uploadStartedAt: string | null;
   uploadedAt: string | null;
   verifiedAt: string | null;
@@ -967,6 +1082,14 @@ export type StoredCall = {
   lastPlatform: string | null;
   // 2xx replies beyond the first for the same event and platform.
   duplicateDeliveries: number;
+  // From the CRM payloads: the call's length (0 = never connected), whether it has a recording, when
+  // it started and the agent number's last 4 digits.
+  callSeconds: number | null;
+  hasRecording: boolean | null;
+  startedAt: string | null;
+  agentLast4: string | null;
+  // How the license is known: 'ingest' or 'agent_number' (see ca_refresh_calls).
+  licenseVia: string | null;
 };
 
 const isoOrNull = (value: unknown) => (value ? iso(value) : null);
@@ -977,6 +1100,7 @@ const toCall = (r: Row): StoredCall => ({
   licenseId: r.license_id,
   ingestedAt: isoOrNull(r.ingested_at),
   recordingDetail: r.recording_detail,
+  callType: r.call_type ?? null,
   uploadStartedAt: isoOrNull(r.upload_started_at),
   uploadedAt: isoOrNull(r.uploaded_at),
   verifiedAt: isoOrNull(r.verified_at),
@@ -991,6 +1115,11 @@ const toCall = (r: Row): StoredCall => ({
   lastLabel: r.last_label,
   lastPlatform: r.last_platform,
   duplicateDeliveries: r.duplicate_deliveries ?? 0,
+  callSeconds: r.call_seconds ?? null,
+  hasRecording: r.has_recording ?? null,
+  startedAt: isoOrNull(r.started_at),
+  agentLast4: r.agent_last4 ?? null,
+  licenseVia: r.license_via ?? null,
 });
 
 // A call's time is when it was ingested, or its first callout when its ingest log wasn't stored.

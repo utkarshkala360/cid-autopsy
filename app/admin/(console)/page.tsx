@@ -14,6 +14,7 @@ type MemberRow = {
   full_name: string;
   role: string;
   is_active: boolean;
+  is_auditor: boolean;
   created_at: string;
   last_login_at: string | null;
 };
@@ -23,7 +24,7 @@ export default async function AdminHomePage() {
   const [, members] = (await Promise.all([
     requireAdmin(),
     db()`
-      SELECT id, username, full_name, role, is_active, created_at, last_login_at
+      SELECT id, username, full_name, role, is_active, is_auditor, created_at, last_login_at
       FROM members ORDER BY created_at DESC
     `,
   ])) as [unknown, MemberRow[]];
@@ -60,7 +61,14 @@ export default async function AdminHomePage() {
                     <div className="font-medium text-slate-900">{m.full_name}</div>
                     <div className="break-all font-mono text-xs text-slate-500">{m.username}</div>
                   </td>
-                  <td className="px-4 py-3 capitalize text-slate-700">{m.role}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    <span className="capitalize">{m.role}</span>
+                    {m.is_auditor && (
+                      <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Auditor
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={
@@ -74,7 +82,7 @@ export default async function AdminHomePage() {
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDate(m.last_login_at)}</td>
                   <td className="px-4 py-3">
-                    <MemberActions id={String(m.id)} username={m.username} isActive={m.is_active} />
+                    <MemberActions id={String(m.id)} username={m.username} role={m.role} isActive={m.is_active} isAuditor={m.is_auditor} />
                   </td>
                 </tr>
               ))}

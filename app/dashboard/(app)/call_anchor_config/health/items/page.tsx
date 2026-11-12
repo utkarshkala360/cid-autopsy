@@ -356,6 +356,7 @@ async function CallItems({ client, license, licenses, days, stage, page, names, 
               <td className={td}><CallCell callId={c.callId} back={href({})} /></td>
               <td className={`${td} text-xs`}>
                 {c.recordingDetail ?? "—"}
+                {c.callType && <p className="text-slate-500">{c.callType}</p>}
                 {c.verifiedAt || c.deliveredEvents.includes("recording.ready") ? (
                   <p className="text-emerald-700">verified</p>
                 ) : c.uploadedAt ? (

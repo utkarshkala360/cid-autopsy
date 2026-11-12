@@ -6,7 +6,7 @@ import { cardClass } from "@/components/ui";
 export const metadata: Metadata = { title: "CallAnchor Config" };
 
 export default async function CallAnchorConfigPage() {
-  const { profile } = await requireCallAnchorSession();
+  const { member, profile } = await requireCallAnchorSession();
 
   return (
     <div>
@@ -20,10 +20,12 @@ export default async function CallAnchorConfigPage() {
           Recordings, CRM syncs and errors for every client, and a full breakdown per client.
         </p>
       </Link>
-      <Link href={APIS_PATH} className={`${cardClass} mt-4 block p-6 transition hover:border-indigo-300`}>
-        <h2 className="text-base font-semibold text-slate-900">API console</h2>
-        <p className="mt-1 text-sm text-slate-500">Browse CallAnchor&apos;s APIs and run them live.</p>
-      </Link>
+      {member.role === "admin" && (
+        <Link href={APIS_PATH} className={`${cardClass} mt-4 block p-6 transition hover:border-indigo-300`}>
+          <h2 className="text-base font-semibold text-slate-900">API console</h2>
+          <p className="mt-1 text-sm text-slate-500">Browse CallAnchor&apos;s APIs and run them live.</p>
+        </Link>
+      )}
     </div>
   );
 }

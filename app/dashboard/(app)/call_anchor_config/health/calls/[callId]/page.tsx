@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { loadCall, type AnchorResult } from "@/lib/callanchor/health";
 import { crmStatus } from "@/lib/callanchor/labels";
+import type { StoredCall } from "@/lib/callanchor/store";
 import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { ago, formatTime, int, licenseHref } from "../../format";
 import { Json, Section, Stepper, Table, td } from "../../parts";
@@ -88,14 +89,19 @@ export default async function CallTimelinePage({ params, searchParams }: PagePro
           ) : (
             <p className="text-slate-600">Not flagged.</p>
           )}
+          {call.call && callSummary(call.call) && <p className="text-slate-600">{callSummary(call.call)}</p>}
           {call.license ? (
             <p className="text-slate-600">
               Made by phone{" "}
               <Link href={licenseHref(HEALTH_PATH, call.license.licenseId)} className="font-mono text-indigo-700 hover:underline">…{call.license.last4}</Link>
               {call.license.deviceModel && ` (${[call.license.deviceBrand, call.license.deviceModel].filter(Boolean).join(" ")}, app ${call.license.appVersion ?? "unknown"})`}
+              {call.call?.licenseVia === "agent_number" && <span className="text-slate-500"> · matched by the agent number in the CRM payload</span>}
             </p>
           ) : (
-            <p className="text-slate-500">The phone that made this call isn&apos;t known: its ingest log was stored before licenses were linked, or wasn&apos;t stored.</p>
+            <p className="text-slate-500">
+              The phone that made this call isn&apos;t known: its ingest log wasn&apos;t stored, and no single phone at this client
+              ends in the agent number{call.call?.agentLast4 ? ` …${call.call.agentLast4}` : ""} from the CRM payload.
+            </p>
           )}
           {call.hasIntegration !== null && (
             <p className="text-slate-500">
@@ -265,4 +271,15 @@ function Request({ result, retry }: { result: AnchorResult; retry: string }) {
       </div>
     </div>
   );
+}
+
+// What the CRM payload says about the call: type, length, recording and start.
+function callSummary(c: StoredCall) {
+  const parts = [
+    c.callType ? c.callType[0].toUpperCase() + c.callType.slice(1) : null,
+    c.callSeconds === null ? null : c.callSeconds === 0 ? "didn't connect (0 s)" : `${c.callSeconds} s`,
+    c.hasRecording === null ? null : c.hasRecording ? "has a recording" : "no recording",
+    c.startedAt ? `started ${formatTime(c.startedAt)} IST` : null,
+  ].filter(Boolean);
+  return parts.length ? `${parts.join(" · ")}.` : null;
 }

@@ -6,7 +6,7 @@ import { loadLicense } from "@/lib/callanchor/health";
 import type { CallStage } from "@/lib/callanchor/issues";
 import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, storedCookie } from "@/lib/callanchor/session";
 import { ago, formatHour, formatTime, int, itemsHref } from "../../format";
-import { Funnel, IssueList, ItemLink, PulsePanel, Section, StatusBadge, Table, Tile, td } from "../../parts";
+import { Funnel, IssueList, ItemLink, Json, PulsePanel, Section, StatusBadge, Table, Tile, td } from "../../parts";
 
 export const metadata: Metadata = { title: "License" };
 
@@ -114,6 +114,24 @@ export default async function LicensePage({ params }: PageProps<"/dashboard/call
               <td className={td}>{c.label}</td>
               <td className={`${td} text-xs text-slate-500`}>{c.field === "member_id" ? (c.oldValue ? "a member" : "nobody") : (c.oldValue ?? "—")}</td>
               <td className={`${td} text-xs`}>{c.field === "member_id" ? (c.newValue ? "another member" : "nobody") : (c.newValue ?? "—")}</td>
+            </tr>
+          ))}
+        </Table>
+      </Section>
+
+      <Section
+        title="Portal events"
+        note="What happened to this phone in CallAnchor's portal and app: settings changes, activation, logins and logouts, with who did it. From the stored audit log."
+      >
+        <Table head={["When (IST)", "Event", "By", "Details"]} empty={data.portal.length ? undefined : "No portal events stored for this phone."}>
+          {data.portal.map((a) => (
+            <tr key={a.id}>
+              <td className={`${td} text-xs text-slate-500`}>{formatTime(a.occurredAt)}</td>
+              <td className={td}>
+                {a.action} {a.resourceType.replace(/_/g, " ")}
+              </td>
+              <td className={`${td} text-xs text-slate-500`}>{a.actorType ?? "—"}</td>
+              <td className={`${td} text-xs`}>{a.raw ? <Json value={a.raw} label="Event and metadata" /> : "—"}</td>
             </tr>
           ))}
         </Table>

@@ -12,7 +12,8 @@
     "sf": "node sf-cli/node_modules/@salesforce/cli/bin/run.js",
     "ca": "npm run --silent --prefix callanchor-apis ca --",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
-    "admin:create": "node --env-file-if-exists=.env.local scripts/create-admin.mjs"
+    "admin:create": "node --env-file-if-exists=.env.local scripts/create-admin.mjs",
+    "audit:notes": "node --env-file-if-exists=.env.local scripts/audit-notes.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

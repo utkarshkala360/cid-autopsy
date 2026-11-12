@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { compareWithContract, operations, type ContractResult } from "@/lib/callanchor/contract";
 import { callPortal } from "@/lib/callanchor/portal";
-import { APIS_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
+import { APIS_PATH, requireApiConsoleAccess, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { field } from "@/lib/form";
 
 export type ApiRunState =
@@ -24,7 +24,7 @@ const ID_PATTERN = /^[\w-]{1,100}$/; // ids can't contain "/" or "..", so a valu
 const NUMBER_PATTERN = /^\d{1,6}$/;
 
 export async function runApiAction(_prev: ApiRunState, formData: FormData): Promise<ApiRunState> {
-  const { member } = await requireCallAnchorSession(APIS_PATH);
+  const { member } = await requireApiConsoleAccess();
   const opId = field(formData, "opId");
   const op = operations.find((o) => o.id === opId);
   if (!op || op.safety === "auth") return { opId, error: "That operation can't be run here." };

@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS members (
   id              BIGSERIAL PRIMARY KEY,
   username        TEXT        NOT NULL UNIQUE,
   full_name       TEXT        NOT NULL,
-  role            TEXT        NOT NULL DEFAULT 'agent' CHECK (role IN ('agent', 'member')),
+  role            TEXT        NOT NULL DEFAULT 'agent' CHECK (role IN ('agent', 'member', 'admin')),
   password_hash   TEXT        NOT NULL,
   is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
   -- Bumped on password reset / deactivation to invalidate existing sessions.
@@ -22,6 +22,35 @@ CREATE TABLE IF NOT EXISTS members (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at   TIMESTAMPTZ
 );
+
+-- Admins also see the CallAnchor API console. Re-created so older databases accept 'admin'.
+ALTER TABLE members DROP CONSTRAINT IF EXISTS members_role_check;
+ALTER TABLE members ADD CONSTRAINT members_role_check CHECK (role IN ('agent', 'member', 'admin'));
+
+-- Auditors get the "Audit note" button on every dashboard page. A permission on top of the role.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS is_auditor BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Notes auditors leave on dashboard pages, with the page they were on. Reviewed weekly to improve
+-- the dashboard; `npm run audit:notes` prints the open ones. `author` keeps the ID if the member goes.
+CREATE TABLE IF NOT EXISTS audit_notes (
+  id          BIGSERIAL PRIMARY KEY,
+  member_id   BIGINT      REFERENCES members (id) ON DELETE SET NULL,
+  author      TEXT        NOT NULL,
+  kind        TEXT        NOT NULL CHECK (kind IN ('bug', 'confusing', 'wrong_data', 'missing', 'idea', 'other')),
+  comment     TEXT        NOT NULL,
+  url         TEXT        NOT NULL,
+  path        TEXT        NOT NULL,
+  page_title  TEXT,
+  -- Page context captured in the browser: heading, query params, selected text, viewport, browser.
+  metadata    JSONB       NOT NULL DEFAULT '{}',
+  status      TEXT        NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'done', 'wontfix')),
+  resolution  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS audit_notes_status_idx ON audit_notes (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS audit_notes_path_idx ON audit_notes (path, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS login_attempts (
   id         BIGSERIAL PRIMARY KEY,
@@ -247,21 +276,50 @@ CREATE INDEX IF NOT EXISTS ca_calls_callout_idx ON ca_calls (client_id, first_ca
 -- record (QA finding I4). NULL until ca_refresh_calls has rebuilt the row once.
 ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS duplicate_deliveries INTEGER;
 
+-- mobile.call.create's callType: outgoing, incoming, missed or rejected. A missed or rejected call
+-- never connected, so it has nothing to record (owner, 2026-11-05).
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS call_type TEXT;
+
+-- What each callout's payload says about its call (callFacts in lib/callanchor/links.ts): whether it
+-- has a recording, its type, length and start, and the agent number's last 4 digits. facts_read is
+-- set once the payload was read, even if it held none of them.
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS has_recording BOOLEAN;
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS call_type TEXT;
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS call_seconds INTEGER;
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS call_started_at TIMESTAMPTZ;
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS agent_last4 TEXT;
+ALTER TABLE ca_callout_events ADD COLUMN IF NOT EXISTS facts_read BOOLEAN;
+CREATE INDEX IF NOT EXISTS ca_callout_events_request_idx ON ca_callout_events (request_id);
+
+-- The same facts per call. 0 seconds means the call never connected (owner, 2026-11-05).
+-- license_via says how the license is known: 'ingest' (mobile.call.create) or 'agent_number' (the
+-- payload's agent number, when exactly one of the client's licenses ends in those 4 digits), so calls
+-- whose ingest log wasn't stored still belong to a phone.
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS call_seconds INTEGER;
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS has_recording BOOLEAN;
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS agent_last4 TEXT;
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS license_via TEXT;
+
 -- Rebuilds the given calls from the stored logs and callouts. store.ts calls it after each save. A
 -- call exists once it has a mobile.call.create log or a callout.
 CREATE OR REPLACE FUNCTION ca_refresh_calls(ids TEXT[]) RETURNS void LANGUAGE sql AS $$
 INSERT INTO ca_calls AS t (call_id, client_id, license_id, ingested_at, recording_detail, upload_started_at, uploaded_at,
   verified_at, upload_failed_at, attempts, first_callout_at, last_callout_at, first_delivered_at, delivered_events,
-  last_status, last_http, last_label, last_platform, duplicate_deliveries, updated_at)
-SELECT ids.id, coalesce(l.client_id, c.client_id), l.license_id, l.ingested_at, l.detail, l.started, l.uploaded,
+  last_status, last_http, last_label, last_platform, duplicate_deliveries, call_type, call_seconds, has_recording,
+  started_at, agent_last4, license_via, updated_at)
+SELECT ids.id, coalesce(l.client_id, c.client_id), coalesce(l.license_id, m.license_id), l.ingested_at, l.detail, l.started, l.uploaded,
   l.verified, l.failed, coalesce(c.attempts, 0), c.first_at, c.last_at, c.first_delivered_at,
-  coalesce(c.delivered_events, '{}'), c.last_status, c.last_http, c.last_label, c.last_platform, coalesce(c.duplicates, 0), now()
+  coalesce(c.delivered_events, '{}'), c.last_status, c.last_http, c.last_label, c.last_platform, coalesce(c.duplicates, 0),
+  coalesce(l.call_type, c.call_type), c.seconds, c.has_recording, c.started_at, c.agent_last4,
+  CASE WHEN l.license_id IS NOT NULL THEN 'ingest' WHEN m.license_id IS NOT NULL THEN 'agent_number' END, now()
 FROM unnest(ids) AS ids(id)
 CROSS JOIN LATERAL (
   SELECT max(client_id) AS client_id,
     max(license_id) FILTER (WHERE source = 'mobile.call.create') AS license_id,
     min(occurred_at) FILTER (WHERE source = 'mobile.call.create') AS ingested_at,
     (array_agg(detail ORDER BY occurred_at) FILTER (WHERE source = 'mobile.call.create'))[1] AS detail,
+    (array_agg(raw->'metadata'->>'callType' ORDER BY occurred_at) FILTER (WHERE source = 'mobile.call.create'))[1] AS call_type,
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-init') AS started,
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-complete') AS uploaded,
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.job-processed') AS verified,
@@ -277,23 +335,101 @@ CROSS JOIN LATERAL (
     (array_agg(label ORDER BY at DESC, attempt DESC))[1] AS last_label,
     (array_agg(platform_id ORDER BY at DESC, attempt DESC))[1] AS last_platform,
     count(*) FILTER (WHERE http_status BETWEEN 200 AND 299)
-      - count(DISTINCT event_type || '|' || platform_id) FILTER (WHERE http_status BETWEEN 200 AND 299) AS duplicates
+      - count(DISTINCT event_type || '|' || platform_id) FILTER (WHERE http_status BETWEEN 200 AND 299) AS duplicates,
+    (array_agg(call_type ORDER BY at) FILTER (WHERE call_type IS NOT NULL))[1] AS call_type,
+    max(call_seconds) AS seconds,
+    bool_or(has_recording) AS has_recording,
+    min(call_started_at) AS started_at,
+    (array_agg(agent_last4 ORDER BY at) FILTER (WHERE agent_last4 IS NOT NULL))[1] AS agent_last4
   FROM ca_callout_events WHERE call_id = ids.id
 ) c
+CROSS JOIN LATERAL (
+  SELECT CASE WHEN count(*) = 1 THEN max(license_id) END AS license_id
+  FROM ca_licenses
+  WHERE l.license_id IS NULL AND c.agent_last4 IS NOT NULL
+    AND client_id = coalesce(l.client_id, c.client_id) AND number_last4 = c.agent_last4
+) m
 WHERE l.ingested_at IS NOT NULL OR c.attempts > 0
 ON CONFLICT (call_id) DO UPDATE SET
   client_id = EXCLUDED.client_id, license_id = coalesce(EXCLUDED.license_id, t.license_id),
+  license_via = CASE WHEN EXCLUDED.license_id IS NOT NULL THEN EXCLUDED.license_via ELSE t.license_via END,
   ingested_at = EXCLUDED.ingested_at, recording_detail = EXCLUDED.recording_detail,
   upload_started_at = EXCLUDED.upload_started_at, uploaded_at = EXCLUDED.uploaded_at,
   verified_at = EXCLUDED.verified_at, upload_failed_at = EXCLUDED.upload_failed_at,
   attempts = EXCLUDED.attempts, first_callout_at = EXCLUDED.first_callout_at, last_callout_at = EXCLUDED.last_callout_at,
   first_delivered_at = EXCLUDED.first_delivered_at, delivered_events = EXCLUDED.delivered_events,
   last_status = EXCLUDED.last_status, last_http = EXCLUDED.last_http, last_label = EXCLUDED.last_label,
-  last_platform = EXCLUDED.last_platform, duplicate_deliveries = EXCLUDED.duplicate_deliveries, updated_at = now()
+  last_platform = EXCLUDED.last_platform, duplicate_deliveries = EXCLUDED.duplicate_deliveries,
+  call_type = coalesce(EXCLUDED.call_type, t.call_type), call_seconds = coalesce(EXCLUDED.call_seconds, t.call_seconds),
+  has_recording = coalesce(EXCLUDED.has_recording, t.has_recording), started_at = coalesce(EXCLUDED.started_at, t.started_at),
+  agent_last4 = coalesce(EXCLUDED.agent_last4, t.agent_last4), updated_at = now()
 $$;
 
 -- Rows stored before duplicate_deliveries existed get it once; afterwards this matches nothing.
 SELECT ca_refresh_calls(array_agg(call_id)) FROM ca_calls WHERE duplicate_deliveries IS NULL;
+
+-- Stored calls get their callType once; afterwards this matches nothing.
+SELECT ca_refresh_calls(array_agg(c.call_id)) FROM ca_calls c WHERE c.call_type IS NULL AND EXISTS (
+  SELECT 1 FROM ca_system_logs l
+  WHERE l.call_id = c.call_id AND l.source = 'mobile.call.create' AND l.raw->'metadata'->>'callType' IS NOT NULL
+);
+
+-- ---- Linked events: mobile, CRM and portal (lib/callanchor/links.ts) ----
+
+-- Portal events (support/audit-logs): license, integration, client and session changes, by
+-- customers, support and the system. Stored whole, like system logs, since CallAnchor archives them.
+-- license_id, platform_id and callout_log_id are what auditLinks() finds in each.
+CREATE TABLE IF NOT EXISTS ca_audit_logs (
+  id             TEXT        PRIMARY KEY,
+  client_id      TEXT,
+  occurred_at    TIMESTAMPTZ NOT NULL,
+  action         TEXT        NOT NULL,
+  resource_type  TEXT        NOT NULL,
+  resource_id    TEXT,
+  actor_type     TEXT,
+  license_id     TEXT,
+  platform_id    TEXT,
+  callout_log_id TEXT,
+  correlation_id TEXT,
+  raw            JSONB
+);
+
+CREATE INDEX IF NOT EXISTS ca_audit_logs_client_at_idx ON ca_audit_logs (client_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS ca_audit_logs_license_idx ON ca_audit_logs (license_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS ca_audit_logs_at_idx ON ca_audit_logs (occurred_at DESC);
+
+-- A stream's next pull also reads back to here, once: for a new stream's history, or to fill new
+-- columns on stored rows. Cleared when the pull succeeds.
+ALTER TABLE ca_sync_state ADD COLUMN IF NOT EXISTS backfill_from TIMESTAMPTZ;
+INSERT INTO ca_sync_state (stream, backfill_from) VALUES ('audit', now() - interval '90 days') ON CONFLICT (stream) DO NOTHING;
+-- Callouts stored before their payload facts were read get them from one deep read, back to the
+-- oldest stored row. Once they're read, this matches nothing.
+UPDATE ca_sync_state s SET backfill_from = (SELECT min(at) FROM ca_callout_events e WHERE e.client_id = substr(s.stream, 10))
+WHERE s.stream LIKE 'callouts:%' AND s.backfill_from IS NULL AND EXISTS (
+  SELECT 1 FROM ca_callout_events e
+  WHERE e.client_id = substr(s.stream, 10) AND e.facts_read IS NULL AND e.at > now() - interval '5 days'
+);
+
+-- Every stored event in one shape, each with the keys it shares with the others: client, license,
+-- call, CRM platform and callout request. stream is mobile, crm, portal or system. A log or callout
+-- takes its call's license when it doesn't name one. The base for search across all three.
+CREATE OR REPLACE VIEW ca_events AS
+SELECT l.id, l.occurred_at AS at,
+  CASE l.category WHEN 'mobile' THEN 'mobile' WHEN 'webhook' THEN 'crm' WHEN 'auth' THEN 'portal' ELSE 'system' END AS stream,
+  l.source AS kind, l.client_id,
+  coalesce(l.license_id, k.license_id, CASE WHEN l.raw->>'resourceType' = 'license' THEN l.resource_id END) AS license_id,
+  l.call_id, l.raw->'metadata'->>'platformSlug' AS platform_id,
+  CASE WHEN l.source = 'custom-webhook-sync' THEN l.resource_id END AS request_id,
+  coalesce(l.detail, l.severity) AS status, l.message AS summary
+FROM ca_system_logs l LEFT JOIN ca_calls k ON k.call_id = l.call_id
+UNION ALL
+SELECT e.id, e.at, 'crm', e.event_type, e.client_id, k.license_id, e.call_id, e.platform_id, e.request_id,
+  CASE WHEN e.http_status BETWEEN 200 AND 299 THEN 'delivered' ELSE e.status END, e.label
+FROM ca_callout_events e LEFT JOIN ca_calls k ON k.call_id = e.call_id
+UNION ALL
+SELECT a.id, a.occurred_at, 'portal', a.action || ' ' || a.resource_type, a.client_id, a.license_id, NULL, a.platform_id, NULL,
+  a.actor_type, a.action || ' ' || replace(a.resource_type, '_', ' ') || coalesce(' · ' || a.platform_id, '')
+FROM ca_audit_logs a;
 
 -- Fills ca_calls from what's already stored, once: afterwards each save keeps it current.
 SELECT ca_refresh_calls(array_agg(id)) FROM (

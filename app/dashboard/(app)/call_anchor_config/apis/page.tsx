@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { operations } from "@/lib/callanchor/contract";
 import { callPortal } from "@/lib/callanchor/portal";
-import { APIS_PATH, requireCallAnchorSession, storedCookie } from "@/lib/callanchor/session";
+import { requireApiConsoleAccess, storedCookie } from "@/lib/callanchor/session";
 import { ApiConsole } from "./ApiConsole";
 
 export const metadata: Metadata = { title: "CallAnchor APIs" };
@@ -20,7 +20,7 @@ async function loadClients(memberId: string) {
 }
 
 export default async function CallAnchorApisPage() {
-  const { member, profile } = await requireCallAnchorSession(APIS_PATH);
+  const { member, profile } = await requireApiConsoleAccess();
   const clients = await loadClients(member.id);
 
   return (

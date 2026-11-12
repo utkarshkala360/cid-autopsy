@@ -11,6 +11,10 @@ export default async function AdminConsoleLayout({ children }: LayoutProps<"/adm
         homeHref="/admin"
         userLabel={admin.username}
         logoutAction={adminLogoutAction}
+        nav={[
+          { href: "/admin", label: "Members" },
+          { href: "/admin/audit-notes", label: "Audit notes" },
+        ]}
       />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </>

@@ -192,6 +192,15 @@ export const isVerified = (c: StoredCall) => c.verifiedAt !== null || sentRecord
 export const isUploaded = (c: StoredCall) => c.uploadedAt !== null || isVerified(c);
 export const isRecorded = (c: StoredCall) =>
   c.recordingDetail === "pending_upload" || c.uploadStartedAt !== null || c.uploadFailedAt !== null || isUploaded(c);
+// A call that never connected, so had nothing to record: its payload says 0 seconds (owner,
+// 2026-11-05), or it was missed or rejected. Without a payload length, a call synced only as
+// call.completed, which CallAnchor sends for a missed incoming or rejected outgoing call, counts too.
+// Not a recording failure.
+export const isUnconnected = (c: StoredCall) =>
+  !isRecorded(c) &&
+  (c.callSeconds !== null
+    ? c.callSeconds === 0
+    : c.callType === "missed" || c.callType === "rejected" || c.deliveredEvents.includes("call.completed"));
 // When the call was ready to go to the CRM: after verification for a recording, else on ingest.
 const readyAt = (c: StoredCall) => (c.verifiedAt && isRecorded(c) ? c.verifiedAt : c.ingestedAt);
 
@@ -231,7 +240,13 @@ export const CALL_STAGES = {
   },
   skipped: { title: "Calls skipped for the trial recording limit", test: (c) => c.recordingDetail === "skipped_trial_limit" },
   recorded: { title: "Calls recorded", test: isRecorded },
-  notRecorded: { title: "Calls not recorded", test: (c) => c.recordingDetail === "not_recorded" && !isRecorded(c) },
+  notConnected: { title: "Calls that didn't connect (missed, rejected or unanswered): nothing to record", test: isUnconnected },
+  notRecorded: {
+    title: "Calls not recorded that may have connected",
+    test: (c) =>
+      (c.recordingDetail === "not_recorded" || (c.hasRecording === false && c.recordingDetail !== "skipped_trial_limit")) &&
+      !isRecorded(c) && !isUnconnected(c),
+  },
   mislabeled: { title: "Calls CallAnchor marked not recorded, whose recording uploaded", test: (c) => c.recordingDetail === "not_recorded" && isRecorded(c) },
   uploaded: { title: "Recordings uploaded", test: isUploaded },
   notUploaded: { title: "Recordings not uploaded", test: (c) => isRecorded(c) && !isUploaded(c) },
@@ -1073,22 +1088,24 @@ export function licenseHealth(input: LicenseInput, now: number): LicenseHealth[]
       }
     }
 
-    // Not recording: most calls come in not_recorded although recording is on, this phone usually
-    // records, or other phones at the client do.
+    // Not recording: most connected calls come in not_recorded although recording is on, this phone
+    // usually records, or other phones at the client do. Calls that didn't connect count nowhere.
+    const connected = (list: StoredCall[]) => list.filter((c) => !isUnconnected(c));
+    const [answered, answeredWeek, answeredPeers] = [connected(calls), connected(week), connected(peers)];
     const notRecorded = stage("notRecorded");
-    const peerRecorded = peers.filter(isRecorded).length;
-    const peersRecord = peers.length >= RULES.notRecordingMinCalls && peerRecorded / peers.length >= 0.5;
-    const usuallyRecords = week.length >= RULES.notRecordingMinCalls && week.filter(isRecorded).length / week.length >= 0.5;
-    if (calls.length >= RULES.notRecordingMinCalls && notRecorded.length / calls.length > 0.5 && (license.recordingEnabled === true || usuallyRecords || peersRecord)) {
+    const peerRecorded = answeredPeers.filter(isRecorded).length;
+    const peersRecord = answeredPeers.length >= RULES.notRecordingMinCalls && peerRecorded / answeredPeers.length >= 0.5;
+    const usuallyRecords = answeredWeek.length >= RULES.notRecordingMinCalls && answeredWeek.filter(isRecorded).length / answeredWeek.length >= 0.5;
+    if (answered.length >= RULES.notRecordingMinCalls && notRecorded.length / answered.length > 0.5 && (license.recordingEnabled === true || usuallyRecords || peersRecord)) {
       add("license_not_recording", "critical", "Phone isn't recording calls", {
         calls: notRecorded,
-        impactText: `${n(notRecorded.length, "call")} of ${calls.length} not recorded`,
+        impactText: `${n(notRecorded.length, "call")} of ${answered.length} that may have connected not recorded`,
         evidence: [
           license.recordingEnabled === true
             ? "Recording is on for this license"
             : usuallyRecords
-              ? "This phone recorded most of its calls over the last 7 days"
-              : `Other phones at this client record ${Math.round((peerRecorded / peers.length) * 100)}% of their calls`,
+              ? "This phone recorded most of its connected calls over the last 7 days"
+              : `Other phones at this client record ${Math.round((peerRecorded / answeredPeers.length) * 100)}% of their connected calls`,
           `Device: ${[license.deviceBrand, license.deviceModel].filter(Boolean).join(" ") || "unknown"} · app ${license.appVersion ?? "unknown"}`,
         ],
         drill: drill("notRecorded"),

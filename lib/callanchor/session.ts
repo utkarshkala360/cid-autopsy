@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { checkSession, type SessionCheck } from "@/lib/callanchor/portal";
 import { decrypt, encrypt } from "@/lib/crypto";
@@ -49,6 +49,13 @@ export async function requireCallAnchorSession(next = CALLANCHOR_PATH) {
   const session = await getCallAnchorSession(member.id);
   if (session.status === "invalid" || session.status === "missing") redirect(verifyUrl(next));
   return { member, profile: session.status === "valid" ? session.profile : null };
+}
+
+// The API console runs any CallAnchor read live and shows customer data, so only admins get it.
+export async function requireApiConsoleAccess() {
+  const access = await requireCallAnchorSession(APIS_PATH);
+  if (access.member.role !== "admin") notFound();
+  return access;
 }
 
 export async function saveCallAnchorSession(memberId: string, mobile: string, cookie: string) {

@@ -14,6 +14,8 @@ function isValidId(id: string) {
   return USERNAME_RE.test(id) || (id.length <= 254 && EMAIL_RE.test(id));
 }
 const MIN_PASSWORD_LENGTH = 10;
+// Admins also get the CallAnchor API console.
+const ROLES = ["agent", "member", "admin"];
 
 function field(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -43,6 +45,7 @@ export async function createMemberAction(_prev: FormState, formData: FormData): 
   const username = field(formData, "username").toLowerCase();
   const fullName = field(formData, "fullName");
   const role = field(formData, "role");
+  const isAuditor = formData.get("auditor") === "on";
   const password = String(formData.get("password") ?? "");
 
   if (!isValidId(username)) {
@@ -51,15 +54,15 @@ export async function createMemberAction(_prev: FormState, formData: FormData): 
     };
   }
   if (!fullName || fullName.length > 100) return { error: "Full name is required (max 100 characters)." };
-  if (role !== "agent" && role !== "member") return { error: "Choose a valid role." };
+  if (!ROLES.includes(role)) return { error: "Choose a valid role." };
   if (password.length < MIN_PASSWORD_LENGTH) {
     return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` };
   }
 
   try {
     await db()`
-      INSERT INTO members (username, full_name, role, password_hash)
-      VALUES (${username}, ${fullName}, ${role}, ${await hashPassword(password)})
+      INSERT INTO members (username, full_name, role, is_auditor, password_hash)
+      VALUES (${username}, ${fullName}, ${role}, ${isAuditor}, ${await hashPassword(password)})
     `;
   } catch (error) {
     if (isUniqueViolation(error)) return { error: `ID "${username}" is already taken.` };
@@ -82,6 +85,44 @@ export async function setMemberActiveAction(formData: FormData) {
     WHERE id = ${id}
   `;
   revalidatePath("/admin");
+}
+
+export async function setMemberRoleAction(formData: FormData) {
+  await requireAdmin();
+  const id = memberId(formData);
+  const role = field(formData, "role");
+  if (!ROLES.includes(role)) throw new Error("Invalid role.");
+  // Pages read the role from the database on every request, so the change applies at once.
+  await db()`UPDATE members SET role = ${role} WHERE id = ${id}`;
+  revalidatePath("/admin");
+}
+
+// Auditors can leave notes on any dashboard page. Read from the database per request, so it applies at once.
+export async function setMemberAuditorAction(formData: FormData) {
+  await requireAdmin();
+  const id = memberId(formData);
+  const auditor = field(formData, "auditor") === "true";
+  await db()`UPDATE members SET is_auditor = ${auditor} WHERE id = ${id}`;
+  revalidatePath("/admin");
+}
+
+const NOTE_STATUS_VALUES = ["open", "done", "wontfix"];
+
+export async function setAuditNoteStatusAction(formData: FormData) {
+  await requireAdmin();
+  const id = field(formData, "id");
+  if (!/^\d+$/.test(id)) throw new Error("Invalid note id.");
+  const status = field(formData, "status");
+  if (!NOTE_STATUS_VALUES.includes(status)) throw new Error("Invalid status.");
+  const resolution = field(formData, "resolution").slice(0, 2000) || null;
+  await db()`
+    UPDATE audit_notes
+    SET status = ${status},
+        resolution = COALESCE(${resolution}, resolution),
+        resolved_at = CASE WHEN ${status} = 'open' THEN NULL ELSE COALESCE(resolved_at, now()) END
+    WHERE id = ${id}
+  `;
+  revalidatePath("/admin/audit-notes");
 }
 
 export async function resetMemberPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
