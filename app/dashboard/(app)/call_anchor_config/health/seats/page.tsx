@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { loadSeats, type SeatRow } from "@/lib/callanchor/health";
 import { durationText, type SeatState } from "@/lib/callanchor/issues";
-import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
+import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { ago, formatTime, int, licenseHref } from "../format";
-import { HealthTabs, LoadingNote, Section, StatusBadge, Table, Tile, td } from "../parts";
+import { LoadingNote, Section, StatusBadge, Table, Tile, td } from "../parts";
 
 export const metadata: Metadata = { title: "Seats" };
 
@@ -35,7 +35,6 @@ export default async function SeatsPage({ searchParams }: PageProps<"/dashboard/
     <div>
       <Breadcrumbs items={[{ href: CALLANCHOR_PATH, label: "CallAnchor Config" }, { href: HEALTH_PATH, label: "Client health" }]} />
       <h1 className="text-xl font-semibold text-slate-900">Client health</h1>
-      <HealthTabs basePath={HEALTH_PATH} current="seats" />
       <Suspense key={client ?? ""} fallback={<LoadingNote text="Reading every seat…" />}>
         <Seats client={client} />
       </Suspense>
@@ -44,7 +43,8 @@ export default async function SeatsPage({ searchParams }: PageProps<"/dashboard/
 }
 
 async function Seats({ client }: { client?: string }) {
-  const { clients: all, unusedAfterMs, loadedAt } = await loadSeats();
+  // A client asked for by id is shown even when it's internal.
+  const { clients: all, hiddenInternal, unusedAfterMs, loadedAt } = await loadSeats(Boolean(client) || (await showInternal()));
   const now = Date.parse(loadedAt);
   const clients = all.filter((c) => !client || c.clientId === client);
   const working = clients.filter((c) => c.status !== "inactive");
@@ -59,8 +59,8 @@ async function Seats({ client }: { client?: string }) {
     <>
       <p className="mt-3 text-sm text-slate-500">
         {name ? `${name}: ` : "Active and trial clients: "}seats bought, then used. A seat is unused when it&apos;s not assigned, logged out, or logged in
-        with no call for {durationText(unusedAfterMs)} (set on the Settings tab). Calls count from linked calls and from CallAnchor&apos;s lifetime count
-        rising.
+        with no call for {durationText(unusedAfterMs)} (set in Settings). Calls count from linked calls and from CallAnchor&apos;s lifetime count
+        rising.{hiddenInternal > 0 && ` ${hiddenInternal} internal clients hidden.`}
         {client && (
           <>
             {" "}

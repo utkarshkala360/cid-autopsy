@@ -5,33 +5,6 @@ import type { ReplySuggestion, StoreStatus } from "@/lib/callanchor/store";
 import { badgeClass, cardClass } from "@/components/ui";
 import { DAY_STATES, ISSUE_LEVELS, LEVELS, LICENSE_STATUSES, TRENDS, ago, formatDay, formatHour, formatTime, int, issueHref, itemsHref, pct, rateClass } from "./format";
 
-// The health views, as tabs. Each page passes its own.
-const TABS = [
-  { key: "clients", label: "Clients", path: "" },
-  { key: "licenses", label: "Licenses", path: "/licenses" },
-  { key: "seats", label: "Seats", path: "/seats" },
-  { key: "settings", label: "Settings", path: "/settings" },
-] as const;
-
-export function HealthTabs({ basePath, current }: { basePath: string; current: (typeof TABS)[number]["key"] }) {
-  return (
-    <nav aria-label="Client health" className="mt-3 flex gap-1 border-b border-slate-200">
-      {TABS.map((t) => (
-        <Link
-          key={t.key}
-          href={`${basePath}${t.path}`}
-          aria-current={t.key === current ? "page" : undefined}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-            t.key === current ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
-          }`}
-        >
-          {t.label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
 // How complete and fresh the stored data is: last pull, stream errors, calls missing their ingest
 // log (finding D), empty hours and the snapshot's age. Replaces the raw store note.
 export function CoverageNote({ store, coverage, pullErrors, now, tookMs }: { store: StoreStatus; coverage: CoverageSummary; pullErrors: string[]; now: number; tookMs: number }) {
@@ -383,9 +356,16 @@ export function Tile({ label, value, detail, href }: { label: string; value: Rea
   );
 }
 
+// A section's anchor and its name in the left menu's "On this page": the title up to any count.
+export function sectionAnchor(title: string) {
+  const label = title.split(":")[0].trim();
+  return { id: `s-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`, label };
+}
+
 export function Section({ title, note, children }: { title: string; note?: React.ReactNode; children: React.ReactNode }) {
+  const anchor = sectionAnchor(title);
   return (
-    <section className="mt-8">
+    <section id={anchor.id} data-section={anchor.label} className="mt-8 scroll-mt-6">
       <h2 className="text-base font-semibold text-slate-900">{title}</h2>
       {note && <p className="mt-1 text-sm text-slate-500">{note}</p>}
       <div className="mt-3">{children}</div>
@@ -395,8 +375,9 @@ export function Section({ title, note, children }: { title: string; note?: React
 
 // A section that starts closed, for detail most visits don't need (QA U4).
 export function Collapsed({ title, note, children }: { title: string; note?: React.ReactNode; children: React.ReactNode }) {
+  const anchor = sectionAnchor(title);
   return (
-    <details className="mt-6">
+    <details id={anchor.id} data-section={anchor.label} className="mt-6 scroll-mt-6">
       <summary className="cursor-pointer text-base font-semibold text-slate-900">{title}</summary>
       {note && <p className="mt-1 text-sm text-slate-500">{note}</p>}
       <div className="mt-3">{children}</div>

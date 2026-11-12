@@ -301,18 +301,24 @@ ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS agent_last4 TEXT;
 ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS license_via TEXT;
 
+-- mobile.recording.mark-unavailable: the phone found no recording file after the call, so there's
+-- nothing to upload. reasonMessage says why ("No recording file found after call").
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS unavailable_at TIMESTAMPTZ;
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS unavailable_reason TEXT;
+
 -- Rebuilds the given calls from the stored logs and callouts. store.ts calls it after each save. A
 -- call exists once it has a mobile.call.create log or a callout.
 CREATE OR REPLACE FUNCTION ca_refresh_calls(ids TEXT[]) RETURNS void LANGUAGE sql AS $$
 INSERT INTO ca_calls AS t (call_id, client_id, license_id, ingested_at, recording_detail, upload_started_at, uploaded_at,
   verified_at, upload_failed_at, attempts, first_callout_at, last_callout_at, first_delivered_at, delivered_events,
   last_status, last_http, last_label, last_platform, duplicate_deliveries, call_type, call_seconds, has_recording,
-  started_at, agent_last4, license_via, updated_at)
+  started_at, agent_last4, license_via, unavailable_at, unavailable_reason, updated_at)
 SELECT ids.id, coalesce(l.client_id, c.client_id), coalesce(l.license_id, m.license_id), l.ingested_at, l.detail, l.started, l.uploaded,
   l.verified, l.failed, coalesce(c.attempts, 0), c.first_at, c.last_at, c.first_delivered_at,
   coalesce(c.delivered_events, '{}'), c.last_status, c.last_http, c.last_label, c.last_platform, coalesce(c.duplicates, 0),
   coalesce(l.call_type, c.call_type), c.seconds, c.has_recording, c.started_at, c.agent_last4,
-  CASE WHEN l.license_id IS NOT NULL THEN 'ingest' WHEN m.license_id IS NOT NULL THEN 'agent_number' END, now()
+  CASE WHEN l.license_id IS NOT NULL THEN 'ingest' WHEN m.license_id IS NOT NULL THEN 'agent_number' END,
+  l.unavailable, l.unavailable_reason, now()
 FROM unnest(ids) AS ids(id)
 CROSS JOIN LATERAL (
   SELECT max(client_id) AS client_id,
@@ -323,7 +329,10 @@ CROSS JOIN LATERAL (
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-init') AS started,
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-complete') AS uploaded,
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.job-processed') AS verified,
-    min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-failed') AS failed
+    min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-failed') AS failed,
+    min(occurred_at) FILTER (WHERE source = 'mobile.recording.mark-unavailable') AS unavailable,
+    (array_agg(left(raw->'metadata'->>'reasonMessage', 200) ORDER BY occurred_at)
+      FILTER (WHERE source = 'mobile.recording.mark-unavailable'))[1] AS unavailable_reason
   FROM ca_system_logs WHERE call_id = ids.id
 ) l
 CROSS JOIN LATERAL (
@@ -362,11 +371,18 @@ ON CONFLICT (call_id) DO UPDATE SET
   last_platform = EXCLUDED.last_platform, duplicate_deliveries = EXCLUDED.duplicate_deliveries,
   call_type = coalesce(EXCLUDED.call_type, t.call_type), call_seconds = coalesce(EXCLUDED.call_seconds, t.call_seconds),
   has_recording = coalesce(EXCLUDED.has_recording, t.has_recording), started_at = coalesce(EXCLUDED.started_at, t.started_at),
-  agent_last4 = coalesce(EXCLUDED.agent_last4, t.agent_last4), updated_at = now()
+  agent_last4 = coalesce(EXCLUDED.agent_last4, t.agent_last4),
+  unavailable_at = EXCLUDED.unavailable_at, unavailable_reason = EXCLUDED.unavailable_reason, updated_at = now()
 $$;
 
 -- Rows stored before duplicate_deliveries existed get it once; afterwards this matches nothing.
 SELECT ca_refresh_calls(array_agg(call_id)) FROM ca_calls WHERE duplicate_deliveries IS NULL;
+
+-- Stored calls the phone marked unavailable get it once; afterwards this matches nothing.
+SELECT ca_refresh_calls(array_agg(DISTINCT l.call_id)) FROM ca_system_logs l
+WHERE l.source = 'mobile.recording.mark-unavailable' AND EXISTS (
+  SELECT 1 FROM ca_calls c WHERE c.call_id = l.call_id AND c.unavailable_at IS NULL
+);
 
 -- Stored calls get their callType once; afterwards this matches nothing.
 SELECT ca_refresh_calls(array_agg(c.call_id)) FROM ca_calls c WHERE c.call_type IS NULL AND EXISTS (
@@ -518,3 +534,38 @@ CREATE TABLE IF NOT EXISTS ca_health_settings (
   updated_by TEXT             NOT NULL,
   updated_at TIMESTAMPTZ      NOT NULL DEFAULT now()
 );
+
+-- Clients marked internal (our own test and demo accounts). Health pages hide them, with their
+-- calls, licenses and seats, unless "Show internal" is ticked (owner, 2026-11-12).
+CREATE TABLE IF NOT EXISTS ca_client_flags (
+  client_id  TEXT        PRIMARY KEY,
+  internal   BOOLEAN     NOT NULL DEFAULT FALSE,
+  updated_by TEXT        NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- A customer can be a CallAnchor client. Each client CallAnchor lists becomes a customer with
+-- product CallAnchor, or is linked to the customer of the same name (owner, 2026-11-12).
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS product TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS callanchor_client_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS customers_callanchor_idx ON customers (callanchor_client_id);
+
+-- Two statements share a line because scripts/migrate.mjs splits on a semicolon at a line's end.
+-- Run after each snapshot pull (store.ts) and on every migration. Links by name first, then adds the
+-- clients still unmatched. A name another client already took gets the end of its client id.
+CREATE OR REPLACE FUNCTION ca_map_customers() RETURNS void LANGUAGE sql AS $$
+UPDATE customers c SET callanchor_client_id = s.client_id, product = coalesce(c.product, 'CallAnchor')
+FROM ca_client_snapshots s
+WHERE c.callanchor_client_id IS NULL AND s.company_name IS NOT NULL AND lower(c.name) = lower(s.company_name)
+  AND NOT EXISTS (SELECT 1 FROM customers x WHERE x.callanchor_client_id = s.client_id); INSERT INTO customers (name, product, callanchor_client_id)
+SELECT s.company_name, 'CallAnchor', s.client_id FROM ca_client_snapshots s
+WHERE s.company_name IS NOT NULL AND trim(s.company_name) <> ''
+  AND NOT EXISTS (SELECT 1 FROM customers c WHERE c.callanchor_client_id = s.client_id)
+ON CONFLICT DO NOTHING; INSERT INTO customers (name, product, callanchor_client_id)
+SELECT s.company_name || ' · ' || right(s.client_id, 6), 'CallAnchor', s.client_id FROM ca_client_snapshots s
+WHERE s.company_name IS NOT NULL AND trim(s.company_name) <> ''
+  AND NOT EXISTS (SELECT 1 FROM customers c WHERE c.callanchor_client_id = s.client_id)
+ON CONFLICT DO NOTHING
+$$;
+
+SELECT ca_map_customers();

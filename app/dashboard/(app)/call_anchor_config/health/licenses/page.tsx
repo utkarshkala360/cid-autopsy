@@ -3,9 +3,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { loadFleetLicenses, type FleetLicense } from "@/lib/callanchor/health";
-import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
+import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { LICENSE_STATUSES, STATUS_RANK, ago, int, licenseHref, pct, rateClass } from "../format";
-import { DayStrip, HealthTabs, LoadingNote, Section, StatusBadge, Table, td } from "../parts";
+import { DayStrip, ItemLink, LoadingNote, Section, StatusBadge, Table, issueLinks, td } from "../parts";
 
 export const metadata: Metadata = { title: "Licenses" };
 
@@ -35,7 +35,6 @@ export default async function LicensesPage({ searchParams }: PageProps<"/dashboa
     <div>
       <Breadcrumbs items={[{ href: CALLANCHOR_PATH, label: "CallAnchor Config" }, { href: HEALTH_PATH, label: "Client health" }]} />
       <h1 className="text-xl font-semibold text-slate-900">Client health</h1>
-      <HealthTabs basePath={HEALTH_PATH} current="licenses" />
       <p className="mt-3 text-sm text-slate-500">
         Every phone across clients, worst first. Without a status filter, only phones that need action are listed. Notes don&apos;t change a
         phone&apos;s status; how each seat is used is on the Seats tab. From stored data: the dashboard brings it up to date.
@@ -48,7 +47,8 @@ export default async function LicensesPage({ searchParams }: PageProps<"/dashboa
 }
 
 async function Licenses({ filters, href }: { filters: Filters; href: (changes: Record<string, string | null | undefined>) => string }) {
-  const { licenses, loadedAt } = await loadFleetLicenses();
+  // A client asked for by id is shown even when it's internal.
+  const { licenses, loadedAt } = await loadFleetLicenses(Boolean(filters.client) || (await showInternal()));
   const now = Date.parse(loadedAt);
   const model = (h: FleetLicense) => [h.license.deviceBrand, h.license.deviceModel].filter(Boolean).join(" ") || "Unknown device";
   const matches = (h: FleetLicense, skip?: keyof Filters) =>
@@ -114,7 +114,7 @@ async function Licenses({ filters, href }: { filters: Filters; href: (changes: R
                     h.issues.map((i) => (
                       <p key={i.id} className={i.level === "info" ? "text-slate-500" : ""}>
                         {i.level === "info" && <span aria-hidden className="text-sky-700">i </span>}
-                        {i.title}
+                        <ItemLink href={issueLinks(HEALTH_PATH, i).primary}>{i.title}</ItemLink>
                         {i.rolledUp ? " (shared by the client's phones)" : ""}
                       </p>
                     ))

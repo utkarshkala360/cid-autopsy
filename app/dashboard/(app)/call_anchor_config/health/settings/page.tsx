@@ -2,18 +2,17 @@ import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { loadSettings } from "@/lib/callanchor/health";
 import { SETTINGS, settingDefault, settingValue } from "@/lib/callanchor/issues";
-import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
+import { CALLANCHOR_PATH, HEALTH_PATH, requireHealthAdmin } from "@/lib/callanchor/session";
 import { formatTime } from "../format";
-import { HealthTabs } from "../parts";
 import { SettingsForm, type SettingField } from "./SettingsForm";
 
 export const metadata: Metadata = { title: "Health settings" };
 
-// The thresholds that decide what's flagged, editable by the owner (2026-11-05). Fleet-wide; saved
+// The thresholds that decide what's flagged, editable by the owner (2026-11-05). Admins only (2026-11-12). Fleet-wide; saved
 // values override RULES in lib/callanchor/issues.ts on every load.
 
 export default async function HealthSettingsPage() {
-  await requireCallAnchorSession(`${HEALTH_PATH}/settings`);
+  await requireHealthAdmin();
   const saved = new Map((await loadSettings()).map((s) => [s.key, s]));
   const fields: SettingField[] = SETTINGS.map((s) => {
     const change = saved.get(s.key);
@@ -34,7 +33,6 @@ export default async function HealthSettingsPage() {
     <div>
       <Breadcrumbs items={[{ href: CALLANCHOR_PATH, label: "CallAnchor Config" }, { href: HEALTH_PATH, label: "Client health" }]} />
       <h1 className="text-xl font-semibold text-slate-900">Client health</h1>
-      <HealthTabs basePath={HEALTH_PATH} current="settings" />
       <p className="mt-3 max-w-3xl text-sm text-slate-500">
         What gets flagged, and when. Times are plain elapsed time, judged day by day, with no working-hours filter. Changes apply to every client and
         phone from the next page load. Set a value back to its default to clear it.

@@ -63,8 +63,19 @@ Rules already established in this repo.
   platform and callout request, so they can be searched and analysed together (owner, 2026-11-05).
 - Health rules use plain elapsed time, judged day by day. No working-hours or working-day filter
   (owner, 2026-11-05).
-- Health thresholds are configurable on the health Settings tab, fleet-wide. Defaults are `RULES` in
-  `lib/callanchor/issues.ts`; saved values live in `ca_health_settings` (owner, 2026-11-05).
+- Health thresholds are configurable on the health Settings page, fleet-wide. Defaults are `RULES` in
+  `lib/callanchor/issues.ts`; saved values live in `ca_health_settings` (owner, 2026-11-05). Settings
+  is for admins only: page and action call `requireHealthAdmin()`, others get a 404 and no link
+  (owner, 2026-11-12).
+- A client can be marked internal (our own test and demo accounts). Its calls, licenses and seats
+  are hidden from every cross-client health view until "Show internal clients" is ticked in the left
+  menu; a client or phone opened by id still shows (owner, 2026-11-12). Flags live in
+  `ca_client_flags`; marking is admin-only, like Settings.
+- Every client CallAnchor lists is a customer with product CallAnchor, linked by
+  `customers.callanchor_client_id`, added on its own after each snapshot pull (`ca_map_customers()`)
+  (owner, 2026-11-12).
+- Health pages share a left menu: the health views first, then the open page's sections (owner,
+  2026-11-12).
 - Seat use (purchased, assigned, logged in, calling, unused) has its own Seats tab, not issue cards.
   Unused seats aren't issues (owner, 2026-11-05).
 - CRM replies are custom code written per client, so their text is never a reliable error
@@ -78,7 +89,9 @@ Rules already established in this repo.
 - Auditor is a member permission on top of the role, set in the Admin Console. Auditors leave notes
   on any page through the Audit note button; each saves the page URL and context to `audit_notes`.
   The owner reviews them with the agent weekly to improve the dashboard: start from
-  `npm run audit:notes`, and mark each note done or won't fix with what changed (owner, 2026-11-12).
+  `npm run audit:notes`, and mark each note done or won't fix with what changed (owner, 2026-11-12):
+  `npm run audit:notes -- --mark <ids> done "what changed" --commit <hash>`, after the fix is
+  committed. Notes are never deleted; `--days 7` shows closed ones too.
 - Commit only redacted fixtures. `npm test` in `callanchor-apis/` must pass before a commit there.
 
 ## Happy implementation
@@ -103,6 +116,10 @@ What a good change looks like here.
   rebuild call state from all logs on a page.
 - Link a health number to its items with a `Drill` and `itemsHref()`; the items page
   (`health/items`) reads the store with the same filters, and `health/calls/<id>` shows one call.
+- Build health page blocks with `Section` or `Collapsed` (`health/parts.tsx`): they carry the anchor
+  the left menu's "On this page" lists. Any other block needs `id` and `data-section` to show there.
+- A cross-client view filters internal clients through `internalScope()` in `health.ts`, or
+  `hideInternal` on the store's item queries; never a second list of ids.
 - Run slow background work, like the 5-day refresh, with `after()`, so it doesn't block the page.
 - To make a threshold editable, add it to `SETTINGS` in `lib/callanchor/issues.ts`; every loader in
   `health.ts` calls `loadSettings()` first, so pages and actions see the saved values.
@@ -135,6 +152,8 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-12 | Give "phone couldn't save the recording" its own issue, apart from "Recordings stuck on the phone" | 12 stored calls have `mobile.recording.mark-unavailable`: the phone found no file, so waiting won't help. They still count as stuck on the phone (only the reason is shown now); the fix is the phone's microphone permission or dialer recording setting | Awaiting owner |
+| 2026-11-12 | Decide what deleting an auto-added CallAnchor customer means | `ca_map_customers()` adds it back on the next snapshot pull. Either block deleting them, or keep a "not a customer" mark | Awaiting owner |
 | 2026-11-05 | Alerts for new critical issues and a phone with no sync, by Slack or email (QA O1) | Nobody is told until someone opens the page. Needs a channel and the scheduled pull | Awaiting owner |
 | 2026-11-05 | Get a CallAnchor role that can read `click-to-call-logs`, `bulk-dial-logs`, app builds, log retention and support users, and sample `licenses/{id}/history` on a client with licenses | Our `support_agent` login gets 403 on them, so they have no sample or contract entry. See "What our login can't read" in `callanchor-apis/docs/endpoint-inventory.md` | Awaiting owner |
 | 2026-11-04 | Limit who sees raw payloads and log metadata | They carry customer phone numbers, agents' notes, actor emails and IPs, and every member with a CallAnchor login can open them | Awaiting owner |
@@ -152,6 +171,8 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-12 | Audit notes 1–7: phone's "recording unavailable" reason on calls (`ca_calls.unavailable_at`/`unavailable_reason`, items page, call problem and journey); "CRM reply" heading for delivered syncs; license issue titles link to their rows (client and licenses pages); left menu for health pages with "On this page" sections, replacing the tabs; internal clients with Mark internal (admins) and Show internal clients; Settings admins only; CallAnchor clients become customers with a Product column | Done in code; type-check and lint clean, schema checked in PGlite. Not pushed, not viewed signed in, notes still open. Schema applies on the next deploy and adds all 54 clients as customers | `health/HealthNav.tsx`, `health/actions.ts`, `db/schema.sql` |
+| 2026-11-12 | `npm run audit:notes -- --mark <ids> <done\|wontfix\|open> "what changed" [--commit <ref>]` closes notes from the review, same rules as the admin page; `--commit` adds the short hash to the resolution | Done, checked in PGlite; not pushed | `scripts/audit-notes.mjs` |
 | 2026-11-12 | Auditor permission: Admin Console checkbox on create and Make/Remove auditor per member; floating Audit note button on member pages (type, comment, highlighted text) saving URL, title, heading, query, viewport, browser and host to `audit_notes`; `/admin/audit-notes` review page with open/done/won't fix; `npm run audit:notes` for the weekly review | Done, pushed 2026-11-12 (`c882582`); tables created by that deploy. Not yet viewed signed in | `components/AuditNoteButton.tsx`, `app/admin/(console)/audit-notes/`, `scripts/audit-notes.mjs` |
 | 2026-11-05 | Global search bar in CallAnchor Config over `ca_events`, for quick search and analysis | Planned; owner said it comes next | |
 | 2026-11-05 | Linked events: callouts keep their call's type, length, recording flag, start and agent last 4 from the payload; calls with no ingest log get their phone from the agent number; portal events (audit log) stored as a stream, linked to license, integration and callout; `ca_events` view joins all three; "didn't connect" now uses the real call length; call page shows the call facts, license page its portal events | Done in code, checked in PGlite; not applied to the shared DB (the agent's apply was blocked) and not pushed. Applies on the next deploy; the next dashboard visit then backfills stored callouts and 90 days of portal events in the background | `lib/callanchor/links.ts`, `db/schema.sql`, `lib/callanchor/store.ts` |
@@ -171,6 +192,13 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-12: Said "run audit". Ran `npm run audit:notes` (7 open notes, all the owner's) and built
+  all seven; the new rules are in the SOP. Note 1's message was in the phone's mark-unavailable log
+  metadata, never joined to the call. Notes stay open until the fix is committed.
+- 2026-11-12: Asked whether `npm run audit:notes` marks, archives or deletes notes, and how done
+  work is tracked. It doesn't: it's read-only. Status (open, done, won't fix), resolution and
+  `resolved_at` are set on `/admin/audit-notes`; nothing is deleted. Recommended a `--mark` option;
+  owner said "build it". Built it and added the command to the weekly review rule.
 - 2026-11-12: Asked for an auditor permission that lets members enter comments saved in the DB with
   the page URL and metadata, to be reviewed with the agent weekly to optimise the dashboard. Built it
   as a permission on top of the role, with an admin review page and a Markdown export; added the

@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { checkSession, type SessionCheck } from "@/lib/callanchor/portal";
@@ -10,6 +11,7 @@ export const CALLANCHOR_PATH = "/dashboard/call_anchor_config";
 export const VERIFY_PATH = `${CALLANCHOR_PATH}/verify`;
 export const APIS_PATH = `${CALLANCHOR_PATH}/apis`;
 export const HEALTH_PATH = `${CALLANCHOR_PATH}/health`;
+export const HEALTH_SETTINGS_PATH = `${HEALTH_PATH}/settings`;
 
 // Each attempt can place a real phone call.
 const OTP_SCOPE = "callanchor_otp";
@@ -56,6 +58,20 @@ export async function requireApiConsoleAccess() {
   const access = await requireCallAnchorSession(APIS_PATH);
   if (access.member.role !== "admin") notFound();
   return access;
+}
+
+// Fleet-wide health choices: thresholds, and which clients are internal. Admins only (owner,
+// 2026-11-12); others get a 404 and don't see the Settings link.
+export async function requireHealthAdmin(next = HEALTH_SETTINGS_PATH) {
+  const access = await requireCallAnchorSession(next);
+  if (access.member.role !== "admin") notFound();
+  return access;
+}
+
+// Whether this browser asked to see internal clients on the health pages. Off by default.
+export const SHOW_INTERNAL_COOKIE = "ca_show_internal";
+export async function showInternal() {
+  return (await cookies()).get(SHOW_INTERNAL_COOKIE)?.value === "1";
 }
 
 export async function saveCallAnchorSession(memberId: string, mobile: string, cookie: string) {

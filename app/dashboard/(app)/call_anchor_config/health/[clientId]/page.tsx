@@ -3,13 +3,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { cardClass } from "@/components/ui";
+import { cardClass, secondaryButtonClass } from "@/components/ui";
 import { loadClientHealth, WINDOW_DAYS, type Drill, type WindowDays } from "@/lib/callanchor/health";
 import type { CallStage } from "@/lib/callanchor/issues";
 import { PortalError } from "@/lib/callanchor/portal";
 import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
+import { setClientInternalAction } from "../actions";
 import { STATUS_RANK, ago, formatTime, int, itemsHref, licenseHref, pct, rateClass } from "../format";
-import { Collapsed, CoverageNote, DayStrip, Funnel, HealthBadge, IssueList, ItemLink, LoadingNote, PulsePanel, Section, StatusBadge, SyncTrend, Table, Tile, td } from "../parts";
+import { Collapsed, CoverageNote, DayStrip, Funnel, HealthBadge, IssueList, ItemLink, issueLinks, LoadingNote, PulsePanel, Section, StatusBadge, SyncTrend, Table, Tile, td } from "../parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores this client's last 5 days, and the daily refresh runs after the response.
@@ -97,10 +98,27 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-slate-900">{client.companyName}</h1>
         <HealthBadge level={data.level} />
+        {data.internal && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">Internal</span>}
         <span className="text-sm text-slate-500">
           {client.status} · {client.plan} plan{client.accessSuspended ? " · access suspended" : ""}
         </span>
+        {member.role === "admin" && (
+          <form action={setClientInternalAction} className="ml-auto">
+            <input type="hidden" name="clientId" value={clientId} />
+            <input type="hidden" name="internal" value={data.internal ? "0" : "1"} />
+            <button
+              type="submit"
+              className={secondaryButtonClass}
+              title={data.internal ? "Show this client's calls, licenses and seats everywhere again" : "Hide this client from the health pages unless Show internal clients is ticked"}
+            >
+              {data.internal ? "Mark as live customer" : "Mark internal"}
+            </button>
+          </form>
+        )}
       </div>
+      {data.internal && (
+        <p className="mt-1 text-xs text-slate-500">Internal: hidden from the fleet, licenses, seats and item lists unless Show internal clients is ticked.</p>
+      )}
       <p className="mt-2 text-base text-slate-800">
         {top
           ? `${top.title}${top.impactText ? `: ${top.impactText}` : ""}${top.firstAt ? `, since ${formatTime(top.firstAt)} IST` : ""}.`
@@ -142,7 +160,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         <IssueList issues={data.issues} basePath={HEALTH_PATH} now={now} licenseLabels={licenseLabels} empty="Nothing needs attention." />
       </Section>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+      <div id="s-call-journey" data-section="Call journey" className="mt-8 flex scroll-mt-6 flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-slate-900">Call journey, {data.windowLabel}</h2>
         <WindowPicker path={path} days={days} />
       </div>
@@ -241,7 +259,17 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
                   <td className={td}>{data.agents[l.licenseId] ?? <span className="text-slate-400">Unassigned</span>}</td>
                   <td className="px-3 py-2 align-top text-xs">
                     <StatusBadge status={h.status} />
-                    {h.issues[0] && <p className="mt-0.5 text-slate-600">{h.issues[0].title}{h.issues.length > 1 ? ` +${h.issues.length - 1}` : ""}</p>}
+                    {h.issues[0] && (
+                      <p className="mt-0.5 text-slate-600">
+                        <ItemLink href={issueLinks(HEALTH_PATH, h.issues[0]).primary}>{h.issues[0].title}</ItemLink>
+                        {h.issues.length > 1 && (
+                          <>
+                            {" "}
+                            <Link href={licenseHref(HEALTH_PATH, l.licenseId)} className="text-indigo-700 hover:underline">+{h.issues.length - 1} more</Link>
+                          </>
+                        )}
+                      </p>
+                    )}
                   </td>
                   <td className={`${td} text-right tabular-nums`}>
                     {int(h.calls24h)}

@@ -313,6 +313,8 @@ export function stuckStage(c: StoredCall, now: number): string | null {
 export function callProblem(c: StoredCall, ctx: ClientContext, now: number): string | null {
   const stuck = stuckStage(c, now);
   if (stuck) return stuck;
+  // The phone said there's no recording file, so waiting won't help (audit note 1).
+  if (c.unavailableAt && !isUploaded(c)) return `Phone couldn't save the recording${c.unavailableReason ? `: ${c.unavailableReason}` : ""}`;
   if (inStage("waiting", c, ctx, now)) return "Phone hasn't uploaded the recording";
   if (inStage("unsynced", c, ctx, now)) return "Verified, not synced to the CRM";
   if (inStage("missing", c, ctx, now)) return "No CRM callout was sent";

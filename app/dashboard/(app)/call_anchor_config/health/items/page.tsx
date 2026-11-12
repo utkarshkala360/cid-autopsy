@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, WINDOW_DAYS, type WindowDays } from "@/lib/callanchor/health";
 import { isCallStage, type CallStage } from "@/lib/callanchor/issues";
-import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
+import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import {
   ITEMS_PER_PAGE,
   readCalloutPage,
@@ -40,6 +40,9 @@ const FILTERS: Record<Kind, Record<string, string>> = {
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
+// A 2xx reply isn't an error, so the reply column is named by the outcome it lists (audit note 2).
+const replyHeading = (status: string | undefined) => (status === "delivered" ? "CRM reply" : status === "failed" ? "Error or reply" : "Reply or error");
+
 export default async function HealthItemsPage({ searchParams }: PageProps<"/dashboard/call_anchor_config/health/items">) {
   const query = (await searchParams) as Query;
   const asked = KINDS.find((k) => k === one(query.kind));
@@ -73,7 +76,9 @@ export default async function HealthItemsPage({ searchParams }: PageProps<"/dash
 
   const path = href({ page: page > 1 ? String(page) : null });
   await requireCallAnchorSession(path);
-  const [names, phone] = await Promise.all([readClientNames(), filters.license ? readLicense(filters.license) : Promise.resolve(null)]);
+  const [names, phone, internal] = await Promise.all([readClientNames(), filters.license ? readLicense(filters.license) : Promise.resolve(null), showInternal()]);
+  // Across all clients, internal ones are left out unless "Show internal" is ticked.
+  const hideInternal = !client && !internal;
   const clientName = client ? (names.get(client) ?? client) : null;
   // How a chip names a filter: a phone by its last four digits, never its raw id (QA U7).
   const chipValue = (key: string, value: string) =>
@@ -128,14 +133,14 @@ export default async function HealthItemsPage({ searchParams }: PageProps<"/dash
           <Chip href={href({ client: null, page: null })} label="Client" value={clientName!} />
         )}
         {Object.entries(filters).map(([key, value]) => (
-          <Chip key={key} href={href({ [key]: null, page: null })} label={FILTERS[kind][key]} value={chipValue(key, value)} />
+          <Chip key={key} href={href({ [key]: null, page: null })} label={key === "label" ? replyHeading(filters.status) : FILTERS[kind][key]} value={chipValue(key, value)} />
         ))}
       </div>
 
       <Suspense key={path} fallback={<LoadingNote text="Reading the stored items…" />}>
-        {kind === "syncs" && <SyncItems filter={calloutFilter(filters, client)} days={days} page={page} names={names} href={href} />}
-        {kind === "logs" && <LogItems filter={{ ...filters, clientId: client, problems: filters.problems === "1" }} days={days} page={page} names={names} href={href} />}
-        {kind === "calls" && <CallItems client={client} license={filters.license} licenses={phones} days={days} stage={stage!} page={page} names={names} href={href} />}
+        {kind === "syncs" && <SyncItems filter={{ ...calloutFilter(filters, client), hideInternal }} days={days} page={page} names={names} href={href} />}
+        {kind === "logs" && <LogItems filter={{ ...filters, clientId: client, problems: filters.problems === "1", hideInternal }} days={days} page={page} names={names} href={href} />}
+        {kind === "calls" && <CallItems client={client} license={filters.license} licenses={phones} showInternal={!hideInternal} days={days} stage={stage!} page={page} names={names} href={href} />}
       </Suspense>
     </div>
   );
@@ -244,7 +249,7 @@ async function SyncItems({ filter, days, page, names, href }: { filter: CalloutF
       <Pager page={page} total={total} href={href} />
       <div className="mt-3">
         <Table
-          head={["When", ...(allClients ? ["Client"] : []), "Event", "Status", "Platform", "HTTP", "Attempt", "Time", "Reply or error", "Call"]}
+          head={["When", ...(allClients ? ["Client"] : []), "Event", "Status", "Platform", "HTTP", "Attempt", "Time", replyHeading(filter.status), "Call"]}
           empty={items.length ? undefined : "Nothing matches in this window."}
         >
           {items.map((e) => (
@@ -312,17 +317,18 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
   );
 }
 
-async function CallItems({ client, license, licenses, days, stage, page, names, href }: {
+async function CallItems({ client, license, licenses, showInternal, days, stage, page, names, href }: {
   client?: string;
   license?: string;
   licenses: string[];
+  showInternal: boolean;
   days: WindowDays;
   stage: CallStage;
   page: number;
   names: Map<string, string>;
   href: Href;
 }) {
-  const { items, total, title, loadedAt } = await loadCallItems({ clientId: client, licenseId: license, licenseIds: licenses }, stage, days, page);
+  const { items, total, title, loadedAt } = await loadCallItems({ clientId: client, licenseId: license, licenseIds: licenses, showInternal }, stage, days, page);
   const now = Date.parse(loadedAt);
   return (
     <>
@@ -363,6 +369,10 @@ async function CallItems({ client, license, licenses, days, stage, page, names, 
                   <p>uploaded</p>
                 ) : c.uploadFailedAt ? (
                   <p className="text-red-700">upload failed</p>
+                ) : c.unavailableAt ? (
+                  <p className="whitespace-normal text-red-700" title="mobile.recording.mark-unavailable">
+                    phone couldn&apos;t save it{c.unavailableReason ? `: ${c.unavailableReason}` : ""}
+                  </p>
                 ) : null}
               </td>
               <td className={`${td} text-xs ${c.firstDeliveredAt ? "text-emerald-700" : c.lastStatus === "failed" ? "font-medium text-red-700" : ""}`}>

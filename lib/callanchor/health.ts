@@ -41,6 +41,7 @@ import {
   readDaily,
   readHealthSettings,
   readIntegrationChanges,
+  readInternalClients,
   readIssueState,
   readLastSyncs,
   readLicense,
@@ -128,6 +129,15 @@ export async function loadSettings() {
   const saved = await readHealthSettings();
   applySettings(Object.fromEntries(saved.map((s) => [s.key, s.value])));
   return saved;
+}
+
+// ---- Internal clients ----
+
+// Clients marked internal, and which of them to hide: all of them unless "Show internal" is ticked.
+export type InternalScope = { internal: Set<string>; hidden: Set<string> };
+async function internalScope(show: boolean): Promise<InternalScope> {
+  const internal = await readInternalClients();
+  return { internal, hidden: show ? new Set() : internal };
 }
 
 // ---- Assessing clients and licenses ----
@@ -373,18 +383,21 @@ function errorGroups(events: StoredCallout[], names: Map<string, string>): Error
     .sort((a, b) => b.calls - a.calls);
 }
 
-export async function loadFleetHealth(cookie: string, memberId: string) {
+export async function loadFleetHealth(cookie: string, memberId: string, showInternal = false) {
   const started = Date.now();
   await loadSettings();
   const pull = await pullFleet(cookie);
   const now = Date.now();
-  const [assessments, logs, store, cover, lastVisit] = await Promise.all([
+  const [everyClient, everyLog, store, cover, lastVisit, scope] = await Promise.all([
     assess(now, null),
     readLogs(null, now - DAY),
     readStoreStatus(null),
     readCoverage(null),
     markVisit(memberId, "fleet"),
+    internalScope(showInternal),
   ]);
+  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
+  const logs = everyLog.filter((l) => !l.clientId || !scope.hidden.has(l.clientId));
   const platform = platformIssues(logs, now);
   // Clients that usually call: the denominator for a fleet-wide stall.
   const busy = assessments.filter((a) => a.snapshot.status !== "inactive" && a.pulse.days.slice(-8, -1).reduce((sum, d) => sum + d.calls, 0) / 7 >= RULES.quietMinDailyCalls).length;
@@ -431,6 +444,8 @@ export async function loadFleetHealth(cookie: string, memberId: string) {
 
   return {
     rows: rows.sort((a, b) => byLevel(a.level, b.level) || b.openIssues - a.openIssues || b.calls24h - a.calls24h),
+    internal: [...scope.internal],
+    hiddenInternal: everyClient.length - assessments.length,
     needsAction,
     lastVisit,
     names: Object.fromEntries(names),
@@ -603,7 +618,7 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
   await Promise.all([saveLicenses(clientId, tenantBody.licenses), saveIntegrations(clientId, tenant.integrations)]);
   const now = Date.now();
   const since = now - days * DAY;
-  const [[assessment], calls, events, logs, [snapshot], store, cover, suggestions, lastSyncs, integrationChanges] = await Promise.all([
+  const [[assessment], calls, events, logs, [snapshot], store, cover, suggestions, lastSyncs, integrationChanges, internal] = await Promise.all([
     assess(now, clientId, { tenant, status: client.status, accessSuspended: client.accessSuspended }),
     readCalls({ clientId }, since),
     readCallouts(clientId, since),
@@ -614,6 +629,7 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     readSuggestions(),
     readLastSyncs(clientId),
     readIntegrationChanges(clientId, now - 30 * DAY),
+    readInternalClients(),
   ]);
   if (!assessment) throw new PortalError(404, "Client not stored yet");
   await remember(assessment.issues);
@@ -648,6 +664,7 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     client,
     level: assessment.level,
     issues: assessment.issues,
+    internal: internal.has(clientId),
     licenses: assessment.licenses,
     licenseTotals: licenseCounts(assessment.licenses),
     historyStart: assessment.licenses.map((h) => h.baselineSince).filter((t): t is string => !!t).sort()[0] ?? null,
@@ -683,12 +700,13 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
 export type FleetLicense = LicenseHealth & { companyName: string };
 
 // Every license fleet-wide with its status, from the store.
-export async function loadFleetLicenses() {
+export async function loadFleetLicenses(showInternal = false) {
   await loadSettings();
   const now = Date.now();
-  const assessments = await assess(now, null);
+  const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
+  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
   const licenses: FleetLicense[] = assessments.flatMap((a) => a.licenses.map((h) => ({ ...h, companyName: a.snapshot.companyName ?? a.snapshot.clientId })));
-  return { licenses, loadedAt: new Date(now).toISOString() };
+  return { licenses, hiddenInternal: everyClient.length - assessments.length, loadedAt: new Date(now).toISOString() };
 }
 
 // ---- Seats ----
@@ -697,10 +715,11 @@ export type SeatRow = { license: LicenseHealth["license"]; seat: LicenseHealth["
 
 // Every client's seats from the store, by use: purchased, active, assigned, logged in and calling, with
 // each seat that isn't being used and since when (owner, 2026-11-05).
-export async function loadSeats() {
+export async function loadSeats(showInternal = false) {
   await loadSettings();
   const now = Date.now();
-  const assessments = await assess(now, null);
+  const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
+  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
   const clients = assessments
     .filter((a) => a.seats.active > 0 || (a.seats.purchased ?? 0) > 0)
     .map((a) => ({
@@ -710,7 +729,7 @@ export async function loadSeats() {
       seats: a.seats,
       rows: a.licenses.map((h): SeatRow => ({ license: h.license, seat: h.seat, lastCallAt: h.lastCallAt, lastSyncAt: h.pulse.lastSyncAt, status: h.status })),
     }));
-  return { clients, unusedAfterMs: RULES.seatUnusedMs, loadedAt: new Date(now).toISOString() };
+  return { clients, hiddenInternal: everyClient.length - assessments.length, unusedAfterMs: RULES.seatUnusedMs, loadedAt: new Date(now).toISOString() };
 }
 
 const LICENSE_FIELD_LABELS: Record<string, string> = {
@@ -797,7 +816,7 @@ const CHECKLISTS: Record<string, string[]> = {
   late_sync: ["Open the slowest calls to see which step was slow", "Late recordings usually mean the phone was offline"],
   reply_format: ["Ask the client whether their webhook code changed", "Compare old and new reply samples"],
   license_not_recording: ["Check the phone's recording permission and dialer", "Compare with another phone of the same model", "Check the app version"],
-  license_stuck_on_phone: ["Check whether the phone is online", "Check battery optimisation and background data for the app", "Check free storage on the phone"],
+  license_stuck_on_phone: ["Open the calls: \"Phone couldn't save the recording\" means check microphone permission and that call recording is on in the default dialer", "Check whether the phone is online", "Check battery optimisation and background data for the app", "Check free storage on the phone"],
   license_not_capturing: ["Check the agent is logged in and using the phone", "Check call capture settings and the default dialer"],
   license_never_called: ["Check the phone's default dialer and call capture policy", "Confirm the agent actually uses this number"],
   license_crm_rejects: ["Check the agent's user mapping in the CRM", "Open a failed call and compare its payload with a successful one"],
@@ -862,19 +881,28 @@ export async function loadIssue(issueId: string) {
 export const ITEMS_PER_PAGE = 100;
 
 // `licenseIds` narrows to several phones, for an issue shared by some of a client's phones.
-export async function loadCallItems(scope: { clientId?: string; licenseId?: string; licenseIds?: string[] }, stage: CallStage, days: WindowDays, page: number) {
+// Across all clients, internal ones are left out unless `showInternal`; a client or phone asked for
+// by id is always shown.
+export async function loadCallItems(
+  scope: { clientId?: string; licenseId?: string; licenseIds?: string[]; showInternal?: boolean },
+  stage: CallStage,
+  days: WindowDays,
+  page: number,
+) {
   await loadSettings();
   const now = Date.now();
-  const [calls, snapshots, licenses] = await Promise.all([
+  const narrowed = Boolean(scope.clientId || scope.licenseId);
+  const [calls, snapshots, licenses, internal] = await Promise.all([
     readCalls({ clientId: scope.clientId, licenseId: scope.licenseId }, now - days * DAY),
     readSnapshots(scope.clientId),
     readLicenses(scope.clientId),
+    internalScope(narrowed || Boolean(scope.showInternal)),
   ]);
   const contexts = new Map(snapshots.map((s) => [s.clientId, clientContext(s.tenant)]));
   const last4 = new Map(licenses.map((l) => [l.licenseId, l.last4]));
   const none = clientContext(null);
   const phones = scope.licenseIds?.length ? new Set(scope.licenseIds) : null;
-  const matching = calls.filter((c) => (!phones || phones.has(c.licenseId ?? "")) && inStage(stage, c, contexts.get(c.clientId ?? "") ?? none, now));
+  const matching = calls.filter((c) => !internal.hidden.has(c.clientId ?? "") && (!phones || phones.has(c.licenseId ?? "")) && inStage(stage, c, contexts.get(c.clientId ?? "") ?? none, now));
   const items = matching.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((c) => ({
     ...c,
     problem: callProblem(c, contexts.get(c.clientId ?? "") ?? none, now),
@@ -903,7 +931,7 @@ function journey(call: StoredCall | null, callouts: StoredCallout[], ctx: Client
     !recorded ? "skipped" : at ? "done" : failedAt ? "failed" : "pending";
   return [
     { label: "Ingested", at: call?.ingestedAt ?? null, state: call?.ingestedAt ? "done" : "missing" },
-    { label: "Uploaded", at: call?.uploadedAt ?? call?.uploadFailedAt ?? null, state: recordingStep(call?.uploadedAt, call?.uploadFailedAt) },
+    { label: "Uploaded", at: call?.uploadedAt ?? call?.uploadFailedAt ?? call?.unavailableAt ?? null, state: recordingStep(call?.uploadedAt, call?.uploadFailedAt ?? call?.unavailableAt) },
     { label: "Verified", at: call?.verifiedAt ?? null, state: recordingStep(call?.verifiedAt) },
     { label: "Sent", at: firstSent, state: firstSent ? "done" : expected ? "pending" : "skipped" },
     { label: "Accepted", at: accepted, state: accepted ? "done" : failed ? "failed" : expected ? "pending" : "skipped" },

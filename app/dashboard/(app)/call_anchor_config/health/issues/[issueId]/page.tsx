@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Issue" };
 export default async function IssuePage({ params }: PageProps<"/dashboard/call_anchor_config/health/issues/[issueId]">) {
   const issueId = decodeURIComponent((await params).issueId);
   if (!ISSUE_ID.test(issueId)) notFound();
-  await requireCallAnchorSession(`${HEALTH_PATH}/issues/${encodeURIComponent(issueId)}`);
+  const { member } = await requireCallAnchorSession(`${HEALTH_PATH}/issues/${encodeURIComponent(issueId)}`);
   const data = await loadIssue(issueId);
   const now = Date.parse(data.loadedAt);
   const { issue } = data;
@@ -79,8 +79,13 @@ export default async function IssuePage({ params }: PageProps<"/dashboard/call_a
 
       <p className="mt-8 text-xs text-slate-400">
         Critical below {RULES.criticalSuccessRate}% success, warning below {RULES.warningSuccessRate}%, a {durationText(RULES.phoneGraceMs)} grace for the phone&apos;s
-        upload and {durationText(RULES.serverGraceMs)} for CallAnchor&apos;s server steps. Change them on the{" "}
-        <Link href={`${HEALTH_PATH}/settings`} className="text-indigo-700 hover:underline">Settings tab</Link>.
+        upload and {durationText(RULES.serverGraceMs)} for CallAnchor&apos;s server steps.
+        {member.role === "admin" && (
+          <>
+            {" "}
+            Change them in <Link href={`${HEALTH_PATH}/settings`} className="text-indigo-700 hover:underline">Settings</Link>.
+          </>
+        )}
       </p>
     </div>
   );

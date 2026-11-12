@@ -725,6 +725,8 @@ async function pullSnapshots(cookie: string) {
           company_name = EXCLUDED.company_name, status = EXCLUDED.status, data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at
       `;
     });
+    // Each client becomes a customer with product CallAnchor (owner, 2026-11-12).
+    await db()`SELECT ca_map_customers()`;
     await release("snapshots", { refreshed: true });
   } catch (error) {
     await release("snapshots", { error: describe(error) });
@@ -877,6 +879,8 @@ export type CalloutFilter = {
   http?: number | "none";
   label?: string;
   auth?: boolean;
+  // Leaves out clients marked internal.
+  hideInternal?: boolean;
 };
 
 export type LogFilter = {
@@ -889,7 +893,10 @@ export type LogFilter = {
   starts?: string;
   // Anything but info, as the platform fault rules count them.
   problems?: boolean;
+  hideInternal?: boolean;
 };
+
+const NOT_INTERNAL = "NOT EXISTS (SELECT 1 FROM ca_client_flags f WHERE f.client_id = t.client_id AND f.internal)";
 
 // Builds a WHERE clause with numbered parameters, since the filters are all optional.
 function conditions() {
@@ -920,8 +927,9 @@ export async function readCalloutPage(filter: CalloutFilter, days: number, page:
   else if (filter.http !== undefined) c.add("http_status = ?", filter.http);
   if (filter.label !== undefined) c.add("label = ?", filter.label);
   if (filter.auth) c.add("http_status IN (401, 403)");
+  if (filter.hideInternal) c.add(NOT_INTERNAL);
   const rows = await db().query(
-    `SELECT *, count(*) OVER () AS total FROM ca_callout_events ${c.where} ORDER BY at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
+    `SELECT *, count(*) OVER () AS total FROM ca_callout_events t ${c.where} ORDER BY at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
     c.params,
   );
   return { items: rows.map(toCallout), total: Number(rows[0]?.total ?? 0), now };
@@ -937,8 +945,9 @@ export async function readLogPage(filter: LogFilter, days: number, page: number)
   if (filter.detail) c.add("detail = ?", filter.detail);
   if (filter.starts) c.add("message LIKE ?", `${escapeLike(filter.starts)}%`);
   if (filter.problems) c.add("severity <> 'info'");
+  if (filter.hideInternal) c.add(NOT_INTERNAL);
   const rows = await db().query(
-    `SELECT *, count(*) OVER () AS total FROM ca_system_logs ${c.where} ORDER BY occurred_at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
+    `SELECT *, count(*) OVER () AS total FROM ca_system_logs t ${c.where} ORDER BY occurred_at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
     c.params,
   );
   return { items: rows.map(toLog), total: Number(rows[0]?.total ?? 0), now };
@@ -1090,6 +1099,9 @@ export type StoredCall = {
   agentLast4: string | null;
   // How the license is known: 'ingest' or 'agent_number' (see ca_refresh_calls).
   licenseVia: string | null;
+  // mobile.recording.mark-unavailable: the phone found no recording file, and its reasonMessage.
+  unavailableAt: string | null;
+  unavailableReason: string | null;
 };
 
 const isoOrNull = (value: unknown) => (value ? iso(value) : null);
@@ -1120,6 +1132,8 @@ const toCall = (r: Row): StoredCall => ({
   startedAt: isoOrNull(r.started_at),
   agentLast4: r.agent_last4 ?? null,
   licenseVia: r.license_via ?? null,
+  unavailableAt: isoOrNull(r.unavailable_at),
+  unavailableReason: r.unavailable_reason ?? null,
 });
 
 // A call's time is when it was ingested, or its first callout when its ingest log wasn't stored.
@@ -1445,6 +1459,21 @@ export async function markVisit(memberId: string, page: string): Promise<string 
 }
 
 // ---- Health settings ----
+
+// ---- Client flags ----
+
+// Clients marked internal: our own test and demo accounts, hidden unless asked for (owner, 2026-11-12).
+export async function readInternalClients(): Promise<Set<string>> {
+  const rows = await db()`SELECT client_id FROM ca_client_flags WHERE internal`;
+  return new Set(rows.map((r) => r.client_id as string));
+}
+
+export async function setClientInternal(clientId: string, internal: boolean, by: string) {
+  await db()`
+    INSERT INTO ca_client_flags (client_id, internal, updated_by) VALUES (${clientId}, ${internal}, ${by})
+    ON CONFLICT (client_id) DO UPDATE SET internal = EXCLUDED.internal, updated_by = EXCLUDED.updated_by, updated_at = now()
+  `;
+}
 
 export type HealthSetting = { key: string; value: number; updatedBy: string; updatedAt: string };
 

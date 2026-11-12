@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { loadSettings } from "@/lib/callanchor/health";
 import { SETTINGS, settingDefault } from "@/lib/callanchor/issues";
-import { HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
+import { HEALTH_PATH, requireHealthAdmin } from "@/lib/callanchor/session";
 import { saveHealthSettings } from "@/lib/callanchor/store";
 import { field } from "@/lib/form";
 import type { FormState } from "@/components/form-state";
@@ -16,7 +16,7 @@ const ORDER: [string, string, string][] = [
 ];
 
 export async function saveSettingsAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { member } = await requireCallAnchorSession(`${HEALTH_PATH}/settings`);
+  const { member } = await requireHealthAdmin();
   await loadSettings();
   const values: Record<string, number> = {};
   for (const s of SETTINGS) {

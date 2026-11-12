@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { loadFleetHealth } from "@/lib/callanchor/health";
 import { PortalError } from "@/lib/callanchor/portal";
-import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
+import { CALLANCHOR_PATH, HEALTH_PATH, requireCallAnchorSession, showInternal, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { FleetTable } from "./FleetTable";
 import { ago, formatTime, int, itemsHref, pct, rateClass } from "./format";
-import { Collapsed, CoverageNote, HealthTabs, IssueList, ItemLink, LoadingNote, Section, Table, Tile, issueLinks, td } from "./parts";
+import { Collapsed, CoverageNote, IssueList, ItemLink, LoadingNote, Section, Table, Tile, issueLinks, td } from "./parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores 5 days for every client, and the daily refresh runs after the response.
@@ -25,7 +25,6 @@ export default async function ClientHealthPage({ searchParams }: PageProps<"/das
     <div>
       <Breadcrumbs items={[{ href: CALLANCHOR_PATH, label: "CallAnchor Config" }]} />
       <h1 className="text-xl font-semibold text-slate-900">Client health</h1>
-      <HealthTabs basePath={HEALTH_PATH} current="clients" />
       <p className="mt-1 text-sm text-slate-500">
         {profile
           ? "What's broken, how bad, and since when, across every client and phone. Each visit pulls only what's new from CallAnchor."
@@ -47,7 +46,7 @@ async function FleetHealth({ all }: { all: boolean }) {
 
   let data;
   try {
-    data = await loadFleetHealth(cookie, member.id);
+    data = await loadFleetHealth(cookie, member.id, await showInternal());
   } catch (error) {
     if (error instanceof PortalError && error.rejected) redirect(verifyUrl(HEALTH_PATH));
     return (
@@ -75,7 +74,7 @@ async function FleetHealth({ all }: { all: boolean }) {
         <Tile
           label="Clients"
           value={int(totals.clients)}
-          detail={`${levels("critical")} critical · ${levels("warning")} warning · ${levels("healthy")} healthy · ${levels("idle")} idle${totals.inactive ? ` · ${totals.inactive} inactive not counted` : ""}`}
+          detail={`${levels("critical")} critical · ${levels("warning")} warning · ${levels("healthy")} healthy · ${levels("idle")} idle${totals.inactive ? ` · ${totals.inactive} inactive not counted` : ""}${data.hiddenInternal ? ` · ${data.hiddenInternal} internal hidden` : ""}`}
         />
         <Tile
           label="Calls, last 24 hours"
@@ -150,6 +149,7 @@ async function FleetHealth({ all }: { all: boolean }) {
           basePath={HEALTH_PATH}
           rows={rows.map(({ issues, ...r }) => ({
             ...r,
+            internal: data.internal.includes(r.clientId),
             lastActivityLabel: ago(r.lastActivityAt, now),
             lastSyncLabel: r.lastSyncAt ? ago(r.lastSyncAt, now) : "never",
             topIssue: issues.find((i) => i.level !== "info")?.title ?? null,

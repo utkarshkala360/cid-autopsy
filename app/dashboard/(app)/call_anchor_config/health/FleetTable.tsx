@@ -9,7 +9,7 @@ import { ItemLink } from "./parts";
 
 // Times are formatted on the server, so the client doesn't re-render them in another zone. Issues
 // stay on the server: a row carries only its worst one's title.
-export type FleetTableRow = Omit<FleetRow, "issues"> & { lastActivityLabel: string; lastSyncLabel: string; topIssue: string | null };
+export type FleetTableRow = Omit<FleetRow, "issues"> & { lastActivityLabel: string; lastSyncLabel: string; topIssue: string | null; internal: boolean };
 
 const FILTERS: (Level | "all")[] = ["all", "critical", "warning", "healthy", "idle", "unknown"];
 const td = "whitespace-nowrap px-3 py-2 align-top";
@@ -79,6 +79,7 @@ export function FleetTable({ rows, basePath }: { rows: FleetTableRow[]; basePath
                       {r.companyName}
                     </Link>
                     <p className="text-xs text-slate-500">
+                      {r.internal && <span className="font-medium text-slate-700">internal · </span>}
                       {r.status}
                       {r.integrations.length ? ` · ${r.integrations.join(", ")}` : " · no integration"}
                     </p>
