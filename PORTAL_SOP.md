@@ -69,9 +69,11 @@ Rules already established in this repo.
   (owner, 2026-11-12).
 - A client can be marked internal (our own test and demo accounts). Its calls, licenses and seats
   are hidden from every cross-client health view until "Show internal clients" is ticked in the left
-  menu; a client or phone opened by id still shows (owner, 2026-11-12). Every client starts normal;
-  only admins mark one internal, with the Internal tick box on Customers or the button on the
-  client's health page (owner, 2026-11-12). Flags live in `ca_client_flags`.
+  menu; a client or phone opened by id still shows (owner, 2026-11-12). Every client starts External;
+  only admins change it, with the "Mark as Internal" / "Mark as External" button on Customers or the
+  client's health page, always after a confirmation. Status shows as a coloured tag (Internal amber,
+  External green), never a bare checkbox. Customers also hides internal ones behind a "Show internal"
+  filter (owner, 2026-11-12). See `components/InternalMark.tsx`; flags live in `ca_client_flags`.
 - Every client CallAnchor lists is a customer with product CallAnchor, linked by
   `customers.callanchor_client_id`, added on its own after each snapshot pull (`ca_map_customers()`)
   (owner, 2026-11-12).
@@ -193,6 +195,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-12: Objected to a bare checkbox for marking internal: wants a confirmation and a coloured
+  "Mark as Internal" / "Mark as External" tag, and a "Show internal" filter on Customers. Built
+  `InternalMark` (status tag, action button, confirm) for Customers and the client page, and the
+  filter. A change that hides data for everyone needs a confirmation. Pushed on "push".
 - 2026-11-12: Couldn't see Settings, though an admin. The Admin Console login (`admins`) and the
   dashboard member account are separate; the member account's role was still Agent, and the
   dashboard checks only that. Fix: set the member's role to Admin in the Admin Console.
