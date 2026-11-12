@@ -6,6 +6,8 @@ import { requireMember } from "@/lib/auth";
 import { db, isUniqueViolation } from "@/lib/db";
 import { field, rowId } from "@/lib/form";
 import { disconnectOrg } from "@/lib/salesforce/orgs";
+import { HEALTH_PATH } from "@/lib/callanchor/session";
+import { setClientInternal } from "@/lib/callanchor/store";
 import type { FormState } from "@/components/form-state";
 
 export async function createCustomerAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -34,4 +36,18 @@ export async function deleteCustomerAction(formData: FormData) {
 
   revalidatePath("/customers");
   redirect("/customers");
+}
+
+// Marks a CallAnchor customer internal (our own test or demo account), or live again. The health
+// pages hide internal clients unless "Show internal clients" is ticked. Admins only; every client
+// starts normal (owner, 2026-11-12).
+export async function setCustomerInternalAction(formData: FormData) {
+  const member = await requireMember();
+  if (member.role !== "admin") return;
+  const id = rowId(formData);
+  const [row] = await db()`SELECT callanchor_client_id FROM customers WHERE id = ${id}`;
+  if (!row?.callanchor_client_id) return;
+  await setClientInternal(row.callanchor_client_id, formData.get("internal") === "1", member.fullName || member.username);
+  revalidatePath("/customers", "layout");
+  revalidatePath(HEALTH_PATH, "layout");
 }

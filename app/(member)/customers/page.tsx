@@ -6,6 +6,7 @@ import { cardClass } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { HEALTH_PATH } from "@/lib/callanchor/session";
 import { CreateCustomerForm } from "./CreateCustomerForm";
+import { InternalToggle } from "./InternalToggle";
 
 export const metadata: Metadata = { title: "Customers" };
 
@@ -15,6 +16,7 @@ type CustomerRow = {
   created_at: string;
   product: string | null;
   callanchor_client_id: string | null;
+  internal: boolean;
   org_count: number;
   sandbox_count: number;
   error_count: number;
@@ -22,17 +24,18 @@ type CustomerRow = {
 
 export default async function CustomersPage() {
   // The session check and the data load run together; requireMember redirects before anything renders.
-  const [, customers] = (await Promise.all([
+  const [member, customers] = (await Promise.all([
     requireMember(),
     db()`
-      SELECT c.id, c.name, c.created_at, c.product, c.callanchor_client_id,
+      SELECT c.id, c.name, c.created_at, c.product, c.callanchor_client_id, coalesce(f.internal, false) AS internal,
              count(o.id)::int AS org_count,
              count(o.id) FILTER (WHERE o.is_sandbox)::int AS sandbox_count,
              count(o.id) FILTER (WHERE o.status = 'error')::int AS error_count
       FROM customers c LEFT JOIN salesforce_orgs o ON o.customer_id = c.id
-      GROUP BY c.id ORDER BY lower(c.name)
+      LEFT JOIN ca_client_flags f ON f.client_id = c.callanchor_client_id
+      GROUP BY c.id, f.internal ORDER BY lower(c.name)
     `,
-  ])) as [unknown, CustomerRow[]];
+  ])) as [Awaited<ReturnType<typeof requireMember>>, CustomerRow[]];
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -47,6 +50,7 @@ export default async function CustomersPage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Product</th>
+                <th className="px-4 py-3 font-medium">Internal</th>
                 <th className="px-4 py-3 font-medium">Salesforce orgs</th>
                 <th className="px-4 py-3 font-medium">Created</th>
               </tr>
@@ -54,7 +58,7 @@ export default async function CustomersPage() {
             <tbody className="divide-y divide-slate-100">
               {customers.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
                     No customers yet. Create one to start connecting their Salesforce orgs.
                   </td>
                 </tr>
@@ -72,6 +76,15 @@ export default async function CustomersPage() {
                       <Link href={`${HEALTH_PATH}/${c.callanchor_client_id}`} className="block text-xs text-indigo-700 hover:underline">
                         Client health
                       </Link>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {!c.callanchor_client_id ? (
+                      <span className="text-slate-400">—</span>
+                    ) : member.role === "admin" ? (
+                      <InternalToggle id={c.id} internal={c.internal} />
+                    ) : (
+                      <span className={c.internal ? "font-medium text-slate-700" : "text-slate-500"}>{c.internal ? "Internal" : "Normal"}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
@@ -97,7 +110,8 @@ export default async function CustomersPage() {
           <h2 className="text-base font-semibold text-slate-900">New customer</h2>
           <p className="mt-1 text-sm text-slate-500">
             Then connect their Salesforce orgs from the customer page. Every client CallAnchor lists is added here on its own, with product
-            CallAnchor.
+            CallAnchor. Every client starts normal; admins tick Internal for our own test and demo accounts, which client health then hides
+            unless asked.
           </p>
           <CreateCustomerForm />
         </div>

@@ -69,8 +69,9 @@ Rules already established in this repo.
   (owner, 2026-11-12).
 - A client can be marked internal (our own test and demo accounts). Its calls, licenses and seats
   are hidden from every cross-client health view until "Show internal clients" is ticked in the left
-  menu; a client or phone opened by id still shows (owner, 2026-11-12). Flags live in
-  `ca_client_flags`; marking is admin-only, like Settings.
+  menu; a client or phone opened by id still shows (owner, 2026-11-12). Every client starts normal;
+  only admins mark one internal, with the Internal tick box on Customers or the button on the
+  client's health page (owner, 2026-11-12). Flags live in `ca_client_flags`.
 - Every client CallAnchor lists is a customer with product CallAnchor, linked by
   `customers.callanchor_client_id`, added on its own after each snapshot pull (`ca_map_customers()`)
   (owner, 2026-11-12).
@@ -192,6 +193,14 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-12: Couldn't see Settings, though an admin. The Admin Console login (`admins`) and the
+  dashboard member account are separate; the member account's role was still Agent, and the
+  dashboard checks only that. Fix: set the member's role to Admin in the Admin Console.
+- 2026-11-12: Asked where to set a client as internal, then said there was no such option and to
+  put it in Customers; only admins may mark, and every client starts normal. No member had the
+  Admin role, so the client page button was hidden. Added an admin-only Internal tick box per
+  CallAnchor customer (others see Internal or Normal) and made the rule the owner's. Pushed on
+  "push".
 - 2026-11-12: Said "run audit". Ran `npm run audit:notes` (7 open notes, all the owner's) and built
   all seven; the new rules are in the SOP. Note 1's message was in the phone's mark-unavailable log
   metadata, never joined to the call.
