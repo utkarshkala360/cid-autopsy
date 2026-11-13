@@ -6,9 +6,25 @@ import { planPullAction, pullBatchAction } from "./actions";
 
 const BASE = "/dashboard/call_anchor/health";
 const BATCH = 4;
-// A scope pulled this recently isn't pulled again on the next page (owner, 2026-11-13: moving from
-// Overview to Licenses shouldn't start over). CallAnchor's own milestones still decide what's due.
-const COOLDOWN_MS = 2 * 60 * 1000;
+// A scope pulled this recently isn't planned again on the next page (owner, 2026-11-13: changing
+// pages shouldn't start a pull each time). Kept in session storage, so a reload remembers it too;
+// the server separately skips streams pulled in the last 5 minutes.
+const COOLDOWN_MS = 5 * 60 * 1000;
+const DONE_KEY = "ca-health-pulled";
+const readDone = (): Record<string, number> => {
+  try {
+    return JSON.parse(sessionStorage.getItem(DONE_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+};
+const markDone = (scope: string) => {
+  try {
+    sessionStorage.setItem(DONE_KEY, JSON.stringify({ ...readDone(), [scope]: Date.now() }));
+  } catch {
+    // Private mode or storage off: the in-memory record still covers this tab.
+  }
+};
 
 type Failure = { label: string; error: string };
 type PullState =
@@ -81,6 +97,7 @@ async function runJob(clientId: string | null, verifyHref: string, refresh: () =
       refresh();
     }
     job.doneAt.set(scope, Date.now());
+    markDone(scope);
   } catch {
     job.set({ phase: "finished", total: done, failures: [...failures, { label: "Pull", error: "stopped unexpectedly; reload to try again" }], seconds: 0 });
   } finally {
@@ -102,7 +119,8 @@ export function PullProgress({ verifyHref }: { verifyHref: string }) {
   useEffect(() => {
     // A running job carries on, whatever page it was started from; a fleet pull covers every client.
     if (job.running) return;
-    const recent = (s: string) => Date.now() - (job.doneAt.get(s) ?? 0) < COOLDOWN_MS;
+    const stored = readDone();
+    const recent = (s: string) => Date.now() - Math.max(job.doneAt.get(s) ?? 0, stored[s] ?? 0) < COOLDOWN_MS;
     if (recent(scope) || recent("fleet")) return;
     void runJob(clientId, verifyHref, () => router.refresh()).then(() => setTick((t) => t + 1));
   }, [scope, clientId, verifyHref, router]);

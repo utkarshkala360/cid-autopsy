@@ -29,6 +29,9 @@ export const SYNC = {
   refreshDays: 5,
   refreshEveryMs: DAY,
   snapshotEveryMs: 10 * MINUTE,
+  // Pages pull a stream again only after this, so moving between pages doesn't start a pull each
+  // time (owner, 2026-11-13). Lower bound on top of pullEveryMs.
+  pageEveryMs: 5 * MINUTE,
   // Detailed rows (system logs, CRM callouts, calls) are kept 15 days; snapshots (daily summaries,
   // phone and integration changes, portal events) 30 days (owner, 2026-11-13).
   retainDays: 15,
@@ -817,6 +820,10 @@ export type PullStep = { key: string; label: string };
 const STEP_KEY = /^(snapshots|logs|audit|logs:[\w-]{1,100}|callouts:[\w-]{1,100})$/;
 export const isPullStep = (key: string) => STEP_KEY.test(key);
 
+// A stream a page should pull: never pulled, or last pulled longer ago than pageEveryMs.
+const pageDue = (state: StreamState | undefined, now = Date.now()) =>
+  !state?.refreshedAt || !state.pulledAt || now - state.pulledAt >= Math.max(SYNC.pullEveryMs, SYNC.pageEveryMs);
+
 // The streams due now, for every client or one. Before the client list was ever pulled, that's the
 // only step: the rest can't be planned without it.
 export async function planPull(clientId: string | null): Promise<PullStep[]> {
@@ -825,14 +832,14 @@ export async function planPull(clientId: string | null): Promise<PullStep[]> {
   if (!snapshots?.refreshedAt) return [{ key: "snapshots", label: "Client list" }];
   const steps: PullStep[] = [];
   if (!clientId && Date.now() - snapshots.refreshedAt >= SYNC.snapshotEveryMs) steps.push({ key: "snapshots", label: "Client list" });
-  if (isDue(states.get("logs"), "latest")) steps.push({ key: "logs", label: "System logs" });
-  if (isDue(states.get("audit"), "latest")) steps.push({ key: "audit", label: "Portal events" });
+  if (pageDue(states.get("logs"))) steps.push({ key: "logs", label: "System logs" });
+  if (pageDue(states.get("audit"))) steps.push({ key: "audit", label: "Portal events" });
   const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots WHERE data IS NOT NULL`;
   const names = new Map(rows.map((r) => [r.client_id as string, (r.company_name as string | null) ?? "client"]));
   const clients = clientId ? (names.has(clientId) ? [clientId] : []) : [...names.keys()];
-  for (const c of clients) if (isDue(states.get(`callouts:${c}`), "latest")) steps.push({ key: `callouts:${c}`, label: `CRM syncs · ${names.get(c)}` });
+  for (const c of clients) if (pageDue(states.get(`callouts:${c}`))) steps.push({ key: `callouts:${c}`, label: `CRM syncs · ${names.get(c)}` });
   for (const c of await busyClients()) {
-    if (clients.includes(c) && isDue(states.get(`logs:${c}`), "latest")) steps.push({ key: `logs:${c}`, label: `System logs · ${names.get(c)}` });
+    if (clients.includes(c) && pageDue(states.get(`logs:${c}`))) steps.push({ key: `logs:${c}`, label: `System logs · ${names.get(c)}` });
   }
   return steps;
 }
