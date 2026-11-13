@@ -98,3 +98,41 @@ export const callHref = (basePath: string, callId: string, back?: string, client
   `${scoped(basePath, clientId)}/calls/${encodeURIComponent(callId)}${back ? `?${new URLSearchParams({ back })}` : ""}`;
 export const licenseHref = (basePath: string, licenseId: string, clientId?: string | null) => `${scoped(basePath, clientId)}/licenses/${encodeURIComponent(licenseId)}`;
 export const issueHref = (basePath: string, issueId: string, clientId?: string | null) => `${scoped(basePath, clientId)}/issues/${encodeURIComponent(issueId)}`;
+
+// ---- Colour by severity and CRM status code (owner, 2026-11-13) ----
+// Standard notation: red a problem, amber worth a look, green went well, sky information, grey a plain
+// count. Filter chips are tinted in their colour, and filled with it when picked.
+export type Tone = "red" | "amber" | "green" | "sky" | "slate";
+const TONES: Record<Tone, { chip: string; on: string; badge: string }> = {
+  red: { chip: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100", on: "border-red-600 bg-red-600 text-white", badge: "bg-red-50 text-red-700 ring-red-200" },
+  amber: { chip: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100", on: "border-amber-500 bg-amber-500 text-white", badge: "bg-amber-50 text-amber-800 ring-amber-200" },
+  green: { chip: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100", on: "border-emerald-600 bg-emerald-600 text-white", badge: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  sky: { chip: "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100", on: "border-sky-600 bg-sky-600 text-white", badge: "bg-sky-50 text-sky-800 ring-sky-200" },
+  slate: { chip: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50", on: "border-indigo-600 bg-indigo-600 text-white", badge: "bg-slate-100 text-slate-600 ring-slate-200" },
+};
+
+// A severity, health level or log severity as a tone.
+export function severityTone(value: string | null | undefined): Tone {
+  const v = (value ?? "").toLowerCase();
+  if (["critical", "error", "fatal", "failed"].includes(v)) return "red";
+  if (["warning", "warn"].includes(v)) return "amber";
+  if (["healthy", "ok", "delivered", "calling"].includes(v)) return "green";
+  if (v === "info") return "sky";
+  return "slate";
+}
+
+// A CRM reply's HTTP code: 2xx accepted, 4xx refused (the request or its sign-in), 5xx or no reply the
+// CRM failing.
+export function httpTone(code: number | null): Tone {
+  if (code === null) return "red";
+  if (code >= 200 && code < 300) return "green";
+  if (code >= 500) return "red";
+  if (code === 401 || code === 403) return "red";
+  if (code >= 400) return "amber";
+  return "slate";
+}
+
+export const toneChip = (tone: Tone, on: boolean) => `rounded-full border px-3 py-1 text-xs font-medium transition ${on ? TONES[tone].on : TONES[tone].chip}`;
+export const toneBadge = (tone: Tone) => `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${TONES[tone].badge}`;
+export const toneDot: Record<Tone, string> = { red: "bg-red-500", amber: "bg-amber-500", green: "bg-emerald-500", sky: "bg-sky-500", slate: "bg-slate-300" };
+export const toneText: Record<Tone, string> = { red: "text-red-700", amber: "text-amber-800", green: "text-emerald-700", sky: "text-sky-800", slate: "text-slate-500" };

@@ -14,7 +14,7 @@ import {
   type CalloutFilter,
   type LogFilter,
 } from "@/lib/callanchor/store";
-import { ago, callHref, clientHref, formatTime, int, licenseHref } from "../format";
+import { ago, callHref, clientHref, formatTime, httpTone, int, licenseHref, severityTone, toneBadge } from "../format";
 import { IssuePanel, Json, LoadingNote, Table, rowLinkClass, td } from "../parts";
 import { secondaryButtonClass } from "@/components/ui";
 
@@ -482,7 +482,7 @@ async function SyncItems({ filter, days, page, names, href }: { filter: CalloutF
               </td>
               <td className={td}><FilterLink href={href({ platform: e.platformId, page: null })}>{e.platformId}</FilterLink></td>
               <td className={`${td} tabular-nums`}>
-                <FilterLink href={href({ http: e.httpStatus === null ? "none" : String(e.httpStatus), page: null })}>{e.httpStatus ?? "—"}</FilterLink>
+                <FilterLink href={href({ http: e.httpStatus === null ? "none" : String(e.httpStatus), page: null })}><span className={toneBadge(httpTone(e.httpStatus))}>{e.httpStatus ?? "none"}</span></FilterLink>
               </td>
               <td className={`${td} tabular-nums`}>{e.attempt}</td>
               <td className={`${td} tabular-nums text-xs text-slate-500`}>{e.durationMs === null ? "—" : `${int(e.durationMs)} ms`}</td>
@@ -516,8 +516,8 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
               <td className={`${td} text-xs text-slate-500`}>{formatTime(l.occurredAt)}</td>
               {allClients && <td className={td}><ClientCell id={l.clientId} names={names} /></td>}
               <td className={`${td} text-xs`}><FilterLink href={href({ source: l.source, page: null })}>{l.source}</FilterLink></td>
-              <td className={`${td} ${l.severity === "info" ? "" : "font-medium text-red-700"}`}>
-                <FilterLink href={href({ severity: l.severity, page: null })}>{l.severity}</FilterLink>
+              <td className={td}>
+                <FilterLink href={href({ severity: l.severity, page: null })}><span className={toneBadge(severityTone(l.severity))}>{l.severity}</span></FilterLink>
               </td>
               <td className="min-w-80 max-w-2xl px-3 py-2 align-top text-slate-700">
                 {l.message}

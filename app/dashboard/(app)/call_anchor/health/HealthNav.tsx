@@ -9,9 +9,12 @@ import { Icon, type IconName } from "./ui";
 
 const BASE = "/dashboard/call_anchor/health";
 
-// Overview holds clients, licenses and seats together (owner, 2026-11-13); more tabs come later.
+// Overview (what needs action), Clients and Licenses are tabs, each with its own left menu (owner,
+// 2026-11-13). A client's own pages sit under Clients.
 const VIEWS = [
   { key: "overview", label: "Overview", path: "" },
+  { key: "clients", label: "Clients", path: "/clients" },
+  { key: "licenses", label: "Licenses", path: "/licenses" },
   { key: "settings", label: "Settings", path: "/settings", adminOnly: true },
 ] as const;
 
@@ -84,7 +87,8 @@ export function ClientTabs({ root }: { root: string }) {
   );
 }
 
-// Which view a path belongs to. Client, call, issue and item pages sit under Overview.
+// Which view a path belongs to. A client's pages sit under Clients; fleet call, issue and item pages
+// under Overview.
 function viewOf(pathname: string) {
   for (const v of VIEWS) if (v.path && (pathname === BASE + v.path || pathname.startsWith(`${BASE}${v.path}/`))) return v.key;
   return "overview";

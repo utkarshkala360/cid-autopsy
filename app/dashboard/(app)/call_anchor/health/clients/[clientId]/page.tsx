@@ -9,7 +9,7 @@ import type { CallStage } from "@/lib/callanchor/issues";
 import { PortalError } from "@/lib/callanchor/portal";
 import { HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { setClientInternalAction } from "../../actions";
-import { STATUS_RANK, ago, clientHref, formatTime, int, itemsHref, licenseHref, pct, rateClass } from "../../format";
+import { STATUS_RANK, ago, clientHref, formatTime, httpTone, int, itemsHref, licenseHref, pct, rateClass, severityTone, toneBadge } from "../../format";
 import { Collapsed, rowLinkClass, CoverageNote, DayStrip, Funnel, JourneyRollup, LastComplete, IssueList, ItemLink, issueLinks, LoadingNote, PulsePanel, Section, StatusBadge, SyncTrend, Table, Tile, td } from "../../parts";
 
 export const metadata: Metadata = { title: "Client health" };
@@ -202,7 +202,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
               <tr key={`${r.platform}|${r.status}|${r.http}`}>
                 <td className="px-3 py-2 align-top">
                   <ItemLink href={items(drill)} className={`font-medium ${r.status === "failed" ? "text-red-700" : r.status === "delivered" ? "text-emerald-700" : "text-slate-700"}`}>
-                    {r.http === null ? "No response" : `HTTP ${r.http}`} · {r.status}
+                    <span className={toneBadge(httpTone(r.http))}>{r.http === null ? "No response" : `HTTP ${r.http}`}</span> {r.status}
                   </ItemLink>
                   <p className="text-xs text-slate-500">
                     {r.platform} · {r.eventTypes.join(", ")}
@@ -376,7 +376,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
               <td className={td}>
                 <ItemLink href={items({ kind: "logs", source: s.source, severity: s.severity })}>{s.source}</ItemLink>
               </td>
-              <td className={`${td} ${s.severity === "info" ? "" : "font-medium text-red-700"}`}>{s.severity}</td>
+              <td className={td}><span className={toneBadge(severityTone(s.severity))}>{s.severity}</span></td>
               <td className={`${td} text-right tabular-nums`}>{int(s.count)}</td>
               <td className={`${td} text-xs text-slate-500`}>{formatTime(s.lastAt)}</td>
               <td className="px-3 py-2 align-top text-xs text-slate-500">{s.message}</td>

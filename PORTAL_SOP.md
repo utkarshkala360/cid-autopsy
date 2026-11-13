@@ -86,30 +86,48 @@ Rules already established in this repo.
   (owner, 2026-11-13). `/customers` redirects there. The `customers` table and `ca_map_customers()`
   stay in the schema, unused by pages; the Salesforce connect pages went with Customers (no org was
   connected), and `lib/salesforce/` is kept for when a client page needs it.
-- Health pages share one frame: the site header is frozen at the top; Overview and Settings are a
-  bar frozen under it (more tabs to be chosen later); the left menu lists the open page's sections, and picking one
-  shows that section on its own. There is no whole-page view: a page opens on its first section
-  (owner, 2026-11-13). See `health/HealthNav.tsx`.
+- Health pages share one frame: the site header is frozen at the top; the health tabs (Overview,
+  Clients, Licenses, Settings) are a bar frozen under it; the left menu lists the open page's
+  sections, and picking one shows that section on its own. There is no whole-page view: a page opens
+  on its first section (owner, 2026-11-13). See `health/HealthNav.tsx`. The Overview, Clients and
+  Licenses tabs have a filter menu on the left instead (below).
 - Member and admin pages use the full window width, with no centred max-width column; content and
   tables stretch to the right edge. A page section is never squeezed into a side column (owner,
   2026-11-13).
 - Health pages are hierarchical, client on top (owner, 2026-11-13). Everything about a client lives
   under `/health/clients/<client>/`: its Health page, `licenses` (and `licenses/<license>` for one
   phone), `seats`, `items` (Calls & logs), `calls/<call>` and `issues/<issue>`. The frame says where
-  you are at every level: health tabs (Overview, Settings), a breadcrumb
+  you are at every level: health tabs (a client's pages sit under Clients), a breadcrumb
   that follows the URL (`HealthTrail`), the client's name and its own tabs (Health, Licenses, Seats,
   Calls & logs; `ClientTabs`), then the left menu. Build links with `clientHref`, `licenseHref`,
   `callHref`, `issueHref` and `itemsHref` in `health/format.ts`, passing the client id; flat links
   (`/health/licenses/<id>`, `/health/calls/<id>`, `?client=`) still work by redirecting. Pages shown
   both fleet-wide and per client are views in `health/_views/`.
-- Overview, Clients and Licenses are one page, Overview, at `/health` (owner, 2026-11-13): the hero
-  and strip, Needs action, one Clients table row per client with everything about it (journey,
-  calls, CRM reach, 7-day sync, recordings, open issues, licenses needing action, Purchased, Active,
-  Logged in and Calling with rings, Unused), then Licenses with its Health and Use filters and the
-  device and app breakdowns, Trials, CRM errors and log sources. One store read serves the page
-  (`loadFleetHealth` returns the licenses). `/health/overview`, `/health/licenses` and `/health/seats`
-  redirect there, keeping filters and opening the Licenses section. A link to `#s-…` opens that
-  section in the left menu.
+- Client health is split into tabs, each with a left filter menu (owner, 2026-11-13). The menu has
+  groups of options with counts; an option with nothing behind it is hidden unless picked, and All
+  always shows (`MenuLayout` in `health/FilterMenu.tsx`). Modules for issues are CRM, Device, Portal
+  and Usage (`MODULES` and `issueModule()` in `lib/callanchor/modules.ts`; a new issue kind must be
+  placed there).
+  - Overview (`/health`): the fleet hero, then Needs action with Module (All, CRM, Device, Portal,
+    Usage; `?na=`) as the left menu. CRM adds the failed CRM syncs and Portal the system logs
+    (CallAnchor's own faults on top), both over a time range of 24 hours unless one is picked (3, 7
+    or 15 days; `?range=`, read by `loadFleetActivity`). No Trials section.
+  - Clients (`/health/clients`): one row per client, with Module (Call journey, Licenses, Issues;
+    `?view=`) and Health (`?health=`) as the left menu. Health is judged within the picked module and
+    its counts follow it: Call journey by the issues that break the journey (all but Usage), else
+    healthy with calls and idle without; Licenses by the worst license, else healthy with a phone
+    calling and idle without; Issues by the client's overall level. The row's health badge shows the
+    same.
+  - Licenses (`/health/licenses`): every license, with Module (Health & use, Calls & CRM, Device;
+    `?lm=`), Health (`?status=`) and Use (`?use=`) as the left menu. Device holds model, firmware,
+    app version, Google dialer, recording on and call policy, with the by-model and by-app-version
+    breakdowns. A client's own Licenses tab uses the same panel. `?client=` links open the client's
+    tab; `/seats` opens Licenses with `use=unused`.
+- Severity and CRM status codes are colour-coded everywhere (owner, 2026-11-13): red a problem
+  (critical, error, HTTP 5xx, 401/403, no response), amber worth a look (warning, other 4xx), green
+  went well (healthy, calling, 2xx), sky information, grey a plain count. Filter chips are tinted in
+  their colour and filled when picked; values in tables are badges. Use `severityTone`, `httpTone`,
+  `toneChip` and `toneBadge` in `health/format.ts`.
 - Health pages look like the CallAnchor support portal the owner pointed to (owner, 2026-11-13): a
   dark gradient hero per page with an eyebrow, title, status pill and two key numbers, a strip of
   stat cells (icon, coloured accent, number, one line) attached under it, tabs with icons, white
@@ -142,8 +160,7 @@ Rules already established in this repo.
   step it stopped at and the ids that tie every step to the next (owner, 2026-11-13).
 - Seats are licenses, so they share the Licenses tab (owner, 2026-11-13): each license shows its
   health and its seat state (calling, logged in but not calling, logged out, not assigned) with since
-  when; Health and Use filters; the fleet list without a filter shows licenses needing action or
-  unused; seat use per client below. `/seats` links open Licenses with `use=unused`. Unused seats
+  when; Health and Use filters, with All showing every license. `/seats` links open Licenses with `use=unused`. Unused seats
   still aren't issues (owner, 2026-11-05).
 - Seat counts show as a number with a ring filled by its share (owner, 2026-11-13): Purchased is the
   total; the ring of Active is active ÷ purchased, Logged in is logged in ÷ active, Calling is
@@ -264,6 +281,8 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Tabs split: Overview (Needs action, Module as left menu), Clients (Module and per-module Health as left menu, picks kept in the URL), Licenses (Module, Health and Use as left-menu filters, empty options hidden, All shows every license); client pages sit under the Clients tab and breadcrumb; shared `MenuLayout` | Done, builds; not pushed; not yet viewed signed in | `health/FilterMenu.tsx`, `health/clients/page.tsx`, `health/licenses/page.tsx`, `health/FleetTable.tsx`, `health/HealthNav.tsx` |
+| 2026-11-13 | Overview by module: Trials removed; Needs action split into CRM, Device, Portal and Usage, with CRM errors under CRM and system logs under Portal over a time range (24 hours default, 3, 7, 15 days); Clients table switches between Call journey, Licenses and Issues; Licenses switches between Health & use, Calls & CRM and Device (breakdowns moved into Device); license filters moved inside their section; severity and CRM status codes colour-coded as chips and badges | Done, builds; not pushed; not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `health/_views/licenses.tsx`, `lib/callanchor/modules.ts`, `health/format.ts` |
 | 2026-11-13 | Serve the last computed data at once and recompute in the background (5 s); refresh the page every 5 s while pulling, in place; cache cleared on internal marks and saved Settings | Done, builds; pushed with this turn's commit; not yet viewed signed in | `cached` in `lib/callanchor/health.ts`, `health/Progress.tsx` |
 | 2026-11-13 | Overview, Clients and Licenses merged into one Overview page at `/health`: clients table with seat rings and licenses needing action, Licenses section below with filters; tabs now Overview and Settings; old routes redirect; section links open their section | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `LicensesPanel` in `health/_views/licenses.tsx` |
 | 2026-11-13 | Seats merged into Licenses (seat column, Use filter, seat-use strip and per-client table); rings with formula tooltips for seat counts; batched pulls with a progress bar, percentage, live failure list and a 2-minute cooldown, one job per tab; estimated-percentage loaders; Customers section removed (redirects to Client health; Internal flag stays on the client page); boolean arrays sent as text so the postgres.js driver can save them | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/_views/licenses.tsx`, `health/Progress.tsx`, `health/ui.tsx`, `planPull` in `store.ts` |
@@ -295,6 +314,18 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Asked to split the tabs: Overview is Needs action with its modules as the left menu;
+  Clients a tab with its modules as the left menu and Health counted within the picked module;
+  Licenses a tab with its modules, and Health and Use as proper filters, hiding options with nothing
+  behind them. Built all three; recorded the tab rules in the SOP.
+- 2026-11-13: Asked for the Overview to be thought of by module: Needs action shows issues and errors
+  per module (portal, device, CRM…), Clients shows per-client stats per module (call journey,
+  licenses, issues), Licenses per-license stats per module (device, model…). Also asked to colour-code
+  severity chips and CRM status codes. Built both; added the rules to the SOP.
+- 2026-11-13: On Overview, kept Needs action but asked to remove the platform line and the license
+  filters showing under it, remove Trials, and fold CRM errors and System logs into Needs action as
+  filters with a 24-hour default and a changeable time range. Done; platform faults now head the
+  System logs view.
 - 2026-11-13: Showed two loaders at 0% and asked not to make users wait: refresh every 5 seconds so
   the page is usable while loading, without new data interrupting. Measured the slow read: the query
   runs in 4 ms, but the route from here to Neon Singapore carries ~32 KB/s, so 7 days of calls take

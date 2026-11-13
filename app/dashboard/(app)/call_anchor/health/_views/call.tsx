@@ -4,7 +4,7 @@ import { loadCall, type AnchorResult, type JourneyStep } from "@/lib/callanchor/
 import { crmStatus } from "@/lib/callanchor/labels";
 import type { StoredCall } from "@/lib/callanchor/store";
 import { HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
-import { clientHref, formatTime, int, licenseHref } from "../format";
+import { clientHref, formatTime, httpTone, int, licenseHref, toneBadge } from "../format";
 import { CallJourney, Collapsed, JourneyIds, Json, Section, Table, rowLinkClass, td } from "../parts";
 import { secondaryButtonClass } from "@/components/ui";
 
@@ -237,7 +237,7 @@ function Request({ result, retry }: { result: AnchorResult; retry: string }) {
                   {outcome}
                   {outcome !== a.status && <p className="text-xs font-normal text-slate-400">CallAnchor: {a.status}</p>}
                 </td>
-                <td className={`${td} tabular-nums`}>{a.httpStatus ?? "—"}</td>
+                <td className={`${td} tabular-nums`}><span className={toneBadge(httpTone(a.httpStatus ?? null))}>{a.httpStatus ?? "none"}</span></td>
                 <td className={`${td} text-xs tabular-nums text-slate-500`}>{a.durationMs == null ? "—" : `${int(a.durationMs)} ms`}</td>
                 <td className={`${td} font-mono text-xs`}>{a.externalRecordId ?? "—"}</td>
                 <td className="min-w-96 max-w-2xl px-3 py-2 align-top">

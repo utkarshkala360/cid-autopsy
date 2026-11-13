@@ -41,6 +41,7 @@ import {
   readAudit,
   readCall,
   readCallouts,
+  readClientNames,
   readCalls,
   readCoverage,
   readDaily,
@@ -505,8 +506,6 @@ async function computeFleetHealth(cookie: string, memberId: string, showInternal
     names: Object.fromEntries(names),
     licenseNames: Object.fromEntries(assessments.flatMap((a) => a.licenses.map((h) => [h.license.licenseId, h.license.last4 ?? "????"]))),
     platform,
-    errors: errorGroups(assessments.flatMap((a) => a.callouts), names),
-    sources: summarizeSources(logs),
     // Totals leave out inactive clients, as the table does by default (QA N9).
     totals: {
       clients: working.length,
@@ -529,21 +528,6 @@ async function computeFleetHealth(cookie: string, memberId: string, showInternal
         unassigned: sum((a) => a.seats.unassigned),
       } satisfies Seats,
     },
-    trials: assessments
-      .filter((a) => a.snapshot.status === "trial")
-      .map((a) => ({
-        clientId: a.snapshot.clientId,
-        companyName: a.snapshot.companyName ?? a.snapshot.clientId,
-        daysLeft: a.snapshot.tenant?.trialDaysRemaining ?? null,
-        expired: a.snapshot.tenant?.trialExpired ?? false,
-        recorded: a.snapshot.tenant?.recordedCalls ?? 0,
-        recordingLimit: a.snapshot.tenant?.recordingLimit ?? null,
-        calls7d: a.pulse.days.slice(-7).reduce((total, d) => total + d.calls, 0),
-        seats: a.seats,
-        neverCalled: a.licenses.filter((h) => h.issues.some((i) => i.kind === "license_never_called")).length,
-        integrations: a.snapshot.tenant?.activeIntegrations ?? [],
-      }))
-      .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999)),
     coverage: coverage(cover, allCalls),
     pullErrors: [...new Set(pull.errors)],
     // The merged Client health page lists every license from this same read, so it doesn't assess
@@ -554,6 +538,23 @@ async function computeFleetHealth(cookie: string, memberId: string, showInternal
     loadedAt: new Date(now).toISOString(),
     tookMs: Date.now() - started,
   };
+}
+
+// CRM errors and system log sources for the Overview's Needs action filters, over a window the
+// user picks (24 hours by default; owner, 2026-11-13). Served like the fleet: last result at once.
+export function loadFleetActivity(showInternal: boolean, days: number) {
+  return cached(`activity:${showInternal}:${days}`, async () => {
+    const now = Date.now();
+    const since = now - days * DAY;
+    const [callouts, everyLog, scope, names] = await Promise.all([readCallouts(null, since), readLogs(null, since), internalScope(showInternal), readClientNames()]);
+    const keep = (clientId: string | null) => !clientId || !scope.hidden.has(clientId);
+    const logs = everyLog.filter((l) => keep(l.clientId));
+    return {
+      errors: errorGroups(callouts.filter((e) => keep(e.clientId)), names),
+      sources: summarizeSources(logs),
+      platform: platformIssues(logs, now, days === 1 ? "24 hours" : `${days} days`),
+    };
+  });
 }
 
 // Every system log source in a window, by severity: what CallAnchor logged.

@@ -3,9 +3,10 @@ import { Suspense } from "react";
 import { loadFleetLicenses, type FleetLicense, type Seats } from "@/lib/callanchor/health";
 import { durationText, type SeatState } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
-import { LICENSE_STATUSES, STATUS_RANK, ago, clientHref, formatTime, int, licenseHref, pct, rateClass } from "../format";
+import { LICENSE_STATUSES, STATUS_RANK, ago, clientHref, formatTime, int, licenseHref, pct, rateClass, severityTone, type Tone } from "../format";
 import { StatCell, StatStrip } from "../ui";
-import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, Section, StatusBadge, Table, issueLinks, td } from "../parts";
+import { MenuLayout } from "../FilterMenu";
+import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, StatusBadge, Table, issueLinks, td } from "../parts";
 
 // Licenses and seats in one view (owner, 2026-11-13): a seat is a license, so an unused seat is an
 // unused license. Every license across clients, or one client's (its Licenses tab,
@@ -13,7 +14,16 @@ import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, Section, S
 // list: seat use per client (fleet only), and problems grouped by device model and app version, which
 // shows when an issue follows a phone rather than a client.
 
-const FILTERS = { status: "Health", use: "Use", app: "App version", model: "Device model" } as const;
+const FILTERS = { status: "Health", use: "Use", app: "App version", model: "Device model", lm: "Module" } as const;
+// License stats by module (owner, 2026-11-13): the phone and its client always show, then one
+// module's columns.
+const VIEWS = [
+  { id: "health", label: "Health & use" },
+  { id: "crm", label: "Calls & CRM" },
+  { id: "device", label: "Device" },
+] as const;
+type View = (typeof VIEWS)[number]["id"];
+const yesNo = (v: boolean | null) => (v === null ? "—" : v ? "Yes" : "No");
 type Filters = Partial<Record<keyof typeof FILTERS, string>>;
 type Query = Record<string, string | string[] | undefined>;
 
@@ -30,10 +40,10 @@ const USES = ["unused", "calling", "idle", "loggedOut", "unassigned", "inactive"
 const labelOfUse = (use: string) => (use === "unused" ? "Unused" : (SEAT_STATES[use as SeatState]?.label ?? use));
 const isUse = (h: FleetLicense, use: string) => (use === "unused" ? UNUSED.includes(h.seat.state) : h.seat.state === use);
 
-const needsAction = (h: FleetLicense) => h.status === "critical" || h.status === "warning";
-const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1 text-xs font-medium ${on ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`;
+// Use chips in status colours: calling went well, unused worth a look, inactive a plain count.
+const USE_TONE: Record<(typeof USES)[number], Tone> = { unused: "amber", calling: "green", idle: "amber", loggedOut: "amber", unassigned: "amber", inactive: "slate" };
 
+const needsAction = (h: FleetLicense) => h.status === "critical" || h.status === "warning";
 export type LicenseFilters = Filters;
 type Href = (changes: Record<string, string | null | undefined>) => string;
 
@@ -89,9 +99,9 @@ async function Licenses({ filters, href, clientId }: { filters: Filters; href: H
 
 type SeatClient = { clientId: string; companyName: string; status: string; seats: Seats };
 
-// The license list with its filters and breakdowns, from data already read. On a client's tab it
-// leads with that client's seat strip; on the merged Client health page (`embedded`) the clients table
-// above already carries seat use, so only the filters, the list and the breakdowns show (clientId null).
+// The license list from data already read: the seat strip, then the list by module (Health & use,
+// Calls & CRM, Device) with Module, Health and Use as the left menu (owner, 2026-11-13). The Licenses
+// tab passes every license (clientId null); a client's Licenses tab passes its own.
 export function LicensesPanel({
   licenses,
   clients: allClients,
@@ -115,11 +125,10 @@ export function LicensesPanel({
   const model = (h: FleetLicense) => [h.license.deviceBrand, h.license.deviceModel].filter(Boolean).join(" ") || "Unknown device";
   // Without a filter the fleet view lists what needs a look: a health problem or an unused license.
   // One client's view lists every license.
-  const unfiltered = !filters.status && !filters.use;
+  const view: View = VIEWS.find((v) => v.id === filters.lm)?.id ?? "health";
   const matches = (h: FleetLicense, skip?: keyof Filters) =>
     (skip === "status" || !filters.status || h.status === filters.status) &&
     (skip === "use" || !filters.use || isUse(h, filters.use)) &&
-    (skip === "status" || skip === "use" || !unfiltered || clientId !== null || needsAction(h) || UNUSED.includes(h.seat.state)) &&
     (skip === "app" || !filters.app || (h.license.appVersion ?? "Unknown") === filters.app) &&
     (skip === "model" || !filters.model || model(h) === filters.model);
   const shown = licenses
@@ -180,24 +189,50 @@ export function LicensesPanel({
 
   return (
     <>
-      {clientId && <div className="mt-4">{strip}</div>}
+      <div className="mt-4">{strip}</div>
 
-      <div className="mt-5 space-y-2">
+      <div className="mt-6">
+      <MenuLayout
+        groups={[
+          {
+            title: "Module",
+            items: VIEWS.map((v) => ({ key: v.id, label: v.label, active: v.id === view, always: true, href: href({ lm: v.id === "health" ? null : v.id }) })),
+          },
+          {
+            title: "Health",
+            items: [
+              { key: "all", label: "All", count: licenses.filter((h) => matches(h, "status")).length, active: !filters.status, always: true, href: href({ status: null }) },
+              ...statusCounts.map(({ status, count }) => ({
+                key: status,
+                label: LICENSE_STATUSES[status as keyof typeof LICENSE_STATUSES].label,
+                count,
+                tone: severityTone(status),
+                active: filters.status === status,
+                href: href({ status: filters.status === status ? null : status }),
+              })),
+            ],
+          },
+          {
+            title: "Use",
+            items: [
+              { key: "all", label: "All", count: licenses.filter((h) => matches(h, "use")).length, active: !filters.use, always: true, href: href({ use: null }) },
+              ...useCounts.map(({ use, count }) => ({
+                key: use,
+                label: labelOfUse(use),
+                count,
+                tone: USE_TONE[use],
+                active: filters.use === use,
+                href: href({ use: filters.use === use ? null : use }),
+              })),
+            ],
+          },
+        ]}
+      >
         <div className="flex flex-wrap items-center gap-2">
-          <span className="w-14 text-xs font-semibold uppercase tracking-wider text-slate-500">Health</span>
-          {statusCounts.map(({ status, count }) => (
-            <Link key={status} href={href({ status: filters.status === status ? null : status })} aria-pressed={filters.status === status} className={chip(filters.status === status)}>
-              {LICENSE_STATUSES[status as keyof typeof LICENSE_STATUSES].label} {count}
-            </Link>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-14 text-xs font-semibold uppercase tracking-wider text-slate-500">Use</span>
-          {useCounts.map(({ use, count }) => (
-            <Link key={use} href={href({ use: filters.use === use ? null : use })} aria-pressed={filters.use === use} className={chip(filters.use === use)}>
-              {labelOfUse(use)} {count}
-            </Link>
-          ))}
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+            Licenses: {VIEWS.find((v) => v.id === view)!.label}
+            <span className="ml-2 text-sm font-normal text-slate-500">{shown.length} shown</span>
+          </h2>
           {(["app", "model"] as const).map((key) =>
             filters[key] ? (
               <Link key={key} href={href({ [key]: null })} title="Remove this filter" className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-800 hover:bg-indigo-100">
@@ -206,15 +241,18 @@ export function LicensesPanel({
             ) : null,
           )}
         </div>
-      </div>
-
-      <Section title={`Licenses: ${shown.length}`} note={
-          clientId
-            ? undefined
-            : `${unfiltered ? "Needing action or unused; pick a filter for the rest. " : ""}A seat is unused when it's not assigned, logged out, or logged in with no call for ${durationText(unusedAfterMs)}.${hiddenInternal > 0 ? ` ${hiddenInternal} internal clients hidden.` : ""}`
-        }>
+        <p className="mb-3 mt-1 text-sm text-slate-500">
+          Worst first. A seat is unused when it&apos;s not assigned, logged out, or logged in with no call for {durationText(unusedAfterMs)}.
+          {hiddenInternal > 0 && !clientId ? ` ${hiddenInternal} internal clients hidden.` : ""}
+        </p>
         <Table
-          head={["Phone", ...(clientId ? [] : ["Client"]), "Health", "Seat", "Issues", "Calls 24h", "Reached CRM", "CRM sync, 7 days · last call through", "App", "Device"]}
+          head={[
+            "Phone",
+            ...(clientId ? [] : ["Client"]),
+            ...(view === "health" ? ["Health", "Seat", "Issues"] : []),
+            ...(view === "crm" ? ["Calls 24h", "Reached CRM", "CRM sync, 7 days · last call through"] : []),
+            ...(view === "device" ? ["Device", "Firmware", "App version", "Google dialer", "Recording on", "Call policy"] : []),
+          ]}
           empty={shown.length ? undefined : "No licenses match."}
         >
           {shown.map((h) => {
@@ -229,58 +267,80 @@ export function LicensesPanel({
                     <Link href={`${clientHref(HEALTH_PATH, h.license.clientId)}/licenses`} className={rowLinkClass}>{h.companyName}</Link>
                   </td>
                 )}
-                <td className={td}><StatusBadge status={h.status} /></td>
-                <td className={`${td} text-xs`}>
-                  <span className={seat.className}>{seat.label}</span>
-                  {h.seat.since ? (
-                    <p className="text-slate-500" title={`${formatTime(h.seat.since)} IST`}>since {ago(h.seat.since, now)}</p>
-                  ) : (
-                    h.seat.state !== "calling" && h.seat.state !== "inactive" && <p className="text-slate-400">{h.license.lastLoginLabel ? `last login ${h.license.lastLoginLabel}` : "since before tracking"}</p>
-                  )}
-                </td>
-                <td className="min-w-56 px-3 py-2 align-top text-xs text-slate-700">
-                  {h.issues.length ? (
-                    h.issues.map((i) => (
-                      <p key={i.id} className={i.level === "info" ? "text-slate-500" : ""}>
-                        {i.level === "info" && <span aria-hidden className="text-sky-700">i </span>}
-                        <ItemLink href={issueLinks(HEALTH_PATH, i).primary}>{i.title}</ItemLink>
-                        {i.rolledUp ? " (shared by the client's phones)" : ""}
-                      </p>
-                    ))
-                  ) : (
-                    <span className="text-slate-400">—</span>
-                  )}
-                </td>
-                <td className={`${td} text-right tabular-nums`}>
-                  {int(h.calls24h)}
-                  <p className="text-xs text-slate-400">last {ago(h.lastCallAt, now)}</p>
-                </td>
-                <td className={`${td} text-right tabular-nums ${rateClass(h.pulse.reached.share)}`}>{pct(h.pulse.reached.share)}</td>
-                <td className={td}>
-                  <DayStrip days={h.pulse.days.slice(-7)} size="sm" />
-                  <LastComplete pulse={h.pulse} now={now} />
-                </td>
-                <td className={`${td} text-xs`}>
-                  <Link href={href({ app: h.license.appVersion ?? "Unknown" })} className="hover:text-indigo-700 hover:underline">{h.license.appVersion ?? "—"}</Link>
-                </td>
-                <td className={`${td} text-xs`}>
-                  <Link href={href({ model: model(h) })} className="hover:text-indigo-700 hover:underline">{model(h)}</Link>
-                </td>
+                {view === "health" && (
+                  <>
+                    <td className={td}><StatusBadge status={h.status} /></td>
+                    <td className={`${td} text-xs`}>
+                      <span className={seat.className}>{seat.label}</span>
+                      {h.seat.since ? (
+                        <p className="text-slate-500" title={`${formatTime(h.seat.since)} IST`}>since {ago(h.seat.since, now)}</p>
+                      ) : (
+                        h.seat.state !== "calling" && h.seat.state !== "inactive" && <p className="text-slate-400">{h.license.lastLoginLabel ? `last login ${h.license.lastLoginLabel}` : "since before tracking"}</p>
+                      )}
+                    </td>
+                    <td className="min-w-56 px-3 py-2 align-top text-xs text-slate-700">
+                      {h.issues.length ? (
+                        h.issues.map((i) => (
+                          <p key={i.id} className={i.level === "info" ? "text-slate-500" : ""}>
+                            {i.level === "info" && <span aria-hidden className="text-sky-700">i </span>}
+                            <ItemLink href={issueLinks(HEALTH_PATH, i).primary}>{i.title}</ItemLink>
+                            {i.rolledUp ? " (shared by the client's phones)" : ""}
+                          </p>
+                        ))
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                  </>
+                )}
+                {view === "crm" && (
+                  <>
+                    <td className={`${td} text-right tabular-nums`}>
+                      {int(h.calls24h)}
+                      <p className="text-xs text-slate-400">last {ago(h.lastCallAt, now)}</p>
+                    </td>
+                    <td className={`${td} text-right tabular-nums ${rateClass(h.pulse.reached.share)}`}>{pct(h.pulse.reached.share)}</td>
+                    <td className={td}>
+                      <DayStrip days={h.pulse.days.slice(-7)} size="sm" />
+                      <LastComplete pulse={h.pulse} now={now} />
+                    </td>
+                  </>
+                )}
+                {view === "device" && (
+                  <>
+                    <td className={`${td} text-xs`}>
+                      <Link href={href({ model: model(h) })} className="hover:text-indigo-700 hover:underline">{model(h)}</Link>
+                    </td>
+                    <td className={`${td} text-xs text-slate-600`}>{h.license.firmware ?? "—"}</td>
+                    <td className={`${td} text-xs`}>
+                      <Link href={href({ app: h.license.appVersion ?? "Unknown" })} className="hover:text-indigo-700 hover:underline">{h.license.appVersion ?? "—"}</Link>
+                    </td>
+                    <td className={`${td} text-xs`}>{yesNo(h.license.googleDialer)}</td>
+                    <td className={`${td} text-xs ${h.license.recordingEnabled === false ? "font-medium text-red-700" : ""}`}>{yesNo(h.license.recordingEnabled)}</td>
+                    <td className={`${td} text-xs text-slate-600`}>{h.license.callPolicy ?? "—"}</td>
+                  </>
+                )}
               </tr>
             );
           })}
         </Table>
-      </Section>
-
-      <GroupPanel title="By device model" rows={group(model)} href={(value) => href({ model: value })} />
-      <GroupPanel title="By app version" rows={group((h) => h.license.appVersion ?? "Unknown")} href={(value) => href({ app: value })} />
+        {view === "device" && (
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <GroupPanel title="By device model" rows={group(model)} href={(value) => href({ model: value })} />
+            <GroupPanel title="By app version" rows={group((h) => h.license.appVersion ?? "Unknown")} href={(value) => href({ app: value })} />
+          </div>
+        )}
+      </MenuLayout>
+      </div>
     </>
   );
 }
 
 function GroupPanel({ title, rows, href }: { title: string; rows: [string, { total: number; problems: number }][]; href: (value: string) => string }) {
   return (
-    <Section title={title} note="Licenses needing action / logged-in licenses">
+    <div>
+      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+      <p className="mb-2 text-sm text-slate-500">Licenses needing action / logged-in licenses</p>
       {rows.length === 0 ? (
         <p className="text-sm text-slate-500">No problems.</p>
       ) : (
@@ -293,6 +353,6 @@ function GroupPanel({ title, rows, href }: { title: string; rows: [string, { tot
           ))}
         </ul>
       )}
-    </Section>
+    </div>
   );
 }

@@ -2,6 +2,7 @@ const BASE = "/dashboard/call_anchor/health";
 
 const FLEET_LABELS: Record<string, string> = {
   overview: "Overview",
+  clients: "Clients",
   licenses: "Licenses",
   seats: "Seats",
   settings: "Settings",
@@ -23,7 +24,7 @@ export function trailFor(pathname: string, back: string | null, clients: Record<
 
   if (segs[0] === "clients" && segs[1]) {
     const root = `${BASE}/clients/${encodeURIComponent(segs[1])}`;
-    crumbs.push({ label: "Overview", href: BASE }, { label: clients[segs[1]] ?? "Client", href: root });
+    crumbs.push({ label: "Clients", href: `${BASE}/clients` }, { label: clients[segs[1]] ?? "Client", href: root });
     const [, , view, id] = segs;
     if (view === "licenses") {
       crumbs.push({ label: "Licenses", href: `${root}/licenses` });

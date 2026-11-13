@@ -1,5 +1,6 @@
 import "server-only";
 import { isAuthFailure } from "@/lib/callanchor/labels";
+export { MODULES, issueModule, type IssueModule } from "@/lib/callanchor/modules";
 import type {
   DayRow,
   LastSync,
@@ -992,14 +993,14 @@ export const PLATFORM_FAULTS = [
   },
 ] as const;
 
-export function platformIssues(logs: StoredLog[], now: number): Issue[] {
+export function platformIssues(logs: StoredLog[], now: number, windowText = "24 hours"): Issue[] {
   return PLATFORM_FAULTS.flatMap((fault) => {
     const hits = logs.filter(fault.match);
     if (hits.length === 0) return [];
     return [
       issue({ scope: "fleet", clientId: null, licenseId: null }, fault.kind, "info", fault.title, now, {
         impact: 0,
-        impactText: `${n(hits.length, "log line")} in 24 hours`,
+        impactText: `${n(hits.length, "log line")} in ${windowText}`,
         times: hits.map((l) => l.occurredAt),
         evidence: [`${n(new Set(hits.map((l) => l.clientId)).size, "client")} affected. A CallAnchor fault, not the client's`],
         drill: { ...fault.drill },
