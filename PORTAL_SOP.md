@@ -118,10 +118,13 @@ Rules already established in this repo.
     healthy with calls and idle without; Licenses by the worst license, else healthy with a phone
     calling and idle without; Issues by the client's overall level. The row's health badge shows the
     same.
-  - Licenses (`/health/licenses`): every license, with Module (Health & use, Calls & CRM, Device;
-    `?lm=`), Health (`?status=`) and Use (`?use=`) as the left menu. Device holds model, firmware,
-    app version, Google dialer, recording on and call policy, with the by-model and by-app-version
-    breakdowns. A client's own Licenses tab uses the same panel. `?client=` links open the client's
+  - Licenses (`/health/licenses`): every license, with Module (`?lm=`) on top of the left menu and
+    only that module's own filters under it; changing module clears them (owner, 2026-11-13).
+    Health & use: Health (`?status=`) and Use (`?use=`). Calls & CRM: calls in 24h (`?calls=`),
+    reached CRM against the synced-day rate (`?reach=`), CRM sync over 7 days (`?sync=`). Device:
+    model, app version, recording on and Google dialer (`?model=`, `?app=`, `?rec=`, `?dialer=`),
+    listing only values that exist; its columns add firmware and call policy, with the by-model and
+    by-app-version breakdowns. A client's own Licenses tab uses the same panel. `?client=` links open the client's
     tab; `/seats` opens Licenses with `use=unused`.
 - Severity and CRM status codes are colour-coded everywhere (owner, 2026-11-13): red a problem
   (critical, error, HTTP 5xx, 401/403, no response), amber worth a look (warning, other 4xx), green
@@ -162,10 +165,16 @@ Rules already established in this repo.
   health and its seat state (calling, logged in but not calling, logged out, not assigned) with since
   when; Health and Use filters, with All showing every license. `/seats` links open Licenses with `use=unused`. Unused seats
   still aren't issues (owner, 2026-11-05).
-- Seat counts show as a number with a ring filled by its share (owner, 2026-11-13): Purchased is the
-  total; the ring of Active is active ÷ purchased, Logged in is logged in ÷ active, Calling is
-  calling ÷ active. Columns keep their plain names; the formula is in the heading's info tooltip
-  (`Ring` in `health/ui.tsx`, `Head` info in `Table`).
+- Counts with a whole show as a ring in a fixed colour per metric, with a light track of the same
+  hue, the number under it and "of Y" under that; the share shows on hover (owner, 2026-11-13). No
+  Purchased column: it is the "of" under Active. Clients table: Active (blue, of purchased), Logged
+  in (lime, of active), Calling (violet, of active), Unused (amber, of active); Reached CRM (teal, of
+  due) and Recordings synced (blue, of verified); Licenses tab: Reached CRM (teal). `MetricRing` in
+  `health/ui.tsx`.
+- CRM sync, 7 days is one cell for clients and licenses: the day strip, synced days out of days with
+  due calls, and the last call through (`SyncCell` in `health/parts.tsx`). It shows in the Clients
+  table's Call journey and Licenses modules and in the Licenses tab's Calls & CRM (owner,
+  2026-11-13).
 - Pages never pull CallAnchor while rendering; they show the store at once, and the browser pulls
   what's due in batches of 4 with a progress bar, a percentage and what's being pulled, then
   refreshes (owner, 2026-11-13). One pull job runs per tab across page changes; a page pulls a
@@ -285,6 +294,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Licenses tab: each module has its own left-menu filters (Calls & CRM: calls, reach, sync days; Device: model, app, recording, dialer); module change clears filters. Rings in a fixed colour per metric with "of Y" under the number and the share on hover; Purchased column removed; Reached CRM and Recordings as rings; CRM sync, 7 days as one shared cell in both Clients modules and the Licenses tab | Done, pushed 2026-11-13; not yet viewed signed in | `health/_views/licenses.tsx`, `MetricRing` in `health/ui.tsx`, `SyncCell` in `health/parts.tsx`, `health/FleetTable.tsx` |
 | 2026-11-13 | Tabs split: Overview (Needs action, Module as left menu), Clients (Module and per-module Health as left menu, picks kept in the URL), Licenses (Module, Health and Use as left-menu filters, empty options hidden, All shows every license); client pages sit under the Clients tab and breadcrumb; shared `MenuLayout` | Done, pushed 2026-11-13 (`1ab99cb`); not yet viewed signed in | `health/FilterMenu.tsx`, `health/clients/page.tsx`, `health/licenses/page.tsx`, `health/FleetTable.tsx`, `health/HealthNav.tsx` |
 | 2026-11-13 | Overview by module: Trials removed; Needs action split into CRM, Device, Portal and Usage, with CRM errors under CRM and system logs under Portal over a time range (24 hours default, 3, 7, 15 days); Clients table switches between Call journey, Licenses and Issues; Licenses switches between Health & use, Calls & CRM and Device (breakdowns moved into Device); license filters moved inside their section; severity and CRM status codes colour-coded as chips and badges | Done, pushed 2026-11-13 (`1ab99cb`); not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `health/_views/licenses.tsx`, `lib/callanchor/modules.ts`, `health/format.ts` |
 | 2026-11-13 | Serve the last computed data at once and recompute in the background (5 s); refresh the page every 5 s while pulling, in place; cache cleared on internal marks and saved Settings | Done, builds; pushed with this turn's commit; not yet viewed signed in | `cached` in `lib/callanchor/health.ts`, `health/Progress.tsx` |
@@ -318,6 +328,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Pointed out Health and Use belong to the first Licenses module only; Calls & CRM and
+  Device need their own filters. Asked for rings in fixed colours with the share on hover, "X of Y"
+  under the number instead of a Purchased column, and CRM sync, 7 days for both clients and
+  licenses. Built all of it; recorded the rules.
 - 2026-11-13: Reported the new Clients tab failing to load in production. The page read its module
   list from the browser-only Clients table file; moved it to `health/format.ts` and added the rule.
 - 2026-11-13: Asked to split the tabs: Overview is Needs action with its modules as the left menu;

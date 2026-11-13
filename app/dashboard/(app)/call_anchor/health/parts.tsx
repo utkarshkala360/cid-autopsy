@@ -755,3 +755,23 @@ export function LastComplete({ pulse, now }: { pulse: Pulse; now: number }) {
     </p>
   );
 }
+
+// CRM sync over the last 7 days, the same cell for a client and a license (owner, 2026-11-13): the day
+// strip, synced days out of days with due calls, and when a call last went all the way through.
+// `last` comes formatted from the server so the browser doesn't re-render it in another zone.
+export function SyncCell({ days, week, last }: { days: Day[]; week: { synced: number; active: number }; last: { href: string; label: string; title?: string } | null }) {
+  return (
+    <div>
+      <DayStrip days={days.slice(-7)} size="md" />
+      <p className="mt-1 text-xs text-slate-500">{week.active ? `${week.synced} of ${week.active} days` : "no due calls"}</p>
+      <p className="text-xs text-slate-500">
+        last through{" "}
+        {last ? (
+          <Link href={last.href} className={rowLinkClass} title={last.title}>{last.label}</Link>
+        ) : (
+          <span className="font-medium text-amber-800">never</span>
+        )}
+      </p>
+    </div>
+  );
+}

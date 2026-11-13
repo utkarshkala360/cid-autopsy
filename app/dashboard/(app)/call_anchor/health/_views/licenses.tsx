@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { loadFleetLicenses, type FleetLicense, type Seats } from "@/lib/callanchor/health";
-import { durationText, type SeatState } from "@/lib/callanchor/issues";
+import { RULES, durationText, type SeatState } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
-import { LICENSE_STATUSES, STATUS_RANK, ago, clientHref, formatTime, int, licenseHref, pct, rateClass, severityTone, type Tone } from "../format";
-import { StatCell, StatStrip } from "../ui";
+import { LICENSE_STATUSES, STATUS_RANK, ago, callHref, clientHref, formatTime, int, licenseHref, severityTone, type Tone } from "../format";
+import { MetricRing, StatCell, StatStrip } from "../ui";
 import { MenuLayout } from "../FilterMenu";
-import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, StatusBadge, Table, issueLinks, td } from "../parts";
+import { SyncCell, rowLinkClass, ItemLink, LoadingNote, StatusBadge, Table, issueLinks, td } from "../parts";
 
 // Licenses and seats in one view (owner, 2026-11-13): a seat is a license, so an unused seat is an
 // unused license. Every license across clients, or one client's (its Licenses tab,
@@ -14,7 +14,22 @@ import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, StatusBadg
 // list: seat use per client (fleet only), and problems grouped by device model and app version, which
 // shows when an issue follows a phone rather than a client.
 
-const FILTERS = { status: "Health", use: "Use", app: "App version", model: "Device model", lm: "Module" } as const;
+// Each module has its own filters (owner, 2026-11-13): Health & use filters by health and seat use,
+// Calls & CRM by calls, CRM reach and sync days, Device by model, app, recording and dialer. Only the
+// picked module's filters apply, and changing module clears them.
+const FILTERS = {
+  lm: "Module",
+  status: "Health",
+  use: "Use",
+  calls: "Calls, 24h",
+  reach: "Reached CRM, 24h",
+  sync: "CRM sync, 7 days",
+  model: "Device model",
+  app: "App version",
+  rec: "Recording on",
+  dialer: "Google dialer",
+} as const;
+const FILTER_KEYS = (Object.keys(FILTERS) as (keyof typeof FILTERS)[]).filter((k) => k !== "lm");
 // License stats by module (owner, 2026-11-13): the phone and its client always show, then one
 // module's columns.
 const VIEWS = [
@@ -25,6 +40,8 @@ const VIEWS = [
 type View = (typeof VIEWS)[number]["id"];
 const yesNo = (v: boolean | null) => (v === null ? "—" : v ? "Yes" : "No");
 type Filters = Partial<Record<keyof typeof FILTERS, string>>;
+type Option = { value: string; label: string; tone?: Tone; test: (h: FleetLicense) => boolean };
+type FilterDef = { key: Exclude<keyof Filters, "lm">; options: Option[] };
 type Query = Record<string, string | string[] | undefined>;
 
 const SEAT_STATES: Record<SeatState, { label: string; className: string }> = {
@@ -123,14 +140,60 @@ export function LicensesPanel({
 }) {
   const clients = allClients.filter((c) => c.status !== "inactive");
   const model = (h: FleetLicense) => [h.license.deviceBrand, h.license.deviceModel].filter(Boolean).join(" ") || "Unknown device";
-  // Without a filter the fleet view lists what needs a look: a health problem or an unused license.
-  // One client's view lists every license.
   const view: View = VIEWS.find((v) => v.id === filters.lm)?.id ?? "health";
+  const rate = RULES.syncedDayRate;
+  const bool = (value: (h: FleetLicense) => boolean | null, yes: string, no: string, noTone: Tone): Option[] => [
+    { value: "yes", label: yes, tone: "green", test: (h) => value(h) === true },
+    { value: "no", label: no, tone: noTone, test: (h) => value(h) === false },
+    { value: "unknown", label: "Not reported", tone: "slate", test: (h) => value(h) === null },
+  ];
+  const listOf = (value: (h: FleetLicense) => string): Option[] =>
+    [...new Set(licenses.map(value))]
+      .sort((x, y) => licenses.filter((h) => value(h) === y).length - licenses.filter((h) => value(h) === x).length)
+      .map((v) => ({ value: v, label: v, test: (h: FleetLicense) => value(h) === v }));
+  const DEFS: Record<View, FilterDef[]> = {
+    health: [
+      { key: "status", options: Object.keys(LICENSE_STATUSES).map((st) => ({ value: st, label: LICENSE_STATUSES[st as keyof typeof LICENSE_STATUSES].label, tone: severityTone(st), test: (h: FleetLicense) => h.status === st })) },
+      { key: "use", options: USES.map((u) => ({ value: u, label: labelOfUse(u), tone: USE_TONE[u], test: (h: FleetLicense) => isUse(h, u) })) },
+    ],
+    crm: [
+      {
+        key: "calls",
+        options: [
+          { value: "yes", label: "Made calls", tone: "green", test: (h) => h.calls24h > 0 },
+          { value: "none", label: "No calls", tone: "slate", test: (h) => h.calls24h === 0 },
+        ],
+      },
+      {
+        key: "reach",
+        options: [
+          { value: "good", label: `${rate}% or more`, tone: "green", test: (h) => h.pulse.reached.due > 0 && (h.pulse.reached.share ?? 0) >= rate },
+          { value: "low", label: `Below ${rate}%`, tone: "amber", test: (h) => h.pulse.reached.due > 0 && (h.pulse.reached.share ?? 0) > 0 && (h.pulse.reached.share ?? 0) < rate },
+          { value: "none", label: "None reached", tone: "red", test: (h) => h.pulse.reached.due > 0 && h.pulse.reached.delivered === 0 },
+          { value: "nodue", label: "Nothing due", tone: "slate", test: (h) => h.pulse.reached.due === 0 },
+        ],
+      },
+      {
+        key: "sync",
+        options: [
+          { value: "every", label: "Synced every day", tone: "green", test: (h) => h.pulse.week.active > 0 && h.pulse.week.synced === h.pulse.week.active },
+          { value: "missed", label: "Missed some days", tone: "amber", test: (h) => h.pulse.week.synced > 0 && h.pulse.week.synced < h.pulse.week.active },
+          { value: "none", label: "No day synced", tone: "red", test: (h) => h.pulse.week.active > 0 && h.pulse.week.synced === 0 },
+          { value: "nodue", label: "Nothing due", tone: "slate", test: (h) => h.pulse.week.active === 0 },
+        ],
+      },
+    ],
+    device: [
+      { key: "model", options: listOf(model) },
+      { key: "app", options: listOf((h) => h.license.appVersion ?? "Unknown") },
+      { key: "rec", options: bool((h) => h.license.recordingEnabled, "On", "Off", "red") },
+      { key: "dialer", options: bool((h) => h.license.googleDialer, "Yes", "No", "slate") },
+    ],
+  };
+  const defs = DEFS[view];
+  // A license matches the picked module's filters; `skip` leaves one out, to count its options.
   const matches = (h: FleetLicense, skip?: keyof Filters) =>
-    (skip === "status" || !filters.status || h.status === filters.status) &&
-    (skip === "use" || !filters.use || isUse(h, filters.use)) &&
-    (skip === "app" || !filters.app || (h.license.appVersion ?? "Unknown") === filters.app) &&
-    (skip === "model" || !filters.model || model(h) === filters.model);
+    defs.every((d) => d.key === skip || !filters[d.key] || (d.options.find((o) => o.value === filters[d.key])?.test(h) ?? false));
   const shown = licenses
     .filter((h) => matches(h))
     .sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || Number(UNUSED.includes(b.seat.state)) - Number(UNUSED.includes(a.seat.state)) || b.issues.length - a.issues.length);
@@ -154,8 +217,7 @@ export function LicensesPanel({
     }
     return [...groups.entries()].filter(([, g]) => g.problems > 0).sort((a, b) => b[1].problems / b[1].total - a[1].problems / a[1].total || b[1].problems - a[1].problems);
   };
-  const statusCounts = Object.keys(LICENSE_STATUSES).map((s) => ({ status: s, count: licenses.filter((h) => matches(h, "status") && h.status === s).length }));
-  const useCounts = USES.map((u) => ({ use: u, count: licenses.filter((h) => matches(h, "use") && isUse(h, u)).length }));
+  const clearAll = Object.fromEntries(FILTER_KEYS.map((k) => [k, null]));
 
   const strip = (
     <StatStrip>
@@ -165,16 +227,16 @@ export function LicensesPanel({
         label="Licenses"
         value={int(sum("active"))}
         sub={`active${purchased !== null ? ` of ${int(purchased)} purchased` : ""}${notSetUp ? ` · ${int(notSetUp)} not set up` : ""}`}
-        href={href({ status: null, use: null })}
+        href={href({ ...clearAll, lm: null, status: null, use: null })}
       />
-      <StatCell icon="alert" tone={needs ? "red" : "green"} label="Need action" value={int(needs)} sub="critical or warning health" href={href({ status: "critical", use: null })} />
+      <StatCell icon="alert" tone={needs ? "red" : "green"} label="Need action" value={int(needs)} sub="critical or warning health" href={href({ ...clearAll, lm: null, status: "critical", use: null })} />
       <StatCell
         icon="seats"
         tone="green"
         label="In use"
         value={`${int(sum("calling"))} / ${int(sum("active"))}`}
         sub={`calling · ${int(sum("loggedIn"))} logged in`}
-        href={href({ use: "calling", status: null })}
+        href={href({ ...clearAll, lm: null, use: "calling", status: null })}
       />
       <StatCell
         icon="activity"
@@ -182,7 +244,7 @@ export function LicensesPanel({
         label="Unused"
         value={int(unused)}
         sub={`${int(sum("idle"))} not calling · ${int(sum("loggedOut"))} logged out · ${int(sum("unassigned"))} not assigned`}
-        href={href({ use: "unused", status: null })}
+        href={href({ ...clearAll, lm: null, use: "unused", status: null })}
       />
     </StatStrip>
   );
@@ -196,36 +258,25 @@ export function LicensesPanel({
         groups={[
           {
             title: "Module",
-            items: VIEWS.map((v) => ({ key: v.id, label: v.label, active: v.id === view, always: true, href: href({ lm: v.id === "health" ? null : v.id }) })),
+            items: VIEWS.map((v) => ({ key: v.id, label: v.label, active: v.id === view, always: true, href: href({ ...clearAll, lm: v.id === "health" ? null : v.id }) })),
           },
-          {
-            title: "Health",
-            items: [
-              { key: "all", label: "All", count: licenses.filter((h) => matches(h, "status")).length, active: !filters.status, always: true, href: href({ status: null }) },
-              ...statusCounts.map(({ status, count }) => ({
-                key: status,
-                label: LICENSE_STATUSES[status as keyof typeof LICENSE_STATUSES].label,
-                count,
-                tone: severityTone(status),
-                active: filters.status === status,
-                href: href({ status: filters.status === status ? null : status }),
-              })),
-            ],
-          },
-          {
-            title: "Use",
-            items: [
-              { key: "all", label: "All", count: licenses.filter((h) => matches(h, "use")).length, active: !filters.use, always: true, href: href({ use: null }) },
-              ...useCounts.map(({ use, count }) => ({
-                key: use,
-                label: labelOfUse(use),
-                count,
-                tone: USE_TONE[use],
-                active: filters.use === use,
-                href: href({ use: filters.use === use ? null : use }),
-              })),
-            ],
-          },
+          ...defs.map((d) => {
+            const pool = licenses.filter((h) => matches(h, d.key));
+            return {
+              title: FILTERS[d.key],
+              items: [
+                { key: "all", label: "All", count: pool.length, active: !filters[d.key], always: true, href: href({ [d.key]: null }) },
+                ...d.options.map((o) => ({
+                  key: o.value,
+                  label: o.label,
+                  count: pool.filter(o.test).length,
+                  tone: o.tone,
+                  active: filters[d.key] === o.value,
+                  href: href({ [d.key]: filters[d.key] === o.value ? null : o.value }),
+                })),
+              ],
+            };
+          }),
         ]}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -233,13 +284,6 @@ export function LicensesPanel({
             Licenses: {VIEWS.find((v) => v.id === view)!.label}
             <span className="ml-2 text-sm font-normal text-slate-500">{shown.length} shown</span>
           </h2>
-          {(["app", "model"] as const).map((key) =>
-            filters[key] ? (
-              <Link key={key} href={href({ [key]: null })} title="Remove this filter" className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-800 hover:bg-indigo-100">
-                <span className="font-medium">{FILTERS[key]}:</span> {filters[key]} <span aria-hidden>✕</span>
-              </Link>
-            ) : null,
-          )}
         </div>
         <p className="mb-3 mt-1 text-sm text-slate-500">
           Worst first. A seat is unused when it&apos;s not assigned, logged out, or logged in with no call for {durationText(unusedAfterMs)}.
@@ -250,7 +294,7 @@ export function LicensesPanel({
             "Phone",
             ...(clientId ? [] : ["Client"]),
             ...(view === "health" ? ["Health", "Seat", "Issues"] : []),
-            ...(view === "crm" ? ["Calls 24h", "Reached CRM", "CRM sync, 7 days · last call through"] : []),
+            ...(view === "crm" ? ["Calls 24h", "Reached CRM, 24h", "CRM sync, 7 days"] : []),
             ...(view === "device" ? ["Device", "Firmware", "App version", "Google dialer", "Recording on", "Call policy"] : []),
           ]}
           empty={shown.length ? undefined : "No licenses match."}
@@ -299,10 +343,15 @@ export function LicensesPanel({
                       {int(h.calls24h)}
                       <p className="text-xs text-slate-400">last {ago(h.lastCallAt, now)}</p>
                     </td>
-                    <td className={`${td} text-right tabular-nums ${rateClass(h.pulse.reached.share)}`}>{pct(h.pulse.reached.share)}</td>
+                    <td className={`${td} text-center`}>
+                      {h.pulse.reached.due ? <MetricRing value={h.pulse.reached.delivered} of={h.pulse.reached.due} hue="teal" ofLabel="due calls reached the CRM" /> : <span className="text-slate-400" title="No call was due at a CRM">—</span>}
+                    </td>
                     <td className={td}>
-                      <DayStrip days={h.pulse.days.slice(-7)} size="sm" />
-                      <LastComplete pulse={h.pulse} now={now} />
+                      <SyncCell
+                        days={h.pulse.days}
+                        week={h.pulse.week}
+                        last={h.pulse.lastComplete ? { href: callHref(HEALTH_PATH, h.pulse.lastComplete.callId, undefined, h.license.clientId), label: ago(h.pulse.lastComplete.at, now), title: `${formatTime(h.pulse.lastComplete.at)} IST` } : null}
+                      />
                     </td>
                   </>
                 )}

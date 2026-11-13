@@ -178,3 +178,33 @@ export function Ring({ value, of, tone, title }: { value: number | null; of?: nu
     </span>
   );
 }
+
+// A count as a ring in its own colour, the number under it and "of Y" under that; the share shows on
+// hover (owner, 2026-11-13). Each metric keeps one hue, so columns read apart at a glance.
+const RING_HUES = {
+  blue: { bar: "stroke-blue-500", track: "stroke-blue-100" },
+  lime: { bar: "stroke-lime-500", track: "stroke-lime-100" },
+  violet: { bar: "stroke-violet-500", track: "stroke-violet-100" },
+  teal: { bar: "stroke-teal-500", track: "stroke-teal-100" },
+  amber: { bar: "stroke-amber-500", track: "stroke-amber-100" },
+} as const;
+export type RingHue = keyof typeof RING_HUES;
+
+export function MetricRing({ value, of, hue, ofLabel, href }: { value: number | null; of: number | null; hue: RingHue; ofLabel?: string; href?: string }) {
+  const share = value !== null && of ? Math.max(0, Math.min(1, value / of)) : null;
+  const r = 8;
+  const c = 2 * Math.PI * r;
+  const title = value === null ? "Not known" : share !== null ? `${value.toLocaleString("en-IN")} of ${of!.toLocaleString("en-IN")}${ofLabel ? ` ${ofLabel}` : ""}: ${Math.round(share * 100)}%` : "Nothing to compare with";
+  const body = (
+    <span className="inline-flex flex-col items-center leading-tight" title={title}>
+      <svg viewBox="0 0 24 24" className="h-7 w-7 -rotate-90" aria-hidden>
+        <circle cx="12" cy="12" r={r} fill="none" strokeWidth="5" className={RING_HUES[hue].track} />
+        {share !== null && share > 0 && <circle cx="12" cy="12" r={r} fill="none" strokeWidth="5" className={RING_HUES[hue].bar} strokeDasharray={`${share * c} ${c}`} />}
+      </svg>
+      <span className="mt-1 text-sm font-medium tabular-nums text-slate-900">{value === null ? "—" : value.toLocaleString("en-IN")}</span>
+      <span className="text-[11px] tabular-nums text-slate-400">{of === null ? " " : `of ${of.toLocaleString("en-IN")}`}</span>
+      <span className="sr-only">{title}</span>
+    </span>
+  );
+  return href ? <Link href={href} className="inline-block rounded hover:bg-slate-50">{body}</Link> : body;
+}

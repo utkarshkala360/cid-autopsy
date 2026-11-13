@@ -5,10 +5,10 @@ import Link from "next/link";
 import type { FleetRow, Level } from "@/lib/callanchor/health";
 import { MODULES, type IssueModule } from "@/lib/callanchor/modules";
 import { cardClass, inputClass } from "@/components/ui";
-import { CLIENT_VIEWS, DAY_STATES, LEVELS, callHref, clientHref, int, itemsHref, pct, rateClass, severityTone } from "./format";
+import { CLIENT_VIEWS, LEVELS, callHref, clientHref, int, itemsHref, severityTone } from "./format";
 import type { ClientView } from "./format";
-import { ItemLink, JourneyDots, rowLinkClass } from "./parts";
-import { Ring } from "./ui";
+import { ItemLink, JourneyDots, SyncCell, rowLinkClass } from "./parts";
+import { MetricRing } from "./ui";
 import { MenuLayout } from "./FilterMenu";
 
 // Times are formatted on the server, so the client doesn't re-render them in another zone. Issues
@@ -126,19 +126,19 @@ export function FleetTable({
                 <>
                   <th className="px-3 py-2 font-medium" title="Phone → app → recording uploaded → sent to the CRM → accepted. A red dot is a step where calls stopped in the last 24 hours, with how many">Journey 24h</th>
                   <th className="px-3 py-2 text-right font-medium" title="Calls in the last 24 hours, from the stored logs and callouts">Calls 24h</th>
-                  <th className="px-3 py-2 text-right font-medium" title="Calls due at the CRM in the last 24 hours that it accepted (2xx). Calls with nowhere to go aren't due">Reached CRM</th>
+                  <th className="px-3 py-2 text-center font-medium" title="Calls due at the CRM in the last 24 hours that it accepted (2xx), of all due; hover a ring for the share. Calls with nowhere to go aren't due">Reached CRM</th>
                   <th className="px-3 py-2 font-medium" title="The last 7 days (a day is synced when 80% of its due calls reached the CRM), and when a call last went all the way from the phone to the CRM">CRM sync, 7 days</th>
-                  <th className="px-3 py-2 text-right font-medium" title="Recordings synced to the CRM / verified, last 24 hours. Open drops are kept for 15 days until fixed">Recordings</th>
+                  <th className="px-3 py-2 text-center font-medium" title="Recordings synced to the CRM, of those verified, last 24 hours; hover for the share. Open drops are kept for 15 days until fixed">Recordings synced</th>
                 </>
               )}
               {view === "licenses" && (
                 <>
                   <th className="whitespace-nowrap px-3 py-2 font-medium" title="Licenses with critical or warning health, of all the client's licenses">Licenses needing action</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">{info("Purchased", "Purchased: total seats the client bought")}</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">{info("Active", "Ring = active ÷ purchased")}</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">{info("Logged in", "Ring = logged in ÷ active")}</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">{info("Calling", "Ring = calling ÷ active (a call within the unused threshold in Settings)")}</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">{info("Unused", "Unused = not assigned + logged out + logged in but not calling")}</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center font-medium">{info("Active", "Active licenses, of those purchased. Hover a ring for the share")}</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center font-medium">{info("Logged in", "Logged in, of the active licenses")}</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center font-medium">{info("Calling", "Calling, of the active licenses (a call within the unused threshold in Settings)")}</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center font-medium">{info("Unused", "Not assigned + logged out + logged in but not calling, of the active licenses")}</th>
+                  <th className="px-3 py-2 font-medium" title="The last 7 days (a day is synced when 80% of its due calls reached the CRM), and when a call last went all the way from the phone to the CRM">CRM sync, 7 days</th>
                 </>
               )}
               {view === "issues" && (
@@ -182,38 +182,22 @@ export function FleetTable({
                         <ItemLink href={calls("all")}>{int(r.calls24h)}</ItemLink>
                         <p className="text-xs text-slate-400">{r.lastActivityLabel}</p>
                       </td>
-                      <td className={`${td} text-right tabular-nums ${rateClass(r.reachedShare)}`}>
-                        {r.due ? <ItemLink href={calls("notReached")}>{pct(r.reachedShare)}</ItemLink> : <span className="text-slate-400" title="No call was due at a CRM">—</span>}
-                        {r.due > 0 && <p className="text-xs font-normal text-slate-400">{int(r.reached)} of {int(r.due)}</p>}
+                      <td className={`${td} text-center`}>
+                        {r.due ? (
+                          <MetricRing value={r.reached} of={r.due} hue="teal" ofLabel="due calls reached the CRM" href={calls("notReached")} />
+                        ) : (
+                          <span className="text-slate-400" title="No call was due at a CRM">—</span>
+                        )}
                       </td>
                       <td className={td}>
-                        <ol className="flex gap-0.5" aria-label="CRM sync by day, oldest first">
-                          {r.days.map((d) => (
-                            <li
-                              key={d.day}
-                              title={`${d.day}: ${DAY_STATES[d.state].label}${d.due ? `, ${d.delivered} of ${d.due} due reached the CRM` : ""}`}
-                              className={`flex h-4 w-4 items-center justify-center rounded-sm text-[9px] font-bold ${DAY_STATES[d.state].className}`}
-                            >
-                              <span aria-hidden>{DAY_STATES[d.state].icon}</span>
-                            </li>
-                          ))}
-                        </ol>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {r.week.active ? `${r.week.synced} of ${r.week.active} days` : "no due calls"}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          last through{" "}
-                          {r.lastComplete ? (
-                            <Link href={callHref(basePath, r.lastComplete.callId, undefined, r.clientId)} className={rowLinkClass}>{r.lastCompleteLabel}</Link>
-                          ) : (
-                            <span className="font-medium text-amber-800">never</span>
-                          )}
-                        </p>
+                        <SyncCell
+                          days={r.days}
+                          week={r.week}
+                          last={r.lastComplete ? { href: callHref(basePath, r.lastComplete.callId, undefined, r.clientId), label: r.lastCompleteLabel ?? "" } : null}
+                        />
                       </td>
-                      <td className={`${td} text-right tabular-nums`}>
-                        <ItemLink href={calls("synced")}>{int(r.recordingsSynced)}</ItemLink>
-                        <span className="text-slate-400"> / </span>
-                        <ItemLink href={calls("verified")}>{int(r.recordingsVerified)}</ItemLink>
+                      <td className={`${td} text-center`}>
+                        <MetricRing value={r.recordingsSynced} of={r.recordingsVerified} hue="blue" ofLabel="verified recordings synced" href={calls("synced")} />
                         {r.openDrops > 0 && (
                           <p className="text-xs font-medium text-amber-800">
                             <ItemLink href={calls("openDrop", 15)}>{int(r.openDrops)} open</ItemLink>
@@ -237,18 +221,24 @@ export function FleetTable({
                           <span className="text-slate-400">of {r.licenses.total}</span>
                         </Link>
                       </td>
-                      <td className={`${td} text-right font-medium tabular-nums text-slate-900`}>{int(r.seats.purchased)}</td>
-                      <td className={td}><Ring value={r.seats.active} of={r.seats.purchased} /></td>
-                      <td className={td}><Ring value={r.seats.loggedIn} of={r.seats.active} /></td>
-                      <td className={td}><Ring value={r.seats.calling} of={r.seats.active} /></td>
-                      <td className={`${td} text-right tabular-nums`}>
-                        {r.seats.idle + r.seats.loggedOut + r.seats.unassigned > 0 ? (
-                          <Link href={`${clientHref(basePath, r.clientId)}/licenses?use=unused`} className="font-medium text-amber-800 hover:underline">
-                            {int(r.seats.idle + r.seats.loggedOut + r.seats.unassigned)}
-                          </Link>
-                        ) : (
-                          <span className="text-slate-400">0</span>
-                        )}
+                      <td className={`${td} text-center`}><MetricRing value={r.seats.active} of={r.seats.purchased} hue="blue" ofLabel="purchased are active" /></td>
+                      <td className={`${td} text-center`}><MetricRing value={r.seats.loggedIn} of={r.seats.active} hue="lime" ofLabel="active are logged in" /></td>
+                      <td className={`${td} text-center`}><MetricRing value={r.seats.calling} of={r.seats.active} hue="violet" ofLabel="active are calling" /></td>
+                      <td className={`${td} text-center`}>
+                        <MetricRing
+                          value={r.seats.idle + r.seats.loggedOut + r.seats.unassigned}
+                          of={r.seats.active}
+                          hue="amber"
+                          ofLabel="active are unused"
+                          href={r.seats.idle + r.seats.loggedOut + r.seats.unassigned > 0 ? `${clientHref(basePath, r.clientId)}/licenses?use=unused` : undefined}
+                        />
+                      </td>
+                      <td className={td}>
+                        <SyncCell
+                          days={r.days}
+                          week={r.week}
+                          last={r.lastComplete ? { href: callHref(basePath, r.lastComplete.callId, undefined, r.clientId), label: r.lastCompleteLabel ?? "" } : null}
+                        />
                       </td>
                     </>
                   )}
