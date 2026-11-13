@@ -1,19 +1,19 @@
 // Applies db/schema.sql. Runs before `next build`, so every Vercel deploy is migrated.
 import { readFile } from "node:fs/promises";
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 
 const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 
 if (!url) {
   if (process.env.VERCEL) {
-    console.error("[migrate] DATABASE_URL is not set on Vercel. Add a Neon database to the project.");
+    console.error("[migrate] DATABASE_URL is not set on Vercel. Add a database to the project.");
     process.exit(1);
   }
   console.warn("[migrate] DATABASE_URL not set; skipping migrations.");
   process.exit(0);
 }
 
-const sql = neon(url);
+const sql = connect(url);
 const schema = await readFile(new URL("../db/schema.sql", import.meta.url), "utf8");
 const statements = schema
   .split(/;\s*$/m)

@@ -4,6 +4,7 @@ const FLEET_LABELS: Record<string, string> = {
   overview: "Overview",
   clients: "Clients",
   licenses: "Licenses",
+  devices: "Devices",
   seats: "Seats",
   settings: "Settings",
   find: "Find by ID",
@@ -28,20 +29,21 @@ export function trailFor(pathname: string, back: string | null, clients: Record<
     const [, , view, id] = segs;
     if (view === "licenses") {
       crumbs.push({ label: "Licenses", href: `${root}/licenses` });
-      if (id) crumbs.push({ label: `Phone …${phones[id] ?? "????"}` });
+      if (id) crumbs.push({ label: `Phone ${phones[id] ?? id}` });
     } else if (view === "seats") crumbs.push({ label: "Seats" });
+    else if (view === "devices") crumbs.push({ label: "Devices" });
     else if (view === "items") crumbs.push({ label: "Calls & logs" });
     else if (view === "calls") {
       crumbs.push({ label: "Calls & logs", href: backTo ?? `${root}/items?kind=calls&stage=all&window=1` });
-      if (id) crumbs.push({ label: `Call …${id.slice(-8)}` });
+      if (id) crumbs.push({ label: `Call ${id}` });
     } else if (view === "issues") {
-      crumbs.push({ label: "Issues", href: `${root}#s-issues` });
+      crumbs.push({ label: "Issues", href: `${root}/issues` });
       if (id) crumbs.push({ label: "Issue" });
-    } else crumbs.push({ label: "Health" });
+    } else crumbs.push({ label: "Overview" });
   } else {
     const [view, id] = segs;
     crumbs.push({ label: FLEET_LABELS[view ?? ""] ?? "Overview", href: view && id ? `${BASE}/${view === "calls" ? "items?kind=calls&stage=all&window=1" : view}` : undefined });
-    if (id) crumbs.push({ label: view === "calls" ? `Call …${id.slice(-8)}` : view === "issues" ? "Issue" : id });
+    if (id) crumbs.push({ label: view === "calls" ? `Call ${id}` : view === "issues" ? "Issue" : id });
   }
   const last = crumbs.length - 1;
   crumbs[last] = { label: crumbs[last].label };

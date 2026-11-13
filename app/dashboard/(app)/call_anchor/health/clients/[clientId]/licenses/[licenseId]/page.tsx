@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { phoneText } from "@/lib/callanchor/labels";
 import { notFound, redirect } from "next/navigation";
 import { loadLicense } from "@/lib/callanchor/health";
-import type { CallStage } from "@/lib/callanchor/issues";
+import { RULES, type CallStage } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireCallAnchorSession, storedCookie } from "@/lib/callanchor/session";
 import { ago, formatHour, formatTime, int, itemsHref, licenseHref } from "../../../../format";
 import { Funnel, IssueList, JourneyRollup, ItemLink, Json, PulsePanel, Section, StatusBadge, Table, Tile, td } from "../../../../parts";
@@ -33,7 +34,7 @@ export default async function LicensePage({ params }: PageProps<"/dashboard/call
     <div>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-slate-900">
-          Phone <span className="font-mono">…{l.last4}</span>
+          Phone <span className="font-mono">{phoneText(l)}</span>
         </h1>
         {health && <StatusBadge status={health.status} />}
         <span className="text-sm text-slate-500">
@@ -43,8 +44,16 @@ export default async function LicensePage({ params }: PageProps<"/dashboard/call
       </div>
       {health?.learning && (
         <p className="mt-1 text-sm text-slate-500">
-          Learning: rules that compare against this phone&apos;s usual calls need about 7 days of stored history
-          {health.baselineSince ? `, counted from ${formatTime(health.baselineSince)} IST (the first linked call, or the last agent change)` : " first"}.
+          {health.newAgent ? "This phone got a new agent" : "We started tracking this phone"}
+          {health.baselineSince ? ` on ${formatTime(health.baselineSince)} IST` : ""}. Once {health.newAgent ? "they have" : "it has"} a full day of calls we can warn you
+          if {health.newAgent ? "they stop" : "it stops"} making calls
+          {health.baselineSince ? ` (from ${formatTime(new Date(Date.parse(health.baselineSince) + RULES.baselineWindows[0] * 86_400_000).toISOString())} IST)` : ""}. Everything else is checked as normal.
+        </p>
+      )}
+      {health && !health.learning && health.windowDays !== null && health.windowDays < RULES.baselineDays && (
+        <p className="mt-1 text-sm text-slate-500">
+          Its usual calls a day come from its last {health.windowDays === 1 ? "day" : `${health.windowDays} days`}, as that&apos;s all we have so far
+          {health.baselineSince ? `; from ${formatTime(new Date(Date.parse(health.baselineSince) + RULES.baselineWindows.find((d) => d > health.windowDays!)! * 86_400_000).toISOString())} IST it uses ${RULES.baselineWindows.find((d) => d > health.windowDays!)} days` : ""}.
         </p>
       )}
 
@@ -63,7 +72,14 @@ export default async function LicensePage({ params }: PageProps<"/dashboard/call
         <IssueList issues={health?.issues ?? []} basePath={HEALTH_PATH} now={now} empty="Nothing needs attention for this phone." />
       </Section>
 
-      <Section title="Last 24 hours" note="Calls per hour, against this phone's average for that hour over the previous 7 days.">
+      <Section
+        title="Last 24 hours"
+        note={
+          data.priorDays > 0
+            ? `Calls per hour, against this phone's average for that hour over the ${data.priorDays === 1 ? "day" : `${data.priorDays} days`} before.`
+            : "Calls per hour. No earlier full day yet to compare with."
+        }
+      >
         <details className="mb-3">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">Step-by-step counts</summary>
           <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr]">

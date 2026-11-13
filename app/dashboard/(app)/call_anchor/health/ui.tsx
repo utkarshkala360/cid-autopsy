@@ -16,6 +16,7 @@ const ICONS = {
   building: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01M10 21v-3h4v3" /></>,
   back: <path d="M19 12H5m6-6-6 6 6 6" />,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>,
+  device: <><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18h2" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
   route: <><circle cx="6" cy="19" r="3" /><circle cx="18" cy="5" r="3" /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /></>,
 };
@@ -187,8 +188,21 @@ const RING_HUES = {
   violet: { bar: "stroke-violet-500", track: "stroke-violet-100" },
   teal: { bar: "stroke-teal-500", track: "stroke-teal-100" },
   amber: { bar: "stroke-amber-500", track: "stroke-amber-100" },
+  green: { bar: "stroke-emerald-500", track: "stroke-emerald-100" },
+  red: { bar: "stroke-red-500", track: "stroke-red-100" },
+  slate: { bar: "stroke-slate-400", track: "stroke-slate-100" },
 } as const;
 export type RingHue = keyof typeof RING_HUES;
+
+// Rings are coloured as a warning signal, not one colour per metric (owner, 2026-11-13): green fine,
+// amber worth a look, red a problem, grey when there's nothing to judge. `good` says which way is
+// better: "high" for active, logged in, calling and reached; "low" for unused.
+export function signalHue(value: number | null, of: number | null, good: "high" | "low", lines: { ok: number; bad: number } = { ok: 80, bad: 50 }): RingHue {
+  if (value === null || !of) return "slate";
+  const pct = (value / of) * 100;
+  const better = good === "high" ? pct : 100 - pct;
+  return better >= lines.ok ? "green" : better >= lines.bad ? "amber" : "red";
+}
 
 export function MetricRing({ value, of, hue, ofLabel, href }: { value: number | null; of: number | null; hue: RingHue; ofLabel?: string; href?: string }) {
   const share = value !== null && of ? Math.max(0, Math.min(1, value / of)) : null;
@@ -207,4 +221,28 @@ export function MetricRing({ value, of, hue, ofLabel, href }: { value: number | 
     </span>
   );
   return href ? <Link href={href} className="inline-block rounded hover:bg-slate-50">{body}</Link> : body;
+}
+
+// A share as a ring with the percentage inside it, the count and its label under it (owner,
+// 2026-11-13: seats out of purchased). Each metric keeps its hue, as MetricRing.
+export function PctRing({ value, of, hue, label, href, title }: { value: number; of: number | null; hue: RingHue; label: string; href?: string; title?: string }) {
+  const share = of ? Math.max(0, Math.min(1, value / of)) : null;
+  const r = 9;
+  const c = 2 * Math.PI * r;
+  // The share shows on hover only, so the ring stays small (owner, 2026-11-13).
+  const pct = share === null ? "" : ` (${Math.round(share * 100)}%)`;
+  const body = (
+    <span className="inline-flex flex-col items-center leading-tight" title={title ? `${title}${pct}` : `${value} of ${of ?? "—"} ${label.toLowerCase()}${pct}`}>
+      <svg viewBox="0 0 24 24" className="h-6 w-6 -rotate-90" aria-hidden>
+        <circle cx="12" cy="12" r={r} fill="none" strokeWidth="4" className={RING_HUES[hue].track} />
+        {share !== null && share > 0 && <circle cx="12" cy="12" r={r} fill="none" strokeWidth="4" className={RING_HUES[hue].bar} strokeDasharray={`${share * c} ${c}`} />}
+      </svg>
+      <span className="mt-0.5 whitespace-nowrap text-sm font-medium tabular-nums text-slate-900">
+        {value.toLocaleString("en-IN")}
+        {of !== null && <span className="text-xs font-normal text-slate-400">/{of.toLocaleString("en-IN")}</span>}
+      </span>
+      <span className="whitespace-nowrap text-[11px] text-slate-500">{label}</span>
+    </span>
+  );
+  return href ? <Link href={href} scroll={false} className="inline-block rounded px-0.5 hover:bg-slate-50">{body}</Link> : body;
 }

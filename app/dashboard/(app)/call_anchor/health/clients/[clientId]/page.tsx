@@ -9,8 +9,8 @@ import type { CallStage } from "@/lib/callanchor/issues";
 import { PortalError } from "@/lib/callanchor/portal";
 import { HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { setClientInternalAction } from "../../actions";
-import { STATUS_RANK, ago, clientHref, formatTime, httpTone, int, itemsHref, licenseHref, pct, rateClass, severityTone, toneBadge } from "../../format";
-import { Collapsed, rowLinkClass, CoverageNote, DayStrip, Funnel, JourneyRollup, LastComplete, IssueList, ItemLink, issueLinks, LoadingNote, PulsePanel, Section, StatusBadge, SyncTrend, Table, Tile, td } from "../../parts";
+import { ago, clientHref, formatTime, httpTone, int, itemsHref, pct, rateClass, severityTone, toneBadge } from "../../format";
+import { Collapsed, CoverageNote, Funnel, JourneyRollup, ItemLink, LoadingNote, PulsePanel, Section, SyncTrend, Table, Tile, td } from "../../parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores this client's last 5 days, and the daily refresh runs after the response.
@@ -23,12 +23,13 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   if (!ID_PATTERN.test(clientId)) notFound();
   const path = clientHref(HEALTH_PATH, clientId);
   const { profile } = await requireCallAnchorSession(path);
-  const days = (WINDOW_DAYS.find((d) => String(d) === query.window) ?? 1) as WindowDays;
+  // The range is shared with the entity tabs (owner, 2026-11-13); older links used ?window=.
+  const days = (WINDOW_DAYS.find((d) => String(d) === (query.range ?? query.window)) ?? 1) as WindowDays;
 
   return (
     <div>
       {profile ? (
-        <Suspense key={days} fallback={<LoadingNote text="Reading this client's calls, recordings and CRM syncs from CallAnchor…" />}>
+        <Suspense fallback={<LoadingNote text="Reading this client's calls, recordings and CRM syncs from CallAnchor…" />}>
           <ClientHealth clientId={clientId} days={days} path={path} />
         </Suspense>
       ) : (
@@ -41,11 +42,12 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
 function WindowPicker({ path, days }: { path: string; days: WindowDays }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-slate-500">Window</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Range</span>
       {WINDOW_DAYS.map((d) => (
         <Link
           key={d}
-          href={`${path}?window=${d}`}
+          scroll={false}
+          href={d === 1 ? path : `${path}?range=${d}`}
           aria-current={d === days ? "page" : undefined}
           className={`rounded-full border px-3 py-1 text-xs font-medium ${
             d === days ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -89,7 +91,6 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
   const pulseHref = (stage: CallStage, window = 1) => itemsHref(HEALTH_PATH, { kind: "calls", stage }, { client: clientId, window });
   const top = data.issues.find((i) => i.level !== "info");
   const problemPhones = licenseTotals.critical + licenseTotals.warning;
-  const licenseLabels = Object.fromEntries(data.licenses.map((h) => [h.license.licenseId, h.license.last4 ?? "????"]));
   const failedReplies = data.replies.filter((r) => r.status === "failed");
 
   return (
@@ -182,14 +183,6 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
       />
 
       <Section
-        title="Issues"
-        note="Open now. CRM rates cover the last 24 hours and say how many days the problem has run; recordings and calls that never reached the CRM stay until they do, back to 15 days. The window picker below doesn't change these."
-      >
-        <IssueList issues={data.issues} basePath={HEALTH_PATH} now={now} licenseLabels={licenseLabels} empty="Nothing needs attention." />
-      </Section>
-
-
-      <Section
         title={`CRM replies, ${data.windowLabel}`}
         note="Grouped by what we know. What the CRM said is each client's own code, so it's shown as samples and never decides severity."
       >
@@ -239,59 +232,6 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
             <ItemLink href={items({ kind: "syncs", status: "failed" })}>All failed syncs</ItemLink> · Suggestions appear here once the owner adds them for a reply pattern.
           </p>
         )}
-      </Section>
-
-      <Section
-        title="Licenses"
-        note={`${tenant.loggedIn} of ${tenant.licenses} logged in. Worst first. Agents' names are read live from CallAnchor, never stored.${data.historyStart ? ` Calls are linked to phones from ${formatTime(data.historyStart)} IST; older calls have no phone.` : ""}`}
-      >
-        <Table head={["Phone", "Agent", "Status", "Calls 24h", "Reached CRM", "CRM sync, 7 days · last call through", "Recorded / uploaded", "App", "Device"]} empty={data.licenses.length ? undefined : "No licenses stored yet."}>
-          {[...data.licenses]
-            .sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || b.calls24h - a.calls24h)
-            .map((h) => {
-              const l = h.license;
-              const reached = h.pulse.reached;
-              return (
-                <tr key={l.licenseId}>
-                  <td className={td}>
-                    <Link href={licenseHref(HEALTH_PATH, l.licenseId, clientId)} className={`${rowLinkClass} font-mono text-xs`}>…{l.last4}</Link>
-                    <p className="text-xs text-slate-400">{l.isLoggedIn ? "logged in" : "logged out"}{l.isActive === false ? " · inactive" : ""}</p>
-                  </td>
-                  <td className={td}>{data.agents[l.licenseId] ?? <span className="text-slate-400">Unassigned</span>}</td>
-                  <td className="px-3 py-2 align-top text-xs">
-                    <StatusBadge status={h.status} />
-                    {h.issues[0] && (
-                      <p className="mt-0.5 text-slate-600">
-                        <ItemLink href={issueLinks(HEALTH_PATH, h.issues[0]).primary}>{h.issues[0].title}</ItemLink>
-                        {h.issues.length > 1 && (
-                          <>
-                            {" "}
-                            <Link href={licenseHref(HEALTH_PATH, l.licenseId, clientId)} className={rowLinkClass}>+{h.issues.length - 1} more</Link>
-                          </>
-                        )}
-                      </p>
-                    )}
-                  </td>
-                  <td className={`${td} text-right tabular-nums`}>
-                    {int(h.calls24h)}
-                    <p className="text-xs text-slate-400">{h.learning ? "learning" : h.perDay === null ? "" : `usual ${Math.round(h.perDay)}/day`}</p>
-                    <p className="text-xs text-slate-400">last {ago(h.lastCallAt, now)}</p>
-                  </td>
-                  <td className={`${td} text-right tabular-nums ${rateClass(reached.share)}`}>
-                    {pct(reached.share)}
-                    {reached.due > 0 && <p className="text-xs font-normal text-slate-400">{int(reached.delivered)} of {int(reached.due)}</p>}
-                  </td>
-                  <td className={td}>
-                    <DayStrip days={h.pulse.days.slice(-7)} size="sm" />
-                    <LastComplete pulse={h.pulse} now={now} />
-                  </td>
-                  <td className={`${td} text-right tabular-nums`}>{int(h.recorded24h)} / {int(h.uploaded24h)}</td>
-                  <td className={`${td} text-xs text-slate-500`}>{l.appVersion ?? "—"}</td>
-                  <td className={`${td} text-xs text-slate-500`}>{[l.deviceBrand, l.deviceModel].filter(Boolean).join(" ") || "—"}</td>
-                </tr>
-              );
-            })}
-        </Table>
       </Section>
 
       <Section title="CRM syncs over time" note="Every attempt, split by HTTP class.">

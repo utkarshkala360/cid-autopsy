@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { phoneText } from "@/lib/callanchor/labels";
 import { cache, Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, WINDOW_DAYS, type WindowDays } from "@/lib/callanchor/health";
@@ -168,7 +169,7 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
   const clientName = client ? (names.get(client) ?? client) : null;
   // How a chip names a filter: a phone by its last four digits, never its raw id (QA U7).
   const chipValue = (key: string, value: string) =>
-    key === "auth" || key === "problems" ? "yes" : key === "license" ? `…${phone?.last4 ?? "????"}` : key === "licenses" ? `${phones.length} phones` : value;
+    key === "auth" || key === "problems" ? "yes" : key === "license" ? phoneText(phone) : key === "licenses" ? `${phones.length} phones` : value;
   const title =
     kind === "calls"
       ? "Calls"
@@ -458,7 +459,7 @@ function CallCell({ callId, clientId, requestId, back }: { callId: string | null
   return (
     <div className="flex flex-col items-start gap-1">
       <Link href={call} className={`${rowLinkClass} font-mono text-xs`} title="Open this call's journey">
-        …{callId.slice(-8)}
+        {callId}
       </Link>
       {requestId && (
         <Link href={`${call}#request-${requestId}`} className={secondaryButtonClass}>
@@ -592,7 +593,7 @@ async function CallItems({ client, license, licenses, showInternal, days, stage,
               {!client && <td className={td}><ClientCell id={c.clientId} names={names} /></td>}
               <td className={`${td} font-mono text-xs`}>
                 {c.licenseId ? (
-                  <Link href={licenseHref(HEALTH_PATH, c.licenseId, c.clientId)} className={rowLinkClass}>…{c.last4 ?? "????"}</Link>
+                  <Link href={licenseHref(HEALTH_PATH, c.licenseId, c.clientId)} className={rowLinkClass}>{c.phone ?? "Unknown phone"}</Link>
                 ) : (
                   <span className="text-slate-400">—</span>
                 )}

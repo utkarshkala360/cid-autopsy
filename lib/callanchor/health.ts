@@ -1,5 +1,5 @@
 import "server-only";
-import { httpClass } from "@/lib/callanchor/labels";
+import { httpClass, phoneText } from "@/lib/callanchor/labels";
 import {
   applySettings,
   byIssue,
@@ -21,6 +21,8 @@ import {
   pulse,
   lastCompleteOf,
   journeySummary,
+  addToJourney,
+  emptyJourney,
   JOURNEY_STEPS,
   journeyStop,
   isComplete,
@@ -30,9 +32,12 @@ import {
   stageTitle,
   type CallStage,
   type ClientContext,
+  type DayState,
   type Issue,
   type LicenseHealth,
+  type LicenseStatus,
   type Pulse,
+  type Seat,
 } from "@/lib/callanchor/issues";
 import { getJson, PortalError } from "@/lib/callanchor/portal";
 import {
@@ -429,6 +434,16 @@ export function clearHealthCache() {
   memo.clear();
 }
 
+// After a pull saved new data: pages still get the last result at once, but every key recomputes on
+// its next read, and the fleet assessment they're built from is recomputed first rather than served
+// stale (it would otherwise take two reads for new data, such as a phone's number, to show).
+export function refreshHealthCache() {
+  for (const [key, entry] of memo) {
+    if (key.startsWith("assess:")) memo.delete(key);
+    else entry.at = 0;
+  }
+}
+
 export function loadFleetHealth(cookie: string, memberId: string, showInternal = false) {
   return cached(`fleet:${memberId}:${showInternal}`, () => computeFleetHealth(cookie, memberId, showInternal));
 }
@@ -504,7 +519,7 @@ async function computeFleetHealth(cookie: string, memberId: string, showInternal
     needsAction,
     lastVisit,
     names: Object.fromEntries(names),
-    licenseNames: Object.fromEntries(assessments.flatMap((a) => a.licenses.map((h) => [h.license.licenseId, h.license.last4 ?? "????"]))),
+    licenseNames: Object.fromEntries(assessments.flatMap((a) => a.licenses.map((h) => [h.license.licenseId, phoneText(h.license)]))),
     platform,
     // Totals leave out inactive clients, as the table does by default (QA N9).
     totals: {
@@ -778,6 +793,310 @@ async function computeFleetLicenses(showInternal = false) {
   return { licenses, clients, hiddenInternal: everyClient.length - assessments.length, unusedAfterMs: RULES.seatUnusedMs, loadedAt: new Date(now).toISOString() };
 }
 
+// ---- Entity tabs (owner, 2026-11-13) ----
+// Issues, Clients, Licenses and Devices are one view with the entity changing: every row has its
+// health, its call journey and CRM syncs over the picked range, and what needs action. Health and
+// needs action are right now (open issues); the range drives the journey and CRM syncs. A device is a
+// brand + model: CallAnchor gives no device id, so licenses with no model share "Unknown".
+
+export const UNKNOWN_DEVICE = "Unknown";
+export const deviceOf = (l: { deviceBrand: string | null; deviceModel: string | null }) => {
+  const brand = l.deviceBrand?.trim() ?? "";
+  const model = l.deviceModel?.trim() ?? "";
+  if (!model) return UNKNOWN_DEVICE;
+  // Some phones repeat the brand in the model ("samsung SM-A155F").
+  return brand && !model.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${model}` : model;
+};
+
+// One cell of the CRM sync strip: an hour for 24 hours, 6 hours for 3 days, a day for 7 and 15. The
+// range rolls back from now, as the items page's window does, so a cell's count and the calls it
+// opens agree.
+export type StripCell = { start: string; end: string; calls: number; due: number; delivered: number; state: DayState };
+export type RangeStats = {
+  calls: number;
+  journey: JourneySummary;
+  // Due calls in the range that reached the CRM: the one "reached the CRM" (CALL_STAGES.due).
+  reached: { delivered: number; due: number };
+  strip: StripCell[];
+  // Cells at the synced rate, of cells with due calls.
+  synced: number;
+  active: number;
+  lastCallAt: string | null;
+  // Calls in the range that broke on the journey (stopped at upload, sending or the CRM), and how many
+  // of those the numbers show for sure, allowing for chance: the lower end of the 95% range of the
+  // broken share (Wilson), times the calls (owner, 2026-11-13: 1 of 10 and 10 of 100 are both 10%,
+  // but only the second is sure). Rows sort by this within their severity.
+  broke: number;
+  sureLost: number;
+};
+
+// The lower end of the 95% range for `part` of `whole` (Wilson score interval).
+export function sureShare(part: number, whole: number) {
+  if (whole === 0 || part === 0) return 0;
+  const z = 1.96;
+  const p = part / whole;
+  const z2 = z * z;
+  return Math.max(0, (p + z2 / (2 * whole) - z * Math.sqrt((p * (1 - p)) / whole + z2 / (4 * whole * whole))) / (1 + z2 / whole));
+}
+export type LastThrough = { at: string; callId: string; clientId: string } | null;
+export type Needs = { critical: number; warning: number; top: string | null };
+type EntityBase = { level: Level; levelNote: string; needs: Needs; stats: RangeStats; lastThrough: LastThrough };
+export type ClientEntity = EntityBase & { clientId: string; name: string; status: string; internal: boolean; integrations: string[]; seats: Seats; error: string | null };
+export type LicenseEntity = EntityBase & {
+  licenseId: string;
+  last4: string | null;
+  // The full number, or …1234 until it's pulled.
+  phone: string;
+  agentName: string | null;
+  clientId: string;
+  clientName: string;
+  seat: Seat;
+  device: string;
+  appVersion: string | null;
+  firmware: string | null;
+  recordingEnabled: boolean | null;
+  // Too new to judge against its own usual day (gone quiet): when that check starts, and whether a
+  // new agent restarted it. Null once it has a full day of calls.
+  learning: { readyAt: string | null; newAgent: boolean; since: string | null } | null;
+  lastCallAt: string | null;
+};
+export type DeviceEntity = EntityBase & {
+  device: string;
+  licenseIds: string[];
+  clientIds: string[];
+  statuses: Record<LicenseStatus, number>;
+  appVersions: [string, number][];
+  firmware: [string, number][];
+  recordingOff: number;
+};
+export type IssueEntity = { issue: Issue; clientName: string | null; last4: string | null; phone: string | null; agentName: string | null; device: string | null; stats: RangeStats; lastThrough: LastThrough; rolledUp: boolean };
+
+const CELL_MS: Record<WindowDays, number> = { 1: HOUR, 3: 6 * HOUR, 7: DAY, 15: DAY };
+
+type Acc = { calls: number; journey: JourneySummary; due: number; delivered: number; cells: { calls: number; due: number; delivered: number }[]; lastCallAt: string | null };
+const newAcc = (cells: number): Acc => ({ calls: 0, journey: emptyJourney(), due: 0, delivered: 0, cells: Array.from({ length: cells }, () => ({ calls: 0, due: 0, delivered: 0 })), lastCallAt: null });
+
+function finishAcc(acc: Acc, days: WindowDays, now: number): RangeStats {
+  const size = CELL_MS[days];
+  const count = acc.cells.length;
+  const strip = acc.cells.map((c, i): StripCell => {
+    const rate = c.due ? (c.delivered / c.due) * 100 : 0;
+    const state: DayState = c.calls === 0 ? "none" : c.due === 0 ? "quiet" : rate >= RULES.syncedDayRate ? "synced" : c.delivered > 0 ? "partial" : "failed";
+    return { start: new Date(now - (count - i) * size).toISOString(), end: new Date(now - (count - 1 - i) * size).toISOString(), ...c, state };
+  });
+  const broke = acc.journey.stops.upload + acc.journey.stops.sent + acc.journey.stops.crm;
+  return {
+    broke,
+    sureLost: Math.floor(sureShare(broke, acc.journey.calls) * acc.journey.calls),
+    calls: acc.calls,
+    journey: acc.journey,
+    reached: { delivered: acc.delivered, due: acc.due },
+    strip,
+    synced: strip.filter((c) => c.state === "synced").length,
+    active: strip.filter((c) => c.state === "synced" || c.state === "partial" || c.state === "failed").length,
+    lastCallAt: acc.lastCallAt,
+  };
+}
+
+const LEVEL_WORDS: Record<Level, string> = { critical: "Critical", warning: "Warning", healthy: "Healthy", idle: "Idle: no calls", unknown: "Unknown: CallAnchor didn't return its details" };
+const needsOf = (issues: Issue[]): Needs => {
+  const open = issues.filter((i) => i.level !== "info").sort(byIssue);
+  return { critical: open.filter((i) => i.level === "critical").length, warning: open.filter((i) => i.level === "warning").length, top: open[0]?.title ?? null };
+};
+const levelNote = (level: Level, needs: Needs) => (needs.top && (level === "critical" || level === "warning") ? `${LEVEL_WORDS[level]}: ${needs.top}` : LEVEL_WORDS[level]);
+const laterThrough = (a: LastThrough, b: LastThrough) => (!a ? b : !b ? a : b.at > a.at ? b : a);
+const top = (values: (string | null)[]) =>
+  [...values.reduce((m, v) => m.set(v ?? "Not reported", (m.get(v ?? "Not reported") ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1]);
+
+// The fleet's assessment, shared by every range: the issue engine is the slow part.
+const assessFleet = () => cached("assess:fleet", async () => {
+  await loadSettings();
+  const now = Date.now();
+  return { now, assessments: await assess(now, null) };
+});
+
+export function loadEntities(showInternal: boolean, days: WindowDays) {
+  return cached(`entities:${showInternal}:${days}`, () => computeEntities(showInternal, days));
+}
+
+// Computes the ranges not yet in this server's memory, so switching range is instant. Ranges
+// already kept refresh only when a page reads them.
+export function warmEntities(showInternal: boolean) {
+  return Promise.all(WINDOW_DAYS.filter((d) => !memo.has(`entities:${showInternal}:${d}`)).map((d) => loadEntities(showInternal, d))).then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
+async function computeEntities(showInternal: boolean, days: WindowDays) {
+  await loadSettings();
+  const now = Date.now();
+  const [{ assessments: everyClient }, scope, calls, everyLog] = await Promise.all([assessFleet(), internalScope(showInternal), readCalls({}, now - days * DAY), readLogs(null, now - DAY)]);
+  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
+  const ctxOf = new Map(assessments.map((a) => [a.snapshot.clientId, a.ctx]));
+  const licenseList = assessments.flatMap((a) => a.licenses.map((h) => ({ h, a })));
+  const deviceOfLicense = new Map(licenseList.map(({ h }) => [h.license.licenseId, deviceOf(h.license)]));
+
+  // One pass over the range's calls, into the fleet, each client, license and device.
+  const cellCount = (days * DAY) / CELL_MS[days];
+  const fleet = newAcc(cellCount);
+  const byClient = new Map<string, Acc>();
+  const byLicense = new Map<string, Acc>();
+  const byDevice = new Map<string, Acc>();
+  // A client's own devices: its licenses on each model.
+  const byClientDevice = new Map<string, Acc>();
+  const accOf = (map: Map<string, Acc>, key: string) => map.get(key) ?? map.set(key, newAcc(cellCount)).get(key)!;
+  const since = now - days * DAY;
+  for (const c of calls) {
+    const ctx = c.clientId ? ctxOf.get(c.clientId) : undefined;
+    if (!ctx) continue;
+    const at = callTime(c)!;
+    const cell = Math.min(cellCount - 1, Math.max(0, Math.floor((Date.parse(at) - since) / CELL_MS[days])));
+    const due = inStage("due", c, ctx, now);
+    const delivered = due && isDelivered(c);
+    const device = c.licenseId ? deviceOfLicense.get(c.licenseId) : undefined;
+    for (const acc of [
+      fleet,
+      accOf(byClient, c.clientId!),
+      c.licenseId ? accOf(byLicense, c.licenseId) : null,
+      device ? accOf(byDevice, device) : null,
+      device ? accOf(byClientDevice, `${c.clientId}|${device}`) : null,
+    ]) {
+      if (!acc) continue;
+      acc.calls++;
+      addToJourney(acc.journey, c, ctx, now);
+      if (due) acc.due++;
+      if (delivered) acc.delivered++;
+      acc.cells[cell].calls++;
+      if (due) acc.cells[cell].due++;
+      if (delivered) acc.cells[cell].delivered++;
+      if (!acc.lastCallAt || at > acc.lastCallAt) acc.lastCallAt = at;
+    }
+  }
+  const stats = (acc: Acc | undefined) => finishAcc(acc ?? newAcc(cellCount), days, now);
+  const through = (p: Pulse["lastComplete"], clientId: string): LastThrough => (p ? { ...p, clientId } : null);
+
+  const clients = assessments.map(({ snapshot, issues, level, seats, pulse: p }): ClientEntity => {
+    const needs = needsOf(issues);
+    return {
+      clientId: snapshot.clientId,
+      name: snapshot.companyName ?? snapshot.clientId,
+      status: snapshot.status ?? "unknown",
+      internal: scope.internal.has(snapshot.clientId),
+      integrations: snapshot.tenant?.activeIntegrations ?? [],
+      seats,
+      error: snapshot.tenant ? null : "CallAnchor didn't return this client's details",
+      level,
+      levelNote: levelNote(level, needs),
+      needs,
+      stats: stats(byClient.get(snapshot.clientId)),
+      lastThrough: through(p.lastComplete, snapshot.clientId),
+    };
+  });
+
+  const licenses = licenseList.map(({ h, a }): LicenseEntity => {
+    const needs = needsOf(h.issues);
+    return {
+      licenseId: h.license.licenseId,
+      last4: h.license.last4,
+      phone: phoneText(h.license),
+      agentName: h.license.agentName,
+      clientId: a.snapshot.clientId,
+      clientName: a.snapshot.companyName ?? a.snapshot.clientId,
+      seat: h.seat,
+      device: deviceOf(h.license),
+      appVersion: h.license.appVersion,
+      firmware: h.license.firmware,
+      recordingEnabled: h.license.recordingEnabled,
+      // Only a phone with a known start is new; one whose client has no tracked calls isn't.
+      learning: h.learning && h.baselineSince
+        ? {
+            readyAt: h.baselineSince ? new Date(Date.parse(h.baselineSince) + RULES.baselineWindows[0] * DAY).toISOString() : null,
+            newAgent: h.newAgent,
+            since: h.baselineSince,
+          }
+        : null,
+      lastCallAt: h.lastCallAt,
+      level: h.status,
+      levelNote: levelNote(h.status, needs),
+      needs,
+      stats: stats(byLicense.get(h.license.licenseId)),
+      lastThrough: through(h.pulse.lastComplete, a.snapshot.clientId),
+    };
+  });
+
+  const issuesOf = new Map(licenseList.map(({ h }) => [h.license.licenseId, h.issues]));
+  const devicesFrom = (list: LicenseEntity[], acc: (device: string) => Acc | undefined) =>
+    [...Map.groupBy(list, (l) => l.device)].map(([device, group]): DeviceEntity => {
+      const statuses = { critical: 0, warning: 0, healthy: 0, idle: 0 } satisfies Record<LicenseStatus, number>;
+      for (const l of group) statuses[l.level as LicenseStatus]++;
+      // A device's health is its worst license's; the note says how many share it.
+      const level: Level = statuses.critical ? "critical" : statuses.warning ? "warning" : statuses.healthy ? "healthy" : "idle";
+      const needs = needsOf(group.flatMap((l) => issuesOf.get(l.licenseId) ?? []));
+      const bad = statuses.critical + statuses.warning;
+      return {
+        device,
+        licenseIds: group.map((l) => l.licenseId),
+        clientIds: [...new Set(group.map((l) => l.clientId))],
+        statuses,
+        appVersions: top(group.map((l) => l.appVersion)),
+        firmware: top(group.map((l) => l.firmware)),
+        recordingOff: group.filter((l) => l.recordingEnabled === false).length,
+        level,
+        levelNote: bad ? `${LEVEL_WORDS[level]}: ${bad} of ${group.length} licenses need action${needs.top ? `, worst: ${needs.top}` : ""}` : LEVEL_WORDS[level],
+        needs,
+        stats: stats(acc(device)),
+        lastThrough: group.reduce<LastThrough>((best, l) => laterThrough(best, l.lastThrough), null),
+      };
+    });
+  const devices = devicesFrom(licenses, (d) => byDevice.get(d));
+  const clientDevices = Object.fromEntries(
+    [...Map.groupBy(licenses, (l) => l.clientId)].map(([clientId, list]) => [clientId, devicesFrom(list, (d) => byClientDevice.get(`${clientId}|${d}`))]),
+  );
+
+  // Every issue once: fleet-wide ones, each client's (with license issues not rolled up), and the
+  // license issues a client issue stands for, which show when a license or device is picked.
+  const logs = everyLog.filter((l) => !l.clientId || !scope.hidden.has(l.clientId));
+  const platform = platformIssues(logs, now);
+  const busy = assessments.filter((a) => a.snapshot.status !== "inactive" && a.pulse.days.slice(-8, -1).reduce((sum, d) => sum + d.calls, 0) / 7 >= RULES.quietMinDailyCalls).length;
+  const stall = fleetStall(assessments.flatMap((a) => a.issues.filter((i) => i.kind === "client_quiet")), busy, now);
+  const shown = [...(stall ? [stall] : []), ...platform, ...assessments.flatMap((a) => a.issues)];
+  await remember(shown);
+  const rolled = licenseList.flatMap(({ h }) => h.issues.filter((i) => i.rolledUp));
+  const clientById = new Map(clients.map((c) => [c.clientId, c]));
+  const licenseById = new Map(licenses.map((l) => [l.licenseId, l]));
+  const fleetStats = stats(fleet);
+  const issues = [...shown, ...rolled].sort(byIssue).map((issue): IssueEntity => {
+    const license = issue.licenseId ? licenseById.get(issue.licenseId) : undefined;
+    const client = issue.clientId ? clientById.get(issue.clientId) : undefined;
+    const owner = license ?? client;
+    return {
+      issue,
+      clientName: client?.name ?? null,
+      last4: license?.last4 ?? null,
+      phone: license?.phone ?? null,
+      agentName: license?.agentName ?? null,
+      device: license?.device ?? null,
+      stats: owner?.stats ?? fleetStats,
+      lastThrough: owner ? owner.lastThrough : clients.reduce<LastThrough>((best, c) => laterThrough(best, c.lastThrough), null),
+      rolledUp: issue.rolledUp === true,
+    };
+  });
+
+  return {
+    issues,
+    clients,
+    licenses,
+    devices,
+    clientDevices,
+    fleet: fleetStats,
+    hiddenInternal: everyClient.length - assessments.length,
+    unusedAfterMs: RULES.seatUnusedMs,
+    days,
+    loadedAt: new Date(now).toISOString(),
+  };
+}
+
 // The numbers in a client's header, on every page under it: health, calls, CRM reach, licenses and
 // seats, from the store. Null before the client's first pull.
 export function loadClientSummary(clientId: string) {
@@ -836,13 +1155,16 @@ export async function loadLicense(licenseId: string, cookie: string | null) {
   const health = assessment?.licenses.find((h) => h.license.licenseId === licenseId) ?? null;
   const ctx = assessment?.ctx ?? clientContext(null);
   const day = calls.filter((c) => within(c, now, DAY));
-  // Calls per hour today against the average for that hour over the previous 7 days.
+  // Calls per hour today against the average for that hour over the full days before it that this
+  // phone (or its agent) has been seen, up to 7: none, then 1 to 7 (owner, 2026-11-13).
+  const seenMs = health?.baselineSince ? now - Date.parse(health.baselineSince) : 0;
+  const priorDays = Math.max(0, Math.min(RULES.baselineDays, Math.floor(seenMs / DAY) - 1));
   const hourly = Array.from({ length: 24 }, (_, i) => ({ start: new Date(now - (24 - i) * HOUR).toISOString(), calls: 0, baseline: 0 }));
   for (const c of calls) {
     const age = now - Date.parse(callTime(c)!);
     const slot = 23 - (Math.floor(age / HOUR) % 24);
     if (age <= DAY) hourly[slot].calls++;
-    else hourly[slot].baseline += 1 / 7;
+    else if (age <= (priorDays + 1) * DAY) hourly[slot].baseline += 1 / priorDays;
   }
   const live = tenant?.licenses.find((l) => l.id === licenseId);
   return {
@@ -853,6 +1175,7 @@ export async function loadLicense(licenseId: string, cookie: string | null) {
     funnel: funnel(day, ctx, now),
     journey: journeySummary(day, ctx, now),
     hourly,
+    priorDays,
     calls: day.length,
     // Agents' names aren't stored, so a reassignment names only the current agent, read live (QA L10).
     changes: changes.map((c, i) => ({
@@ -973,7 +1296,7 @@ export async function loadCallItems(
     internalScope(narrowed || Boolean(scope.showInternal)),
   ]);
   const contexts = new Map(snapshots.map((s) => [s.clientId, clientContext(s.tenant)]));
-  const last4 = new Map(licenses.map((l) => [l.licenseId, l.last4]));
+  const phoneOf = new Map(licenses.map((l) => [l.licenseId, phoneText(l)]));
   const none = clientContext(null);
   const phones = scope.licenseIds?.length ? new Set(scope.licenseIds) : null;
   const scoped = calls.filter((c) => !internal.hidden.has(c.clientId ?? "") && (!phones || phones.has(c.licenseId ?? "")));
@@ -987,9 +1310,9 @@ export async function loadCallItems(
   const items = matching.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((c) => ({
     ...c,
     problem: callProblem(c, contexts.get(c.clientId ?? "") ?? none, now),
-    last4: c.licenseId ? (last4.get(c.licenseId) ?? null) : null,
+    phone: c.licenseId ? (phoneOf.get(c.licenseId) ?? null) : null,
   }));
-  return { items, total: matching.length, counts, title: stageTitle(stage), last4: Object.fromEntries(last4), loadedAt: new Date(now).toISOString() };
+  return { items, total: matching.length, counts, title: stageTitle(stage), phones: Object.fromEntries(phoneOf), loadedAt: new Date(now).toISOString() };
 }
 
 // ---- One call ----
@@ -1018,7 +1341,7 @@ const text = (value: unknown) => (typeof value === "string" && value ? value : t
 // Phone → app → recording uploaded → sent to the CRM → accepted, in plain words, with every id that
 // links the step to the next: the phone (license), CallAnchor's call record, the upload session and
 // recording file, the CRM request and the CRM's own record id.
-function journey(call: StoredCall | null, callouts: StoredCallout[], logs: StoredLog[], requests: AnchorResult[], ctx: ClientContext, now: number, license: { licenseId: string; last4: string | null } | null): JourneyStep[] {
+function journey(call: StoredCall | null, callouts: StoredCallout[], logs: StoredLog[], requests: AnchorResult[], ctx: ClientContext, now: number, license: { licenseId: string; last4: string | null; number?: string | null } | null): JourneyStep[] {
   const by = (source: string) => logs.find((l) => l.source === source);
   const ingest = by("mobile.call.create");
   const upload = by("mobile.recording.upload-complete") ?? by("mobile.recording.upload-init") ?? by("mobile.recording.upload-failed");
@@ -1045,7 +1368,7 @@ function journey(call: StoredCall | null, callouts: StoredCallout[], logs: Store
       ? [
           call.callType ? `${call.callType[0].toUpperCase()}${call.callType.slice(1)} call` : "A call",
           length === null || length === undefined ? null : length === 0 ? "that didn't connect" : `of ${length} s`,
-          license?.last4 ? `on phone …${license.last4}` : call.agentLast4 ? `by agent number …${call.agentLast4}` : null,
+          license?.last4 || license?.number ? `on phone ${phoneText(license)}` : call.agentLast4 ? `by agent number …${call.agentLast4}` : null,
         ].filter(Boolean).join(" ") + "."
       : "No record of this call is stored.",
     ids: [

@@ -9,14 +9,22 @@ import { Icon, type IconName } from "./ui";
 
 const BASE = "/dashboard/call_anchor/health";
 
-// Overview (what needs action), Clients and Licenses are tabs, each with its own left menu (owner,
-// 2026-11-13). A client's own pages sit under Clients.
+// One tab per entity, each row one of it with the same columns (owner, 2026-11-13): Overview, then
+// Issues, Clients, Licenses and Devices. A client's own pages sit under Clients.
 const VIEWS = [
   { key: "overview", label: "Overview", path: "" },
+  { key: "issues", label: "Issues", path: "/issues" },
   { key: "clients", label: "Clients", path: "/clients" },
   { key: "licenses", label: "Licenses", path: "/licenses" },
+  { key: "devices", label: "Devices", path: "/devices" },
   { key: "settings", label: "Settings", path: "/settings", adminOnly: true },
 ] as const;
+
+// The picked time range follows you between tabs.
+function useRange() {
+  const range = useSearchParams().get("range");
+  return range && /^\d{1,2}$/.test(range) ? `?range=${range}` : "";
+}
 
 type PageSection = { id: string; label: string };
 
@@ -57,15 +65,26 @@ export function HealthBody({ children }: { children: React.ReactNode }) {
   return inClient ? <>{children}</> : <SectionsFrame>{children}</SectionsFrame>;
 }
 
-// One client's tabs, under its name: Health, Licenses (with seats), Calls & logs. A phone opens under
-// Licenses, a call under Calls & logs, an issue under Health.
+// One client's tabs, under its name: the fleet's entity tabs scoped to it (owner, 2026-11-13), then
+// Calls & logs. A phone opens under Licenses, a call under Calls & logs, an issue under Issues.
 export function ClientTabs({ root }: { root: string }) {
   const pathname = usePathname();
+  const range = useRange();
   const rest = pathname.slice(root.length);
-  const current = rest.startsWith("/licenses") || rest.startsWith("/seats") ? "licenses" : rest.startsWith("/items") || rest.startsWith("/calls") ? "items" : "health";
+  const current = rest.startsWith("/licenses") || rest.startsWith("/seats")
+    ? "licenses"
+    : rest.startsWith("/devices")
+      ? "devices"
+      : rest.startsWith("/issues")
+        ? "issues"
+        : rest.startsWith("/items") || rest.startsWith("/calls")
+          ? "items"
+          : "overview";
   const tabs: { key: string; label: string; href: string; icon: IconName }[] = [
-    { key: "health", label: "Health", href: root, icon: "grid" },
-    { key: "licenses", label: "Licenses", href: `${root}/licenses`, icon: "licenses" },
+    { key: "overview", label: "Overview", href: `${root}${range}`, icon: "grid" },
+    { key: "issues", label: "Issues", href: `${root}/issues${range}`, icon: "alert" },
+    { key: "licenses", label: "Licenses", href: `${root}/licenses${range}`, icon: "licenses" },
+    { key: "devices", label: "Devices", href: `${root}/devices${range}`, icon: "device" },
     { key: "items", label: "Calls & logs", href: `${root}/items?kind=calls&stage=all&window=1`, icon: "logs" },
   ];
   return (
@@ -87,8 +106,8 @@ export function ClientTabs({ root }: { root: string }) {
   );
 }
 
-// Which view a path belongs to. A client's pages sit under Clients; fleet call, issue and item pages
-// under Overview.
+// Which view a path belongs to. A client's pages sit under Clients; a fleet issue page under Issues,
+// and call and item pages under Overview.
 function viewOf(pathname: string) {
   for (const v of VIEWS) if (v.path && (pathname === BASE + v.path || pathname.startsWith(`${BASE}${v.path}/`))) return v.key;
   return "overview";
@@ -97,6 +116,7 @@ function viewOf(pathname: string) {
 // The health views as a bar frozen under the site header, with the internal-clients switch.
 export function HealthSubBar({ isAdmin, showInternal }: { isAdmin: boolean; showInternal: boolean }) {
   const current = viewOf(usePathname());
+  const range = useRange();
   const views = VIEWS.filter((v) => !("adminOnly" in v) || isAdmin);
   return (
     <div className="sticky top-14 z-20 -mx-4 -mt-8 mb-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur">
@@ -106,7 +126,7 @@ export function HealthSubBar({ isAdmin, showInternal }: { isAdmin: boolean; show
           {views.map((v) => (
             <Link
               key={v.key}
-              href={BASE + v.path}
+              href={BASE + v.path + (v.key === "settings" ? "" : range)}
               aria-current={v.key === current ? "page" : undefined}
               className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium ${
                 v.key === current ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"

@@ -92,7 +92,7 @@ function IssueRow({ issue, basePath, now, clientName, licenseLabel }: { issue: I
       </td>
       <td className="px-3 py-2 align-top text-slate-700">
         {clientName ?? "—"}
-        {licenseLabel && <span className="block font-mono text-xs text-slate-500">phone …{licenseLabel}</span>}
+        {licenseLabel && <span className="block font-mono text-xs text-slate-500">phone {licenseLabel}</span>}
       </td>
       <td className="min-w-64 px-3 py-2 align-top text-slate-700">{issue.impactText || "—"}</td>
       <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-slate-600">

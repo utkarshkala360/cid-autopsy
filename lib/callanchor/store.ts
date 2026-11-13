@@ -454,7 +454,7 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
   if (licenses.length) {
     await db()`
       INSERT INTO ca_licenses (license_id, client_id, member_id, number_last4, status, is_active, is_logged_in, last_login_label,
-        device_brand, device_model, firmware, google_dialer, app_version, app_version_code, recording_enabled, call_policy, lifetime_calls)
+        device_brand, device_model, firmware, google_dialer, app_version, app_version_code, recording_enabled, call_policy, lifetime_calls, agent_name, number)
       SELECT * FROM unnest(
         ${licenses.map((l) => l.id)}::text[],
         ${licenses.map(() => clientId)}::text[],
@@ -472,7 +472,9 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         ${licenses.map((l) => l.lastLoginAppVersionCode ?? null)}::int[],
         ${boolText(licenses.map((l) => l.recordingEnabled ?? null))}::text[]::boolean[],
         ${licenses.map((l) => l.callCapturePolicy ?? null)}::text[],
-        ${licenses.map((l) => l.lifetimeCallRecordCount ?? 0)}::int[]
+        ${licenses.map((l) => l.lifetimeCallRecordCount ?? 0)}::int[],
+        ${licenses.map((l) => l.assignedTo?.name?.trim() || null)}::text[],
+        ${licenses.map((l) => l.number?.trim() || null)}::text[]
       )
       ON CONFLICT (license_id) DO UPDATE SET
         client_id = EXCLUDED.client_id, member_id = EXCLUDED.member_id, number_last4 = EXCLUDED.number_last4,
@@ -480,7 +482,7 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         last_login_label = EXCLUDED.last_login_label, device_brand = EXCLUDED.device_brand, device_model = EXCLUDED.device_model,
         firmware = EXCLUDED.firmware, google_dialer = EXCLUDED.google_dialer, app_version = EXCLUDED.app_version,
         app_version_code = EXCLUDED.app_version_code, recording_enabled = EXCLUDED.recording_enabled,
-        call_policy = EXCLUDED.call_policy, lifetime_calls = EXCLUDED.lifetime_calls, updated_at = now(), removed_at = NULL,
+        call_policy = EXCLUDED.call_policy, lifetime_calls = EXCLUDED.lifetime_calls, agent_name = EXCLUDED.agent_name, number = EXCLUDED.number, updated_at = now(), removed_at = NULL,
         calls_grew_at = CASE WHEN EXCLUDED.lifetime_calls > ca_licenses.lifetime_calls THEN now() ELSE ca_licenses.calls_grew_at END
     `;
   }
@@ -831,7 +833,13 @@ export async function planPull(clientId: string | null): Promise<PullStep[]> {
   const snapshots = states.get("snapshots");
   if (!snapshots?.refreshedAt) return [{ key: "snapshots", label: "Client list" }];
   const steps: PullStep[] = [];
-  if (!clientId && Date.now() - snapshots.refreshedAt >= SYNC.snapshotEveryMs) steps.push({ key: "snapshots", label: "Client list" });
+  // The client list also carries each license's agent name and full number: pull it at once while a
+  // phone lacks either (both added 2026-11-13), instead of waiting for its next 10-minute turn.
+  const namesMissing = await db()`SELECT 1 FROM ca_licenses WHERE removed_at IS NULL AND ((member_id IS NOT NULL AND agent_name IS NULL) OR number IS NULL) LIMIT 1`.then(
+    (rows) => rows.length > 0,
+    () => false,
+  );
+  if (namesMissing || (!clientId && Date.now() - snapshots.refreshedAt >= SYNC.snapshotEveryMs)) steps.push({ key: "snapshots", label: "Client list" });
   if (pageDue(states.get("logs"))) steps.push({ key: "logs", label: "System logs" });
   if (pageDue(states.get("audit"))) steps.push({ key: "audit", label: "Portal events" });
   const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots WHERE data IS NOT NULL`;
@@ -1219,6 +1227,10 @@ export type StoredLicense = {
   licenseId: string;
   clientId: string;
   memberId: string | null;
+  // The assigned agent's name as CallAnchor shows it, for the license rows (owner, 2026-11-13).
+  agentName: string | null;
+  // The full phone number (owner, 2026-11-13); null on rows saved before it was kept.
+  number: string | null;
   last4: string | null;
   status: string | null;
   isActive: boolean | null;
@@ -1243,6 +1255,8 @@ const toLicense = (r: Row): StoredLicense => ({
   licenseId: r.license_id,
   clientId: r.client_id,
   memberId: r.member_id,
+  agentName: r.agent_name ?? null,
+  number: r.number ?? null,
   last4: r.number_last4,
   status: r.status,
   isActive: r.is_active,

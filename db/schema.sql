@@ -202,7 +202,7 @@ ALTER TABLE ca_system_logs ADD COLUMN IF NOT EXISTS license_id TEXT;
 UPDATE ca_system_logs SET actor_type = raw->>'actorType', actor_id = raw->>'actorId', license_id = raw->'metadata'->>'licenseId'
 WHERE raw IS NOT NULL AND actor_type IS NULL;
 
--- One row per license, from the tenant, updated with each snapshot. No agent names or full numbers.
+-- One row per license, from the tenant, updated with each snapshot, with its agent's name and number.
 CREATE TABLE IF NOT EXISTS ca_licenses (
   license_id        TEXT        PRIMARY KEY,
   client_id         TEXT        NOT NULL,
@@ -228,6 +228,14 @@ CREATE TABLE IF NOT EXISTS ca_licenses (
 );
 
 CREATE INDEX IF NOT EXISTS ca_licenses_client_idx ON ca_licenses (client_id);
+
+-- The assigned agent's name, shown with each license (owner, 2026-11-13). Filled by the next client
+-- list pull. Kept off the change history, which records agent changes by member id only.
+ALTER TABLE ca_licenses ADD COLUMN IF NOT EXISTS agent_name TEXT;
+
+-- The license's full phone number, shown in place of …1234 (owner, 2026-11-13). Filled by the next
+-- client list pull; number_last4 stays for rows saved before.
+ALTER TABLE ca_licenses ADD COLUMN IF NOT EXISTS number TEXT;
 
 -- A dated row each time a license's state changes: login, logout, app update, device switch.
 CREATE TABLE IF NOT EXISTS ca_license_changes (
@@ -588,3 +596,25 @@ ON CONFLICT DO NOTHING
 $$;
 
 SELECT ca_map_customers();
+
+-- A background pull of CallAnchor into the store, one per scope ('fleet' or a client id) (owner,
+-- 2026-11-13: changing pages must not wait on pulls). The server runs it after its response; pages
+-- poll this row for progress. `lease_until` is renewed per batch, so a job cut off by the function's
+-- time limit frees its scope within minutes.
+CREATE TABLE IF NOT EXISTS ca_pull_jobs (
+  scope       TEXT        PRIMARY KEY,
+  started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at TIMESTAMPTZ,
+  lease_until TIMESTAMPTZ,
+  total       INTEGER     NOT NULL DEFAULT 0,
+  done        INTEGER     NOT NULL DEFAULT 0,
+  current     TEXT,
+  failures    JSONB       NOT NULL DEFAULT '[]'::jsonb
+);
+
+
+-- Supabase publishes the public schema through its REST API to anyone holding its public anon key.
+-- Row level security with no policies shuts that out; the app connects as the tables' owner, which
+-- RLS doesn't apply to. Harmless on any other Postgres. Kept last so it covers every table.
+DO $$ DECLARE t record; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.tablename); END LOOP; END $$;
+

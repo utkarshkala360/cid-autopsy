@@ -61,7 +61,7 @@ export default async function ClientLayout({ children, params }: LayoutProps<"/d
               label="Open issues"
               value={int(summary.openIssues)}
               sub={summary.criticalIssues ? `${int(summary.criticalIssues)} critical` : summary.openIssues ? "warnings only" : "nothing needs action"}
-              href={`${root}#s-issues`}
+              href={`${root}/issues`}
             />
             <StatCell
               icon="licenses"

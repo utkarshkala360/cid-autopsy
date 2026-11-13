@@ -74,3 +74,8 @@ export function httpClass(httpStatus: number | null): HttpClass {
   if (httpStatus >= 500) return "5xx";
   return "other";
 }
+
+// A license's phone as shown everywhere: the full number (owner, 2026-11-13), or its last 4 digits on
+// a row saved before full numbers were kept, until the next client list pull fills it in.
+export const phoneText = (l: { number?: string | null; last4: string | null } | null | undefined) =>
+  l?.number || (l?.last4 ? `…${l.last4}` : "Unknown phone");

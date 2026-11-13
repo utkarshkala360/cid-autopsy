@@ -5,7 +5,7 @@
 //                                    set the status (done, wontfix or open) and resolution of notes;
 //                                    --commit adds that commit's short hash to the resolution
 import { execFileSync } from "node:child_process";
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 
 const STATUSES = ["open", "done", "wontfix"];
 const args = process.argv.slice(2);
@@ -26,7 +26,7 @@ function option(name) {
 
 const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url) fail("DATABASE_URL is not set.");
-const sql = neon(url);
+const sql = connect(url);
 
 const markIds = option("--mark");
 if (markIds !== undefined) await mark(markIds);

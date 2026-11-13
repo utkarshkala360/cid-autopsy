@@ -41,7 +41,7 @@ export default async function AuditNotesPage({ searchParams }: PageProps<"/admin
       LIMIT 500
     `,
     db()`SELECT status, count(*)::int AS n FROM audit_notes GROUP BY status`,
-  ])) as [unknown, NoteRow[], { status: string; n: number }[]];
+  ])) as unknown as [unknown, NoteRow[], { status: string; n: number }[]];
 
   const countOf = (s: string) =>
     s === "all" ? counts.reduce((a, c) => a + c.n, 0) : (counts.find((c) => c.status === s)?.n ?? 0);

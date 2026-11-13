@@ -1,8 +1,11 @@
-import { redirect } from "next/navigation";
-import { HEALTH_PATH } from "@/lib/callanchor/session";
-import { clientHref } from "../../../format";
+import type { Metadata } from "next";
+import { EntityTab } from "../../../_views/entities";
 
-// A client's issues are listed on its health page.
-export default async function ClientIssuesIndex({ params }: PageProps<"/dashboard/call_anchor/health/clients/[clientId]/issues">) {
-  redirect(`${clientHref(HEALTH_PATH, (await params).clientId)}#s-issues`);
+export const metadata: Metadata = { title: "Issues" };
+export const maxDuration = 300;
+
+// One client's Issues tab: the fleet Issues table scoped to this client (owner, 2026-11-13).
+export default async function ClientIssuesPage({ params, searchParams }: { params: Promise<{ clientId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [{ clientId }, query] = await Promise.all([params, searchParams]);
+  return <EntityTab entity="issues" query={query} clientId={clientId} />;
 }

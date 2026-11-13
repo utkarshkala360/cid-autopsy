@@ -2,44 +2,39 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { WINDOW_DAYS, loadFleetActivity, loadFleetHealth } from "@/lib/callanchor/health";
-import { MODULES, issueModule, type IssueModule } from "@/lib/callanchor/issues";
+import { loadFleetActivity, loadFleetHealth } from "@/lib/callanchor/health";
 import { PortalError } from "@/lib/callanchor/portal";
 import { secondaryButtonClass } from "@/components/ui";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal, storedCookie, verifyUrl } from "@/lib/callanchor/session";
-import { MenuLayout } from "./FilterMenu";
+import { RangePicker, WorstEntities, queryHref, rangeOf, warmRanges } from "./_views/entities";
 import { Hero, StatCell, StatStrip } from "./ui";
-import { ago, formatTime, httpTone, int, itemsHref, pct, severityTone, toneBadge, type Tone } from "./format";
-import { CoverageNote, IssueList, ItemLink, LoadingNote, Table, issueLinks, td } from "./parts";
+import { formatTime, httpTone, int, itemsHref, pct, severityTone, toneBadge } from "./format";
+import { CoverageNote, ItemLink, LoadingNote, Section, Table, issueLinks, td } from "./parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores 5 days for every client, and the daily refresh runs after the response.
 export const maxDuration = 300;
 
-// How many issue cards show before "show all".
-const BAND_SIZE = 9;
-
-// The Overview tab (owner, 2026-11-13): the hero with the fleet's numbers, then what needs action,
-// with the modules (CRM, Device, Portal, Usage) as the left menu. Clients and Licenses are their own
-// tabs.
+// The Overview tab (owner, 2026-11-13): the hero with the fleet's numbers, then the worst few clients,
+// licenses and devices with the shared columns, failed CRM syncs and system logs, over one range.
+// Issues, Clients, Licenses and Devices are their own tabs.
 export default async function ClientHealthPage({ searchParams }: PageProps<"/dashboard/call_anchor/health">) {
   const { profile } = await requireCallAnchorSession(HEALTH_PATH);
   const query = await searchParams;
-  const all = query.issues === "all";
 
   return (
     <div>
       {!profile && <p className="text-sm text-slate-500">CallAnchor can&apos;t be reached right now.</p>}
       {profile && (
         <Suspense fallback={<LoadingNote text="Reading the stored data. Only the first read after the server starts waits; later visits show the last data at once and update in place." expectMs={20000} />}>
-          <FleetHealth all={all} query={query} />
+          <FleetHealth query={query} />
         </Suspense>
       )}
     </div>
   );
 }
 
-async function FleetHealth({ all, query }: { all: boolean; query: Record<string, string | string[] | undefined> }) {
+async function FleetHealth({ query }: { query: Record<string, string | string[] | undefined> }) {
   const { member } = await requireCallAnchorSession(HEALTH_PATH);
   const cookie = await storedCookie(member.id);
   if (!cookie) redirect(verifyUrl(HEALTH_PATH));
@@ -69,23 +64,9 @@ async function FleetHealth({ all, query }: { all: boolean; query: Record<string,
   const levels = (level: string) => working.filter((r) => r.level === level).length;
   const { seats } = totals;
   const reach = totals.due ? Math.round((totals.reached / totals.due) * 1000) / 10 : null;
-  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-  const mod: IssueModule | "all" = MODULE_IDS.find((m) => m === one(query.na)) ?? "all";
-  const range = WINDOW_DAYS.find((d) => String(d) === one(query.range)) ?? 1;
-  const byModule = Object.fromEntries(MODULE_IDS.map((m) => [m, needsAction.filter((i) => issueModule(i.kind) === m)])) as Record<IssueModule, typeof needsAction>;
-  const modIssues = mod === "all" ? needsAction : byModule[mod];
-  const shown = all ? modIssues : modIssues.slice(0, BAND_SIZE);
-  // Changing the Needs action module or range keeps the page's other filters (licenses).
-  const naHref = (change: Record<string, string | null>) => {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) if (typeof value === "string") params.set(key, value);
-    for (const [key, value] of Object.entries(change)) {
-      if (value === null) params.delete(key);
-      else params.set(key, value);
-    }
-    const text = params.toString();
-    return `${HEALTH_PATH}${text ? `?${text}` : ""}`;
-  };
+  const range = rangeOf(query);
+  const show = await showInternal();
+  warmRanges(show);
   const needLicenses = data.licenses.filter((h) => h.status === "critical" || h.status === "warning").length;
 
   return (
@@ -93,7 +74,7 @@ async function FleetHealth({ all, query }: { all: boolean; query: Record<string,
       <Hero
         eyebrow={{ icon: "activity", label: "Client health" }}
         title="Overview"
-        meta="What needs action across every client, by module: what's broken, how bad and since when. Clients and Licenses have their own tabs. Stored data, brought up to date by the pull above."
+        meta="The fleet at a glance: the worst clients, licenses and devices, and the CRM and system errors behind them. Issues, Clients, Licenses and Devices have their own tabs. Stored data, brought up to date by the pull above."
         kpis={[
           { label: "Reached CRM, 24h", value: pct(reach), bar: reach, note: `${int(totals.reached)} of ${int(totals.due)} due` },
           { label: "Calls, 24h", value: int(totals.calls), note: `${int(totals.callsToday)} since midnight IST` },
@@ -114,7 +95,7 @@ async function FleetHealth({ all, query }: { all: boolean; query: Record<string,
             label="Needs action"
             value={int(needsAction.length)}
             sub={`${critical} critical${fresh ? ` · ${fresh} new since your last visit` : ""}`}
-            href={HEALTH_PATH}
+            href={`${HEALTH_PATH}/issues`}
           />
           <StatCell
             icon="check"
@@ -137,83 +118,33 @@ async function FleetHealth({ all, query }: { all: boolean; query: Record<string,
       <CoverageNote store={data.store} coverage={data.coverage} pullErrors={data.pullErrors} now={now} tookMs={data.tookMs} />
       {rows.length === 0 && <p className="mt-6 text-sm text-slate-500">No clients stored yet. Reload to try the first pull again.</p>}
 
-      <MenuLayout
-        groups={[
-          {
-            title: "Module",
-            items: [
-              { key: "all", label: "All", count: needsAction.length, active: mod === "all", always: true, href: naHref({ na: null, issues: null, range: null }) },
-              ...MODULE_IDS.map((m) => ({
-                key: m,
-                label: MODULES[m].label,
-                title: MODULES[m].note,
-                count: byModule[m].length,
-                tone: (byModule[m].some((i) => i.level === "critical") ? "red" : byModule[m].length ? "amber" : "slate") as Tone,
-                active: mod === m,
-                always: true,
-                href: naHref({ na: m, issues: null, range: null }),
-              })),
-            ],
-          },
-        ]}
-      >
-        <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-          Needs action{mod === "all" ? "" : `: ${MODULES[mod].label}`}
-          <span className="ml-2 text-sm font-normal text-slate-500">
-            {modIssues.length} issue{modIssues.length === 1 ? "" : "s"}, {modIssues.filter((i) => i.level === "critical").length} critical
-          </span>
-        </h2>
-        <p className="mt-1 max-w-4xl text-sm text-slate-500">
-          {mod === "all" ? "Issues and errors across every module" : MODULES[mod].note}, worst impact first. Open an issue for its items, with the
-          evidence and what to check above them. Recordings and calls that never reached the CRM stay here until they do.
-          {data.lastVisit && (
-            <span className={fresh ? "font-medium text-indigo-800" : ""}>
-              {" "}
-              {fresh ? `${fresh} new` : "Nothing new"} since your last visit, {ago(data.lastVisit, now)}.
-            </span>
-          )}
-        </p>
-        <div className="mt-3">
-          <IssueList issues={shown} basePath={HEALTH_PATH} now={now} names={data.names} licenseLabels={data.licenseNames} empty={mod === "all" ? "Nothing needs action." : `No ${MODULES[mod].label} issues.`} />
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <p className="text-sm text-slate-500">Worst first, each opening its tab. Health and Needs action are right now; Call journey, CRM syncs and errors cover the range.</p>
+        <div className="ml-auto">
+          <RangePicker days={range} href={queryHref(HEALTH_PATH, query)} />
         </div>
-        {modIssues.length > shown.length && (
-          <p className="mt-3 text-sm">
-            <Link href={naHref({ issues: "all" })} className={secondaryButtonClass}>Show all {modIssues.length} issues</Link>
-          </p>
-        )}
-        {(mod === "crm" || mod === "portal") && (
-          <div className="mt-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="mr-2 text-base font-semibold text-slate-900">{mod === "crm" ? "CRM errors" : "System logs"}</h3>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Time range</span>
-              {WINDOW_DAYS.map((d) => (
-                <Link key={d} href={naHref({ range: d === 1 ? null : String(d) })} aria-current={d === range ? "page" : undefined} className={chip(d === range)}>
-                  {windowLabel(d)}
-                </Link>
-              ))}
-            </div>
-            <p className="mb-3 mt-1 text-sm text-slate-500">
-              {mod === "crm"
-                ? "Failed CRM syncs across clients, titled by what's trusted: the platform, the HTTP code, and whether the calls ever reached the CRM. The replies under each are samples of each client's own format, masked, and never decide severity. Counted by when the callout was sent."
-                : "Everything CallAnchor logged, by source and severity, with CallAnchor's own faults on top. Open a source for its log lines."}
-            </p>
-            <Suspense key={`${mod}:${range}`} fallback={<LoadingNote text="Reading the stored syncs and logs for this time range." expectMs={4000} />}>
-              <Activity view={mod === "crm" ? "crm" : "logs"} days={range} />
-            </Suspense>
-          </div>
-        )}
-      </MenuLayout>
+      </div>
+      <Suspense key="worst" fallback={<LoadingNote text="Reading clients, licenses and devices for this range…" expectMs={15000} />}>
+        <WorstEntities days={range} show={show} />
+      </Suspense>
+      <Section
+        title="Failed CRM syncs"
+        note="Failed CRM syncs across clients, titled by what's trusted: the platform, the HTTP code, and whether the calls ever reached the CRM. The replies under each are samples of each client's own format, masked, and never decide severity. Counted by when the callout was sent."
+      >
+        <Suspense key="crm" fallback={<LoadingNote text="Reading the stored syncs for this range." expectMs={4000} />}>
+          <Activity view="crm" days={range} />
+        </Suspense>
+      </Section>
+      <Section title="System logs" note="Everything CallAnchor logged, by source and severity, with CallAnchor's own faults on top. Open a source for its log lines.">
+        <Suspense key="logs" fallback={<LoadingNote text="Reading the stored logs for this range." expectMs={4000} />}>
+          <Activity view="logs" days={range} />
+        </Suspense>
+      </Section>
     </>
   );
 }
 
-// Needs action groups issues and errors by module (owner, 2026-11-13). CRM shows the failed syncs
-// under its issues and Portal the system logs, over a time range of 24 hours unless picked.
-const MODULE_IDS = Object.keys(MODULES) as IssueModule[];
-
 const windowLabel = (days: number) => (days === 1 ? "24 hours" : `${days} days`);
-const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1 text-xs font-medium ${on ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`;
 
 async function Activity({ view, days }: { view: "crm" | "logs"; days: number }) {
   const { errors, sources, platform } = await loadFleetActivity(await showInternal(), days);

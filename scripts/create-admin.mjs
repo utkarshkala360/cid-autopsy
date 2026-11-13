@@ -1,6 +1,6 @@
 // Creates an admin, or sets a new password for an existing one (signing them out everywhere).
 // Usage: npm run admin:create -- '<id>' '<password>'
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 import bcrypt from "bcryptjs";
 
 const [rawUsername, password] = process.argv.slice(2);
@@ -17,7 +17,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = connect(url);
 const hash = await bcrypt.hash(password, 12);
 const [row] = await sql`
   INSERT INTO admins (username, password_hash)

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { phoneText } from "@/lib/callanchor/labels";
 import { notFound, redirect } from "next/navigation";
 import { loadCall, type AnchorResult, type JourneyStep } from "@/lib/callanchor/health";
 import { crmStatus } from "@/lib/callanchor/labels";
@@ -79,7 +80,7 @@ export async function CallView({ callId, clientId, query }: { callId: string; cl
             {call.license ? (
               <p className="text-slate-600">
                 Made by phone{" "}
-                <Link href={licenseHref(HEALTH_PATH, call.license.licenseId, call.clientId)} className={`${rowLinkClass} font-mono`}>…{call.license.last4}</Link>
+                <Link href={licenseHref(HEALTH_PATH, call.license.licenseId, call.clientId)} className={`${rowLinkClass} font-mono`}>{phoneText(call.license)}</Link>
                 {call.license.deviceModel && ` (${[call.license.deviceBrand, call.license.deviceModel].filter(Boolean).join(" ")}, app ${call.license.appVersion ?? "unknown"})`}
                 {call.call?.licenseVia === "agent_number" && <span className="text-slate-500"> · matched by the agent number in the CRM payload</span>}
               </p>

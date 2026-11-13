@@ -136,12 +136,3 @@ export const toneChip = (tone: Tone, on: boolean) => `rounded-full border px-3 p
 export const toneBadge = (tone: Tone) => `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${TONES[tone].badge}`;
 export const toneDot: Record<Tone, string> = { red: "bg-red-500", amber: "bg-amber-500", green: "bg-emerald-500", sky: "bg-sky-500", slate: "bg-slate-300" };
 export const toneText: Record<Tone, string> = { red: "text-red-700", amber: "text-amber-800", green: "text-emerald-700", sky: "text-sky-800", slate: "text-slate-500" };
-
-// The Clients tab's modules. Here, not in FleetTable.tsx: a server page can't read values from a
-// "use client" file (it gets a reference, not the array), which broke /health/clients.
-export const CLIENT_VIEWS = [
-  { id: "journey", label: "Call journey", note: "Calls, CRM reach, sync days and recordings" },
-  { id: "licenses", label: "Licenses", note: "Licenses needing action and seat use" },
-  { id: "issues", label: "Issues", note: "Open issues per module" },
-] as const;
-export type ClientView = (typeof CLIENT_VIEWS)[number]["id"];

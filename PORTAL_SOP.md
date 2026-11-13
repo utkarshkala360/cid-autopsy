@@ -87,45 +87,55 @@ Rules already established in this repo.
   stay in the schema, unused by pages; the Salesforce connect pages went with Customers (no org was
   connected), and `lib/salesforce/` is kept for when a client page needs it.
 - Health pages share one frame: the site header is frozen at the top; the health tabs (Overview,
-  Clients, Licenses, Settings) are a bar frozen under it; the left menu lists the open page's
-  sections, and picking one shows that section on its own. There is no whole-page view: a page opens
-  on its first section (owner, 2026-11-13). See `health/HealthNav.tsx`. The Overview, Clients and
-  Licenses tabs have a filter menu on the left instead (below).
+  Issues, Clients, Licenses, Devices, Settings) are a bar frozen under it and carry the picked range
+  (`?range=`) from tab to tab. A page with sections lists them in the left menu, and picking one shows
+  that section on its own; there is no whole-page view (owner, 2026-11-13). See `health/HealthNav.tsx`.
+  The entity tabs have a filter menu on the left instead (below).
 - Member and admin pages use the full window width, with no centred max-width column; content and
   tables stretch to the right edge. A page section is never squeezed into a side column (owner,
   2026-11-13).
 - Health pages are hierarchical, client on top (owner, 2026-11-13). Everything about a client lives
-  under `/health/clients/<client>/`: its Health page, `licenses` (and `licenses/<license>` for one
-  phone), `seats`, `items` (Calls & logs), `calls/<call>` and `issues/<issue>`. The frame says where
-  you are at every level: health tabs (a client's pages sit under Clients), a breadcrumb
-  that follows the URL (`HealthTrail`), the client's name and its own tabs (Health, Licenses, Seats,
-  Calls & logs; `ClientTabs`), then the left menu. Build links with `clientHref`, `licenseHref`,
-  `callHref`, `issueHref` and `itemsHref` in `health/format.ts`, passing the client id; flat links
-  (`/health/licenses/<id>`, `/health/calls/<id>`, `?client=`) still work by redirecting. Pages shown
-  both fleet-wide and per client are views in `health/_views/`.
-- Client health is split into tabs, each with a left filter menu (owner, 2026-11-13). The menu has
-  groups of options with counts; an option with nothing behind it is hidden unless picked, and All
-  always shows (`MenuLayout` in `health/FilterMenu.tsx`). Modules for issues are CRM, Device, Portal
-  and Usage (`MODULES` and `issueModule()` in `lib/callanchor/modules.ts`; a new issue kind must be
-  placed there).
-  - Overview (`/health`): the fleet hero, then Needs action with Module (All, CRM, Device, Portal,
-    Usage; `?na=`) as the left menu. CRM adds the failed CRM syncs and Portal the system logs
-    (CallAnchor's own faults on top), both over a time range of 24 hours unless one is picked (3, 7
-    or 15 days; `?range=`, read by `loadFleetActivity`). No Trials section.
-  - Clients (`/health/clients`): one row per client, with Module (Call journey, Licenses, Issues;
-    `?view=`) and Health (`?health=`) as the left menu. Health is judged within the picked module and
-    its counts follow it: Call journey by the issues that break the journey (all but Usage), else
-    healthy with calls and idle without; Licenses by the worst license, else healthy with a phone
-    calling and idle without; Issues by the client's overall level. The row's health badge shows the
-    same.
-  - Licenses (`/health/licenses`): every license, with Module (`?lm=`) on top of the left menu and
-    only that module's own filters under it; changing module clears them (owner, 2026-11-13).
-    Health & use: Health (`?status=`) and Use (`?use=`). Calls & CRM: calls in 24h (`?calls=`),
-    reached CRM against the synced-day rate (`?reach=`), CRM sync over 7 days (`?sync=`). Device:
-    model, app version, recording on and Google dialer (`?model=`, `?app=`, `?rec=`, `?dialer=`),
-    listing only values that exist; its columns add firmware and call policy, with the by-model and
-    by-app-version breakdowns. A client's own Licenses tab uses the same panel. `?client=` links open the client's
-    tab; `/seats` opens Licenses with `use=unused`.
+  under `/health/clients/<client>/`: its Overview, `issues` (and `issues/<issue>`), `licenses` (and
+  `licenses/<license>` for one phone), `devices`, `items` (Calls & logs) and `calls/<call>`. The frame
+  says where you are at every level: health tabs (a client's pages sit under Clients), a breadcrumb
+  that follows the URL (`HealthTrail`), the client's name and its own tabs (Overview, Issues,
+  Licenses, Devices, Calls & logs; `ClientTabs`), then the left menu. Build links with `clientHref`,
+  `licenseHref`, `callHref`, `issueHref` and `itemsHref` in `health/format.ts`, passing the client id;
+  flat links (`/health/licenses/<id>`, `/health/calls/<id>`, `?client=`) still work by redirecting.
+- Every entity tab has a left filter menu (owner, 2026-11-13): groups of options with counts, each
+  counted against the other picks. Every group is multi-select (`?health=critical,warning`) and
+  collapsed, showing only its picks (or All); opening one lists every option as a tick box, one group
+  open at a time, and an option with nothing behind it is hidden unless picked. All
+  always shows (`MenuLayout` in `health/FilterMenu.tsx`, `applyFilters` in `health/_views/entities.tsx`).
+  Modules for issues are CRM, Device, Portal and Usage (`MODULES` and `issueModule()` in
+  `lib/callanchor/modules.ts`; a new issue kind must be placed there). Filters: Issues by Health
+  (Needs action by default, Critical, Warning, Info), Module and Raised for (all clients, a client, a
+  license), plus `?license=` or `?device=` from a row's Needs action, which also shows the license
+  issues a client issue stands for; Clients by Health, Status (working by default) and CRM
+  integration; Licenses by Health, Seat (`?use=`), calls in the range and Device; Devices by Health
+  and Recording. Every tab has a search box (`?q=`) and pages of 100. Overview (`/health`) is the
+  hero, then the worst five clients, licenses and devices, failed CRM syncs and system logs, all on
+  the range.
+- Health tabs are one view per entity, with the same core columns (owner, 2026-11-13): Overview,
+  Issues (one row per issue), Clients (one per client), Licenses (one per license, client-agnostic),
+  Devices (one per brand + model; licenses with no model share an "Unknown" row; there is no device
+  id), Settings. Every row shows Health as an icon chip on its name (level on hover), Call journey
+  (dotted steps), CRM syncs (one cell: reached-of-due ring, a strip over the range, last call
+  through) and Needs action, plus a few identity columns of its own. A time range (24h default, 3,
+  7, 15 days) drives Call journey and CRM syncs; Health and Needs action are always right now (open
+  issues). A client's page is the client hero over the same Issues, Licenses and Devices tables,
+  scoped to it, so a license row looks the same everywhere. Overview keeps the hero, stat strip,
+  failed CRM syncs, system logs and the worst few of each entity.
+- Rows sort by severity, then by calls surely lost in the range (owner, 2026-11-13): broken calls
+  (stopped at upload, sending or the CRM) out of calls, taken at the lower end of their 95% range
+  (Wilson, `sureShare` in `lib/callanchor/health.ts`), times the calls. 1 of 10 counts as 0, 10 of
+  100 as 5, so a big clear loss leads a tiny sample of the same severity. Clients, Licenses and
+  Devices show it in an Impact column ("≈ 33 lost", then broken of calls and the share; "few calls"
+  under 20); Issues show the calls each affects.
+- A failure rate alone makes Critical only with at least `criticalMinFailures` (5, in Settings)
+  failed calls; with fewer it's a Warning, never dropped: false alarms are better than leaving a
+  small client out (owner, 2026-11-13). This applies to "CRM is rejecting calls" and "<CRM> is
+  failing calls", which now warns below 5 calls instead of staying silent.
 - Severity and CRM status codes are colour-coded everywhere (owner, 2026-11-13): red a problem
   (critical, error, HTTP 5xx, 401/403, no response), amber worth a look (warning, other 4xx), green
   went well (healthy, calling, 2xx), sky information, grey a plain count. Filter chips are tinted in
@@ -152,36 +162,62 @@ Rules already established in this repo.
   time (an accordion), opening on the one that holds the current pick; a closed group names its pick
   in its heading (owner, 2026-11-13). Use `<details name="...">` with a shared name, as the journey
   steps in `ItemFilters` (`health/_views/items.tsx`) do. Health page sections already show one at a time via the left menu.
-- Lists of issues are table rows, one per issue (severity, issue, client and phone, impact, since,
-  status, last 24h, open), not cards, to use the space well (owner, 2026-11-13). See `IssueList` in
-  `health/parts.tsx`.
+- Lists of issues are table rows, one per issue, not cards, to use the space well (owner,
+  2026-11-13). The Issues tab is that list with the shared columns; an issue's Call journey and CRM
+  syncs are those of what it was raised for (its license, its client, or the fleet).
 - The sub app is called CallAnchor and lives at `/dashboard/call_anchor` (was CallAnchor Config at
   `call_anchor_config`; `next.config.ts` redirects old links) (owner, 2026-11-13).
 - The health pages speak in the call's journey, for non-developers: Call made on the phone → Picked up
   by the app → Recording uploaded → Sent to the CRM → Accepted by the CRM. Each client and phone
   shows where its calls stop, and when a call last went all the way through; each call shows the
   step it stopped at and the ids that tie every step to the next (owner, 2026-11-13).
-- Seats are licenses, so they share the Licenses tab (owner, 2026-11-13): each license shows its
-  health and its seat state (calling, logged in but not calling, logged out, not assigned) with since
-  when; Health and Use filters, with All showing every license. `/seats` links open Licenses with `use=unused`. Unused seats
-  still aren't issues (owner, 2026-11-05).
-- Counts with a whole show as a ring in a fixed colour per metric, with a light track of the same
-  hue, the number under it and "of Y" under that; the share shows on hover (owner, 2026-11-13). No
-  Purchased column: it is the "of" under Active. Clients table: Active (blue, of purchased), Logged
-  in (lime, of active), Calling (violet, of active), Unused (amber, of active); Reached CRM (teal, of
-  due) and Recordings synced (blue, of verified); Licenses tab: Reached CRM (teal). `MetricRing` in
-  `health/ui.tsx`.
-- CRM sync, 7 days is one cell for clients and licenses: the day strip, synced days out of days with
-  due calls, and the last call through (`SyncCell` in `health/parts.tsx`). It shows in the Clients
-  table's Call journey and Licenses modules and in the Licenses tab's Calls & CRM (owner,
-  2026-11-13).
-- Pages never pull CallAnchor while rendering; they show the store at once, and the browser pulls
-  what's due in batches of 4 with a progress bar, a percentage and what's being pulled, then
-  refreshes (owner, 2026-11-13). One pull job runs per tab across page changes; a page pulls a
-  stream only if it was last pulled over 5 minutes ago (`SYNC.pageEveryMs`), and the browser doesn't
-  re-plan a scope for 5 minutes, remembered across reloads (`PullProgress` in `health/Progress.tsx`, `planPull` and
-  `runPullStep` in `store.ts`). Failures are listed by cause with the streams they hit. Store reads
-  show an estimated percentage (`LoadingNote`).
+- A phone (license) always shows as its full number, with its agent's name in a grey line under it
+  (owner, 2026-11-13). Use `phoneText()` in `lib/callanchor/labels.ts` (full number from
+  `ca_licenses.number`, or …1234 on a row saved before numbers were kept); names from
+  `ca_licenses.agent_name`. Both are saved by each client list pull, which runs at once while any
+  license lacks them. "Unassigned" only when the seat has no agent. Call ids show whole, never cut.
+- Seats are licenses, so they share the Licenses tab (owner, 2026-11-13): each license shows its seat
+  state (calling, logged in but not calling, logged out, not assigned) with since when, and the Seat
+  filter. `/seats` links open Licenses with `use=unused`. Unused seats still aren't issues (owner,
+  2026-11-05).
+- Counts with a whole show as a ring coloured as a warning signal, never one colour per metric
+  (owner, 2026-11-13): green fine, amber worth a look, red a problem, grey nothing to judge
+  (`signalHue` in `health/ui.tsx`). Seats on Clients are four small rings out of purchased (out of
+  active when purchased isn't known), the count under each as 3/5 (the /5 grey) and its label; the
+  share shows on hover only, and "not set up" is in Active's hover. Active, Logged in and Calling are
+  green at 80% or more, amber from 50%, red below; Unused the other way round (green at 20% or less).
+  Each opens those licenses (`PctRing`). The CRM syncs ring (`MetricRing`, reached of due) is green at
+  the CRM warning line in Settings (95%), amber down to the critical line (80%), red below.
+- A row's calls in the range sit under its name, "39 calls in 24 hours · last 1 h ago", not in a
+  column (owner, 2026-11-13).
+- CRM syncs is one cell everywhere (owner, 2026-11-13): the ring (due calls in the range that
+  reached the CRM, of due), a strip over the range (an hour per cell for 24 hours, 6 hours for 3
+  days, a day for 7 and 15; synced at the synced-day rate), synced cells out of cells with due calls,
+  and the last call through. The range rolls back from now like the items page's window, so a count
+  and the calls it opens agree. Computed in one pass over the range's calls (`loadEntities` in
+  `lib/callanchor/health.ts`); device rows add calls across clients with each call's own client
+  context (`addToJourney`).
+- Pages never pull CallAnchor while rendering, and changing pages never waits on a pull (owner,
+  2026-11-13). A page shows the store at once and asks the server for a pull (POST
+  `health/pull`); the server plans it, answers straight away and runs the steps after its response
+  (`after()`), 4 at a time, saving progress in `ca_pull_jobs` (`lib/callanchor/pull-job.ts`). The
+  browser follows it with plain fetches (GET `health/pull`), shows a small corner indicator with the
+  percentage and any failures by cause, and refreshes the page in place at most every 10 seconds
+  while it runs (`PullProgress` in `health/Progress.tsx`). One job per scope (a fleet job covers every
+  client), held by a lease renewed each batch; a stream is pulled only if last pulled over 5 minutes
+  ago (`SYNC.pageEveryMs`), and the browser doesn't ask again for a scope for 5 minutes, remembered
+  across reloads. Store reads show an estimated percentage (`LoadingNote`).
+- Words on the health pages are everyday words for support staff, never rule or field names (owner,
+  2026-11-13): say what we can't tell yet and when, not "baseline", "learning" or a rule's title.
+- No week-long wait on a new phone or new agent (owner, 2026-11-13): its usual calls a day come from
+  the longest full window it has, 1, 3 or 7 days, and the alert and phone page name that window.
+  `RULES.baselineWindows` in `lib/callanchor/issues.ts`.
+- Hover text on the health pages shows at once (owner, 2026-11-13): give an element a `title` and
+  `InstantTips` (`health/Tips.tsx`, in the health layout) shows it in its own bubble, never the
+  browser's delayed tooltip.
+- Changing the range keeps the current table on screen until the new one is ready, with a spinner on
+  the picked option (`RangeLink`); Suspense boundaries are keyed by page, never by range. Each page
+  view computes the ranges not yet in memory after the response (`warmEntities`) (owner, 2026-11-13).
 - Users never wait on data they've already seen (owner, 2026-11-13). The fleet, licenses and client
   summary loaders keep their last result in server memory and serve it at once, recomputing in the
   background when it's over 5 seconds old, one run per key (`cached` in `lib/callanchor/health.ts`);
@@ -235,6 +271,9 @@ What a good change looks like here.
 - A cross-client view filters internal clients through `internalScope()` in `health.ts`, or
   `hideInternal` on the store's item queries; never a second list of ids.
 - Run slow background work, like the 5-day refresh, with `after()`, so it doesn't block the page.
+- Work the browser starts and follows goes through a route handler and `fetch`, never a server
+  action: server actions share the router's queue with page changes, so a running one made tab
+  changes wait or cancelled it (the browser-driven pull did this until 2026-11-13).
 - To make a threshold editable, add it to `SETTINGS` in `lib/callanchor/issues.ts`; every loader in
   `health.ts` calls `loadSettings()` first, so pages and actions see the saved values.
 - Journey counts come from `journeyStop()` and `isComplete()` in `lib/callanchor/issues.ts`, exposed as
@@ -272,6 +311,7 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-13 | New phone / new agent checked in 1, 3 and 7-day windows instead of waiting 7 days: after its first full day, "stopped capturing calls" compares with its last 1 day, from day 3 its last 3, from day 7 its last 7; the alert says which ("over its last 3 days"), the phone page says which window and when the next starts, and the hourly chart averages the full days before today it has. Badge "New phone · first day" with the start time on hover | Done, typechecks and lints; not pushed | `RULES.baselineWindows` and `licenseHealth` in `lib/callanchor/issues.ts`, `loadLicense` in `lib/callanchor/health.ts`, `NewPhone` in `health/_views/entities.tsx` |
 | 2026-11-13 | Merge the recording near-duplicates on Calls & logs: "Not uploaded", "Phone hasn't uploaded" and "Still on the phone" overlap (the CRM ones are now grouped, see Portal changes) | 37 stages is still more than a support person needs | Awaiting owner |
 | 2026-11-13 | Finish the Supabase Mumbai cutover for local dev too: from here, Neon Singapore returns ~32 KB/s (7 days of calls, 1.2 MB, take 37 s while the query runs in 4 ms), so a cold local read takes over a minute | Production is next to Neon and unaffected; local dev waits on every cold read | Awaiting owner |
 | 2026-11-13 | (Superseded: owner chose to move the database to Mumbai.) Make local dev usable over a slow route to Singapore: either run local against a local Postgres (own store, pulled from CallAnchor), or cut what a page reads (stop loading 8 days of every call, about 6.4 MB, on each fleet visit) and stop the page waiting on CallAnchor pulls | Local took over a minute per page on 13 Nov: the owner's ISP route to Singapore gave Neon 56–230 KB/s (5.8 MB/s elsewhere), over HTTP, WebSocket and curl alike, and transfers over ~4 MB were cut off. Production runs in `sin1` beside Neon and isn't affected | Awaiting owner |
@@ -295,6 +335,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
 | 2026-11-13 | Calls & logs, Accepted by the CRM step: one "Didn't reach the CRM" stage with its reasons indented under it (CRM rejected it (4xx), sign-in 401/403, no response or 5xx; empty ones hidden), counted once in the step. "Sent, not accepted" and "Sync failed" were the same calls (15 days: 45 in each, all 4xx), so they show only when a link opens them | Done, not pushed | `UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx` |
+| 2026-11-13 | Unified entity tabs: Overview, Issues, Clients, Licenses, Devices, Settings; shared columns (Health chip, Call journey, CRM syncs, Needs action) on a range (24h, 3, 7, 15 days) carried between tabs; module switches, the Clients table and the old Licenses panel removed; a client's tabs are Overview, Issues, Licenses, Devices and Calls & logs, the same tables scoped; Overview shows the worst five of each entity, failed CRM syncs and system logs | Done, builds; loader checked read-only against the store (counts add up across clients, licenses and devices); pushed 2026-11-13, not yet viewed signed in | `health/_views/entities.tsx`, `loadEntities` in `lib/callanchor/health.ts`, `health/HealthNav.tsx` |
 | 2026-11-13 | Licenses tab: each module has its own left-menu filters (Calls & CRM: calls, reach, sync days; Device: model, app, recording, dialer); module change clears filters. Rings in a fixed colour per metric with "of Y" under the number and the share on hover; Purchased column removed; Reached CRM and Recordings as rings; CRM sync, 7 days as one shared cell in both Clients modules and the Licenses tab | Done, pushed 2026-11-13; not yet viewed signed in | `health/_views/licenses.tsx`, `MetricRing` in `health/ui.tsx`, `SyncCell` in `health/parts.tsx`, `health/FleetTable.tsx` |
 | 2026-11-13 | Tabs split: Overview (Needs action, Module as left menu), Clients (Module and per-module Health as left menu, picks kept in the URL), Licenses (Module, Health and Use as left-menu filters, empty options hidden, All shows every license); client pages sit under the Clients tab and breadcrumb; shared `MenuLayout` | Done, pushed 2026-11-13 (`1ab99cb`); not yet viewed signed in | `health/FilterMenu.tsx`, `health/clients/page.tsx`, `health/licenses/page.tsx`, `health/FleetTable.tsx`, `health/HealthNav.tsx` |
 | 2026-11-13 | Overview by module: Trials removed; Needs action split into CRM, Device, Portal and Usage, with CRM errors under CRM and system logs under Portal over a time range (24 hours default, 3, 7, 15 days); Clients table switches between Call journey, Licenses and Issues; Licenses switches between Health & use, Calls & CRM and Device (breakdowns moved into Device); license filters moved inside their section; severity and CRM status codes colour-coded as chips and badges | Done, pushed 2026-11-13 (`1ab99cb`); not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `health/_views/licenses.tsx`, `lib/callanchor/modules.ts`, `health/format.ts` |
@@ -329,10 +370,67 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Asked to commit and push everything, including the Supabase driver and `bom1` region
+  changes that were waiting. Pushed to main.
+- 2026-11-13: Rings shouldn't be one colour per metric but a warning signal. Seat rings are green at
+  80%+ (Unused: 20% or less), amber from 50%, red below; the CRM syncs ring uses the CRM success lines
+  from Settings.
+- 2026-11-13: The seat rings looked bad: dropped the "5 purchased" line, the count now reads 5/5
+  (the /5 grey), and the share shows on hover only, in a smaller ring.
+- 2026-11-13: Asked how the journey dots show a client stopping at two steps. Answered: each step
+  gets its own red dot and count, text lists both ("stops at upload, crm"); counts never overlap
+  since a call stops once, at its first break. No change.
+
+- 2026-11-13: Wanted seats out of purchased again (Active, Logged in, Calling, Unused, the share in
+  the ring) and calls moved under the name. Built `PctRing` and the seat cell; "X calls in <range> ·
+  last …" now sits under the name on Clients, Licenses and Devices; the Calls columns went.
+- 2026-11-13: 1 failure in 10 and 10 in 100 are both 10%, but clients differ in size; wanted focus
+  where it's needed, checked before building. Chose: severity tier, then size (calls surely lost);
+  enough failures for Critical but no client left out; an Impact column. Built all three.
+- 2026-11-13: Left menus should be multi-select and collapsed, showing only what's picked. Done for
+  the entity tabs (`?health=critical,warning`). Also: phones still showed …1234 although all 135 full
+  numbers were saved: the server's kept results were two steps stale; a finished pull now marks them
+  stale and recomputes the fleet assessment first, and the page refreshes again 8 s after.
+- 2026-11-13: Asked why call ids and phones were shortened, to show them in full, and to show the
+  agent's name greyed under the phone. Call ids now show whole; full numbers are stored
+  (`ca_licenses.number`, migrated on the shared Neon DB with the owner's OK, "pull fresh": the next
+  pull refetches every license, nothing deleted); the agent is a grey line under the number.
+- 2026-11-13: The "New phone" badge showed for 73 phones whose clients have no tracked calls; now only
+  for phones with a known start. Agent names no longer wrap.
+- 2026-11-13: Asked to check in 1, 3 and 7-day windows and answer accordingly. A phone's usual calls
+  a day now come from the longest full window it has, and every message names that window.
+- 2026-11-13: Asked where the 7-day wait on a new phone comes from (`RULES.baselineDays`; it only
+  held back "stopped capturing calls", the drop-against-usual check) and said not to wait 7 days.
+  Now that check starts after one full day, averaging over the days seen so far.
+- 2026-11-13: Asked where the agent names were. The shared Neon database lacked `agent_name` and
+  `ca_pull_jobs` (dev had started before them). With the owner's OK ran `npm run db:migrate` there;
+  planning a pull now fetches the client list at once while an assigned phone has no name.
+- 2026-11-13: The "New phone" hover text was still jargon (rule names). Rewritten in everyday words:
+  we don't know its usual number of calls yet, so for 7 days we can't warn about fewer calls.
+- 2026-11-13: "learning its usual calls" was confusing. Now a badge "New phone · day 3 of 7" (or "New
+  agent" after a reassignment), with what waits and when it starts on hover; same words on the phone page.
+- 2026-11-13: Asked what "learning its usual calls" means (a phone's first 7 days of calls, from
+  first tracked or last reassigned, before "calls dropped"/"gone quiet" rules judge it; now on hover);
+  asked for the agent's name with each phone (stored as `ca_licenses.agent_name`, shown on license
+  and issue rows, searchable); the search box cut off its hint (widened).
+- 2026-11-13: Hover text (health chip) took long to show, and switching range looked like a reload.
+  Hover text on health pages is now instant (`InstantTips`); a range change keeps the table on screen
+  with a spinner on the picked range, and the other ranges are computed in the background. Not a pull.
+- 2026-11-13: Changing tabs set off the pull; wants the CallAnchor pull to run in the background.
+  Moved it to the server (`after()` behind POST `health/pull`, progress in `ca_pull_jobs`), followed
+  by fetch outside the router, shown as a small corner indicator. Updated the pull rule.
 - 2026-11-13: Asked why one call showed under four CRM filters, and to group them from the data.
   They were nested tests (rejected ⊂ failed ⊂ sent not accepted ⊂ didn't reach); every failure in
   15 days is a 4xx, mostly Salesforce `OPPORTUNITY_NOT_FOUND` for one client. Grouped under one
   parent with reasons nested.
+
+- 2026-11-13: Asked for a unified health view: tabs per entity (Issues, Clients, Licenses, new
+  Devices), each row one entity with Health chip, Call journey, CRM syncs and Needs action on a time
+  range, the same rows inside a client. Answered 8 questions (device = model; Overview kept; client
+  page = same tabs scoped; range 24h/3/7/15d drives journey and CRM). Recorded the rule; building.
+- 2026-11-13: Asked how "Reached CRM, 24h" differs from "CRM sync, 7 days" on Licenses. Explained:
+  the first is the share of due calls in a rolling 24 hours that got a 2xx; the second is a 7-day
+  strip of IST days (synced at 80% of due) plus the last call that went all the way through. No change.
 
 - 2026-11-13: Pointed out Health and Use belong to the first Licenses module only; Calls & CRM and
   Device need their own filters. Asked for rings in fixed colours with the share on hover, "X of Y"

@@ -34,6 +34,9 @@ export const RULES = {
   criticalSuccessRate: 80,
   warningSuccessRate: 95,
   minCallsForRate: 5,
+  // A failure rate alone is Critical only with at least this many failed calls; with fewer it's a
+  // Warning, never dropped, so no small client is left out (owner, 2026-11-13).
+  criticalMinFailures: 5,
   rejectAllWindowMs: 2 * HOUR,
   rejectAllMinCalls: 5,
   unreachableRun: 3,
@@ -57,6 +60,9 @@ export const RULES = {
   baselineDropPoints: 15,
   // Licenses
   baselineDays: 7,
+  // A phone's usual calls a day, judged against the longest of these windows it has fully seen: its
+  // first full day, then 3 days, then 7 (owner, 2026-11-13: no week-long wait). Ascending.
+  baselineWindows: [1, 3, 7],
   licenseMinDailyCalls: 3,
   // A phone that usually makes licenseMinDailyCalls a day and has gone silent this long.
   licenseQuietMs: DAY,
@@ -97,6 +103,7 @@ export const SETTINGS = [
   { key: "quietDays", rule: "quietMs", unit: DAY, label: "Busy client with no calls: warning after", suffix: "days", min: 0.25, max: 30, group: "Clients" },
   { key: "warningSuccessRate", rule: "warningSuccessRate", unit: 1, label: "CRM success: warning below", suffix: "%", min: 1, max: 100, group: "CRM" },
   { key: "criticalSuccessRate", rule: "criticalSuccessRate", unit: 1, label: "CRM success: critical below", suffix: "%", min: 1, max: 100, group: "CRM" },
+  { key: "criticalMinFailures", rule: "criticalMinFailures", unit: 1, label: "Critical needs at least", suffix: "failed calls (fewer: warning)", min: 1, max: 1000, group: "CRM" },
   { key: "syncedDayRate", rule: "syncedDayRate", unit: 1, label: "A day counts as synced at", suffix: "% of due calls", min: 1, max: 100, group: "CRM" },
   { key: "lateSyncMinutes", rule: "lateSyncMs", unit: MINUTE, label: "Sync is late after", suffix: "minutes", min: 1, max: 1440, group: "CRM" },
   { key: "phoneGraceMinutes", rule: "phoneGraceMs", unit: MINUTE, label: "Grace for the phone's upload", suffix: "minutes", min: 1, max: 1440, group: "Recordings" },
@@ -351,17 +358,24 @@ export const isComplete = (c: StoredCall, ctx: ClientContext) =>
 
 export type JourneySummary = { calls: number; complete: number; moving: number; stops: Record<JourneyStop, number>; recorded: number; picked: number; sent: number };
 
+export const emptyJourney = (): JourneySummary => ({ calls: 0, complete: 0, moving: 0, stops: { upload: 0, sent: 0, crm: 0 }, recorded: 0, picked: 0, sent: 0 });
+
+// Adds one call to a summary, judged by its own client's context, so a summary can span clients (a
+// device model's licenses).
+export function addToJourney(out: JourneySummary, c: StoredCall, ctx: ClientContext, now: number) {
+  out.calls++;
+  const stop = journeyStop(c, ctx, now);
+  if (stop) out.stops[stop]++;
+  else if (isComplete(c, ctx)) out.complete++;
+  else out.moving++;
+  if (isRecorded(c)) out.recorded++;
+  if (c.ingestedAt) out.picked++;
+  if (c.attempts > 0) out.sent++;
+}
+
 export function journeySummary(calls: StoredCall[], ctx: ClientContext, now: number): JourneySummary {
-  const out: JourneySummary = { calls: calls.length, complete: 0, moving: 0, stops: { upload: 0, sent: 0, crm: 0 }, recorded: 0, picked: 0, sent: 0 };
-  for (const c of calls) {
-    const stop = journeyStop(c, ctx, now);
-    if (stop) out.stops[stop]++;
-    else if (isComplete(c, ctx)) out.complete++;
-    else out.moving++;
-    if (isRecorded(c)) out.recorded++;
-    if (c.ingestedAt) out.picked++;
-    if (c.attempts > 0) out.sent++;
-  }
+  const out = emptyJourney();
+  for (const c of calls) addToJourney(out, c, ctx, now);
   return out;
 }
 
@@ -657,7 +671,15 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
   } else if (rejected.length > 0) {
     const kept = 100 - rejectedShare;
     const level: IssueLevel | null =
-      settled < RULES.minCallsForRate ? "warning" : kept < RULES.criticalSuccessRate ? "critical" : kept < RULES.warningSuccessRate ? "warning" : null;
+      settled < RULES.minCallsForRate
+        ? "warning"
+        : kept < RULES.criticalSuccessRate
+          ? rejected.length >= RULES.criticalMinFailures
+            ? "critical"
+            : "warning"
+          : kept < RULES.warningSuccessRate
+            ? "warning"
+            : null;
     if (level) {
       add("crm_rejecting", level, "CRM is rejecting calls", crm({
         calls: rejected,
@@ -908,10 +930,12 @@ function integrationIssues(input: ClientInput, day: StoredCall[], now: number): 
       const deliveredCount = outcomes.filter((c) => c.delivered).length;
       const failedCount = outcomes.filter((c) => !c.delivered && c.last.status === "failed").length;
       const rate = share(deliveredCount, deliveredCount + failedCount);
-      if (rate === null || deliveredCount + failedCount < RULES.minCallsForRate || rate >= RULES.warningSuccessRate) continue;
+      // Few calls still warn when one failed, so a small client isn't left out (owner, 2026-11-13).
+      if (rate === null || rate >= RULES.warningSuccessRate || failedCount === 0) continue;
+      const level: IssueLevel = deliveredCount + failedCount >= RULES.minCallsForRate && rate < RULES.criticalSuccessRate && failedCount >= RULES.criticalMinFailures ? "critical" : "warning";
       const name = tenant.integrations.find((i) => i.platformId === platformId)?.platformName ?? platformId;
       issues.push(
-        issue(scope, `integration_failing_${slug(platformId)}`, rate < RULES.criticalSuccessRate ? "critical" : "warning", `${name} is failing calls`, now, {
+        issue(scope, `integration_failing_${slug(platformId)}`, level, `${name} is failing calls`, now, {
           impact: failedCount,
           impactText: `${n(failedCount, "call")} not in ${name}`,
           times: outcomes.filter((c) => !c.delivered && c.last.status === "failed").map((c) => c.last.at),
@@ -1038,9 +1062,13 @@ export type LicenseHealth = {
   license: StoredLicense;
   status: LicenseStatus;
   issues: Issue[];
-  // Baseline rules need about 7 days of license-linked calls first, from the last agent change.
+  // Baseline rules need a full day of license-linked calls first, from the last agent change.
   learning: boolean;
   baselineSince: string | null;
+  // The window its usual calls a day come from: 1, 3 or 7 days; null in its first day.
+  windowDays: number | null;
+  // The baseline restarted because the phone was given to another agent.
+  newAgent: boolean;
   calls24h: number;
   perDay: number | null;
   recorded24h: number;
@@ -1110,9 +1138,11 @@ export function licenseHealth(input: LicenseInput, now: number): LicenseHealth[]
     // A new agent starts a new baseline: the old agent's calls say nothing about the new one (QA L10).
     const reassigned = own.find((c) => c.field === "member_id")?.at ?? null;
     const baselineSince = [input.historyStart, reassigned].filter((t): t is string => !!t).sort().pop() ?? null;
-    const learning = !baselineSince || now - Date.parse(baselineSince) < RULES.baselineDays * DAY;
+    const seenMs = baselineSince ? now - Date.parse(baselineSince) : 0;
+    const windowDays = [...RULES.baselineWindows].reverse().find((d) => seenMs >= d * DAY) ?? null;
+    const learning = windowDays === null;
+    const perDay = windowDays === null ? null : recent.filter((c) => ageOf(c, now) <= windowDays * DAY).length / windowDays;
     const week = recent.filter((c) => ageOf(c, now) > DAY && (!baselineSince || callTime(c)! >= baselineSince));
-    const perDay = learning ? null : week.length / RULES.baselineDays;
     const linked = input.lastSyncs.get(license.licenseId);
     const lastCallAt = [linked?.callAt, license.callsGrewAt].filter((t): t is string => !!t).sort().pop() ?? null;
     const lastSyncAt = linked?.syncAt ?? null;
@@ -1139,7 +1169,7 @@ export function licenseHealth(input: LicenseInput, now: number): LicenseHealth[]
         add("license_not_capturing", silent > RULES.licenseQuietCriticalMs ? "critical" : "warning", "Phone has stopped capturing calls", {
           impact: 0,
           times: [],
-          evidence: [`Usually about ${Math.round(perDay)} calls a day; none for ${ageText(silent)}`, ...(peerHint ? [peerHint] : [])],
+          evidence: [`Usually about ${Math.round(perDay)} calls a day over ${windowDays === 1 ? "its last day" : `its last ${windowDays} days`}; none for ${ageText(silent)}`, ...(peerHint ? [peerHint] : [])],
           drill: drill("all", 7),
         });
       } else if (silent > RULES.noCallWarningMs) {
@@ -1302,7 +1332,9 @@ export function licenseHealth(input: LicenseInput, now: number): LicenseHealth[]
       status: "healthy",
       issues,
       learning,
+      windowDays,
       baselineSince,
+      newAgent: reassigned !== null && reassigned === baselineSince,
       calls24h: calls.length,
       perDay,
       recorded24h: stage("recorded").length,

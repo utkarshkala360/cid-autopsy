@@ -27,7 +27,7 @@ export default async function AdminHomePage() {
       SELECT id, username, full_name, role, is_active, is_auditor, created_at, last_login_at
       FROM members ORDER BY created_at DESC
     `,
-  ])) as [unknown, MemberRow[]];
+  ])) as unknown as [unknown, MemberRow[]];
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
