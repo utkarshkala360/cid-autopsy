@@ -66,6 +66,9 @@ async function runJob(clientId: string | null, verifyHref: string, refresh: () =
   const labels = new Map<string, string>([["snapshots", "Client list"]]);
   let failures: Failure[] = [];
   let done = 0;
+  // While pulling, the page refreshes every 5 seconds so new data shows as it lands. A refresh is a
+  // background transition: the page stays usable, with its scroll, filters and open sections kept.
+  const ticker = setInterval(refresh, 5_000);
   try {
     let plan = await planPullAction(clientId);
     if ("verify" in plan) return window.location.assign(verifyHref);
@@ -101,6 +104,7 @@ async function runJob(clientId: string | null, verifyHref: string, refresh: () =
   } catch {
     job.set({ phase: "finished", total: done, failures: [...failures, { label: "Pull", error: "stopped unexpectedly; reload to try again" }], seconds: 0 });
   } finally {
+    clearInterval(ticker);
     job.running = false;
   }
 }

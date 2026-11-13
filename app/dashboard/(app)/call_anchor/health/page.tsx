@@ -31,7 +31,7 @@ export default async function ClientHealthPage({ searchParams }: PageProps<"/das
     <div>
       {!profile && <p className="text-sm text-slate-500">CallAnchor can&apos;t be reached right now.</p>}
       {profile && (
-        <Suspense fallback={<LoadingNote text="Pulling what's new from CallAnchor. The very first load also stores the last 5 days, which takes up to a minute." />}>
+        <Suspense fallback={<LoadingNote text="Reading the stored data. Only the first read after the server starts waits; later visits show the last data at once and update in place." expectMs={20000} />}>
           <FleetHealth all={all} query={query} />
         </Suspense>
       )}

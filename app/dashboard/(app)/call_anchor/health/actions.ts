@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireMember } from "@/lib/auth";
+import { clearHealthCache } from "@/lib/callanchor/health";
 import { PortalError } from "@/lib/callanchor/portal";
 import { HEALTH_PATH, SHOW_INTERNAL_COOKIE, requireCallAnchorSession, requireHealthAdmin, storedCookie } from "@/lib/callanchor/session";
 import { isPullStep, planPull, runPullStep, setClientInternal, type PullStep } from "@/lib/callanchor/store";
@@ -29,6 +30,7 @@ export async function setClientInternalAction(formData: FormData) {
   if (!ID_PATTERN.test(clientId)) return;
   const { member } = await requireHealthAdmin(`${HEALTH_PATH}/${clientId}`);
   await setClientInternal(clientId, formData.get("internal") === "1", member.fullName || member.username);
+  clearHealthCache();
   revalidatePath(HEALTH_PATH, "layout");
 }
 

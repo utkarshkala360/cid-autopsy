@@ -156,6 +156,12 @@ Rules already established in this repo.
   re-plan a scope for 5 minutes, remembered across reloads (`PullProgress` in `health/Progress.tsx`, `planPull` and
   `runPullStep` in `store.ts`). Failures are listed by cause with the streams they hit. Store reads
   show an estimated percentage (`LoadingNote`).
+- Users never wait on data they've already seen (owner, 2026-11-13). The fleet, licenses and client
+  summary loaders keep their last result in server memory and serve it at once, recomputing in the
+  background when it's over 5 seconds old, one run per key (`cached` in `lib/callanchor/health.ts`);
+  only the first read after a server start waits. While a pull runs, the page refreshes every 5
+  seconds as a background transition, so new data appears in place without a loader, scroll jump or
+  lost filters. A change that alters the numbers calls `clearHealthCache()`.
 - CRM replies are custom code written per client, so their text is never a reliable error
   identifier. Severity comes from CallAnchor and HTTP signals (status code, no response, retries,
   missing events, timing). Reply text is shown as evidence only, until owner-curated suggestions and
@@ -237,6 +243,7 @@ Agent proposals awaiting the owner's decision. Newest first.
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
 | 2026-11-13 | Merge near-duplicate stages on Calls & logs: "Due, didn't reach it", "Sent, not accepted" and "Sync failed" overlap, as do "Not uploaded", "Phone hasn't uploaded" and "Still on the phone" | The panel now follows the journey with counts, but 37 stages is still more than a support person needs | Awaiting owner |
+| 2026-11-13 | Finish the Supabase Mumbai cutover for local dev too: from here, Neon Singapore returns ~32 KB/s (7 days of calls, 1.2 MB, take 37 s while the query runs in 4 ms), so a cold local read takes over a minute | Production is next to Neon and unaffected; local dev waits on every cold read | Awaiting owner |
 | 2026-11-13 | (Superseded: owner chose to move the database to Mumbai.) Make local dev usable over a slow route to Singapore: either run local against a local Postgres (own store, pulled from CallAnchor), or cut what a page reads (stop loading 8 days of every call, about 6.4 MB, on each fleet visit) and stop the page waiting on CallAnchor pulls | Local took over a minute per page on 13 Nov: the owner's ISP route to Singapore gave Neon 56–230 KB/s (5.8 MB/s elsewhere), over HTTP, WebSocket and curl alike, and transfers over ~4 MB were cut off. Production runs in `sin1` beside Neon and isn't affected | Awaiting owner |
 | 2026-11-13 | Ask CallAnchor to fill `externalCallId` on `mobile.call.create` (the phone's own call-log id) | It's empty on all 8,309 stored ingest logs, so the chain starts at CallAnchor's call id: a call on the phone can't be matched to its row here without it | Awaiting owner |
 | 2026-11-12 | Give "phone couldn't save the recording" its own issue, apart from "Recordings stuck on the phone" | 12 stored calls have `mobile.recording.mark-unavailable`: the phone found no file, so waiting won't help. They still count as stuck on the phone (only the reason is shown now); the fix is the phone's microphone permission or dialer recording setting | Awaiting owner |
@@ -257,6 +264,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Serve the last computed data at once and recompute in the background (5 s); refresh the page every 5 s while pulling, in place; cache cleared on internal marks and saved Settings | Done, builds; pushed with this turn's commit; not yet viewed signed in | `cached` in `lib/callanchor/health.ts`, `health/Progress.tsx` |
 | 2026-11-13 | Overview, Clients and Licenses merged into one Overview page at `/health`: clients table with seat rings and licenses needing action, Licenses section below with filters; tabs now Overview and Settings; old routes redirect; section links open their section | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `LicensesPanel` in `health/_views/licenses.tsx` |
 | 2026-11-13 | Seats merged into Licenses (seat column, Use filter, seat-use strip and per-client table); rings with formula tooltips for seat counts; batched pulls with a progress bar, percentage, live failure list and a 2-minute cooldown, one job per tab; estimated-percentage loaders; Customers section removed (redirects to Client health; Internal flag stays on the client page); boolean arrays sent as text so the postgres.js driver can save them | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/_views/licenses.tsx`, `health/Progress.tsx`, `health/ui.tsx`, `planPull` in `store.ts` |
 | 2026-11-13 | Visual redesign after the owner's portal screenshot: hero headers with key numbers and attached stat strips on Clients, Overview, Licenses, Seats and every client page (client hero: health pill, CRM integration, last call through, reached-CRM bar, calls; strip: open issues, licenses, seats, last good sync); client tabs with icons inside the hero; tiles restyled with accents | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/ui.tsx`, `health/clients/[clientId]/layout.tsx`, `loadClientSummary` in `lib/callanchor/health.ts` |
@@ -287,6 +295,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Showed two loaders at 0% and asked not to make users wait: refresh every 5 seconds so
+  the page is usable while loading, without new data interrupting. Measured the slow read: the query
+  runs in 4 ms, but the route from here to Neon Singapore carries ~32 KB/s, so 7 days of calls take
+  37 s locally. Built serve-last-then-recompute caching and in-place 5-second refreshes during pulls.
 - 2026-11-13: Said "great job with the overview" and asked to merge Overview, Licenses and Clients
   with all details together; tabs to be split out later. Merged them into one Overview page read
   once from the store. Earlier: the Clients page sat at 95% for 70 seconds; not yet diagnosed (the

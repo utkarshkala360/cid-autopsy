@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { clearHealthCache } from "@/lib/callanchor/health";
 import { loadSettings } from "@/lib/callanchor/health";
 import { SETTINGS, settingDefault } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireHealthAdmin } from "@/lib/callanchor/session";
@@ -33,6 +34,7 @@ export async function saveSettingsAction(_prev: FormState, formData: FormData): 
     else changed[s.key] = values[s.key];
   }
   await saveHealthSettings(changed, reset, member.fullName || member.username);
+  clearHealthCache();
   revalidatePath(HEALTH_PATH, "layout");
   return { success: "Saved. Every health page uses the new values from its next load." };
 }

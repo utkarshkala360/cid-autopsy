@@ -391,7 +391,48 @@ function errorGroups(events: StoredCallout[], names: Map<string, string>): Error
     .sort((a, b) => b.calls - a.calls);
 }
 
-export async function loadFleetHealth(cookie: string, memberId: string, showInternal = false) {
+// ---- Serving page data while it's recomputed (owner, 2026-11-13: don't make the user wait) ----
+// A page gets the last computed data at once; when that's older than FRESH_MS it's recomputed in
+// the background (one at a time per key), and the next refresh shows it. Only the very first read
+// waits. Kept in this server's memory, so a cold instance reads once.
+const FRESH_MS = 5_000;
+const KEEP_MS = 30 * 60_000;
+const memo = new Map<string, { at: number; value?: unknown; pending?: Promise<unknown> }>();
+
+async function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const entry = memo.get(key) ?? { at: 0 };
+  memo.set(key, entry);
+  const start = () => {
+    entry.pending ??= compute()
+      .then((value) => {
+        entry.value = value;
+        entry.at = Date.now();
+        return value;
+      })
+      .finally(() => {
+        entry.pending = undefined;
+      });
+    return entry.pending as Promise<T>;
+  };
+  if (entry.value !== undefined && now - entry.at < KEEP_MS) {
+    if (now - entry.at >= FRESH_MS) start().catch(() => undefined);
+    return entry.value as T;
+  }
+  return start();
+}
+
+// After a change that alters the numbers (an internal mark, saved thresholds), the next read
+// recomputes instead of serving what was kept.
+export function clearHealthCache() {
+  memo.clear();
+}
+
+export function loadFleetHealth(cookie: string, memberId: string, showInternal = false) {
+  return cached(`fleet:${memberId}:${showInternal}`, () => computeFleetHealth(cookie, memberId, showInternal));
+}
+
+async function computeFleetHealth(cookie: string, memberId: string, showInternal = false) {
   const started = Date.now();
   await loadSettings();
   // The browser pulls what's new batch by batch with a progress bar (PullProgress); the page reads the
@@ -718,7 +759,11 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
 export type FleetLicense = LicenseHealth & { companyName: string };
 
 // Every license fleet-wide with its status, from the store.
-export async function loadFleetLicenses(showInternal = false) {
+export function loadFleetLicenses(showInternal = false) {
+  return cached(`licenses:${showInternal}`, () => computeFleetLicenses(showInternal));
+}
+
+async function computeFleetLicenses(showInternal = false) {
   await loadSettings();
   const now = Date.now();
   const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
@@ -734,7 +779,11 @@ export async function loadFleetLicenses(showInternal = false) {
 
 // The numbers in a client's header, on every page under it: health, calls, CRM reach, licenses and
 // seats, from the store. Null before the client's first pull.
-export async function loadClientSummary(clientId: string) {
+export function loadClientSummary(clientId: string) {
+  return cached(`summary:${clientId}`, () => computeClientSummary(clientId));
+}
+
+async function computeClientSummary(clientId: string) {
   await loadSettings();
   const now = Date.now();
   const [a] = await assess(now, clientId);
