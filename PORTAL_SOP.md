@@ -145,8 +145,9 @@ Rules already established in this repo.
   (`Ring` in `health/ui.tsx`, `Head` info in `Table`).
 - Pages never pull CallAnchor while rendering; they show the store at once, and the browser pulls
   what's due in batches of 4 with a progress bar, a percentage and what's being pulled, then
-  refreshes (owner, 2026-11-13). One pull job runs per tab across page changes, and a scope pulled
-  in the last 2 minutes isn't pulled again (`PullProgress` in `health/Progress.tsx`, `planPull` and
+  refreshes (owner, 2026-11-13). One pull job runs per tab across page changes; a page pulls a
+  stream only if it was last pulled over 5 minutes ago (`SYNC.pageEveryMs`), and the browser doesn't
+  re-plan a scope for 5 minutes, remembered across reloads (`PullProgress` in `health/Progress.tsx`, `planPull` and
   `runPullStep` in `store.ts`). Failures are listed by cause with the streams they hit. Store reads
   show an estimated percentage (`LoadingNote`).
 - CRM replies are custom code written per client, so their text is never a reliable error
@@ -279,6 +280,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Asked why every page change pulls streams again. A stream counted as due 30 seconds
+  after its last pull, and the browser's 2-minute cooldown lived in memory. Pages now pull a stream
+  only after 5 minutes, and the cooldown is 5 minutes, kept in session storage (`a00357c`). All 60
+  streams were healthy, with no errors left after the boolean fix.
 - 2026-11-13: Asked to remove `/customers` and use clients, keeping the Internal/External flag.
   Removed the section and its Salesforce pages (54 customers, all CallAnchor clients; no org
   connected); the flag already lives on the client page in `ca_client_flags`.
