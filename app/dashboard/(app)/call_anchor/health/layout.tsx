@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import { requireMember } from "@/lib/auth";
-import { showInternal } from "@/lib/callanchor/session";
+import { HEALTH_PATH, showInternal, verifyUrl } from "@/lib/callanchor/session";
 import { readClientNames, readLicenses } from "@/lib/callanchor/store";
 import { HealthBody, HealthSubBar, HealthTrail } from "./HealthNav";
+import { PullProgress } from "./Progress";
 
 // Every health page gets the same frame (owner, 2026-11-13): the health tabs frozen under the site
 // header, a breadcrumb that follows the URL's hierarchy, then the page. A client's pages add its name
@@ -17,6 +18,7 @@ export default async function HealthLayout({ children }: LayoutProps<"/dashboard
       <Suspense>
         <HealthTrail clients={Object.fromEntries(names)} phones={phones} />
       </Suspense>
+      <PullProgress verifyHref={verifyUrl(HEALTH_PATH)} />
       <HealthBody>{children}</HealthBody>
     </>
   );

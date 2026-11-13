@@ -13,7 +13,6 @@ const VIEWS = [
   { key: "overview", label: "Overview", path: "/overview" },
   { key: "clients", label: "Clients", path: "" },
   { key: "licenses", label: "Licenses", path: "/licenses" },
-  { key: "seats", label: "Seats", path: "/seats" },
   { key: "settings", label: "Settings", path: "/settings", adminOnly: true },
 ] as const;
 
@@ -56,16 +55,15 @@ export function HealthBody({ children }: { children: React.ReactNode }) {
   return inClient ? <>{children}</> : <SectionsFrame>{children}</SectionsFrame>;
 }
 
-// One client's tabs, under its name: Health, Licenses, Seats, Calls & logs. A phone opens under
+// One client's tabs, under its name: Health, Licenses (with seats), Calls & logs. A phone opens under
 // Licenses, a call under Calls & logs, an issue under Health.
 export function ClientTabs({ root }: { root: string }) {
   const pathname = usePathname();
   const rest = pathname.slice(root.length);
-  const current = rest.startsWith("/licenses") ? "licenses" : rest.startsWith("/seats") ? "seats" : rest.startsWith("/items") || rest.startsWith("/calls") ? "items" : "health";
+  const current = rest.startsWith("/licenses") || rest.startsWith("/seats") ? "licenses" : rest.startsWith("/items") || rest.startsWith("/calls") ? "items" : "health";
   const tabs: { key: string; label: string; href: string; icon: IconName }[] = [
     { key: "health", label: "Health", href: root, icon: "grid" },
     { key: "licenses", label: "Licenses", href: `${root}/licenses`, icon: "licenses" },
-    { key: "seats", label: "Seats", href: `${root}/seats`, icon: "seats" },
     { key: "items", label: "Calls & logs", href: `${root}/items?kind=calls&stage=all&window=1`, icon: "logs" },
   ];
   return (

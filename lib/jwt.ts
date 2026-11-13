@@ -11,7 +11,7 @@ export type SessionPayload = {
 };
 
 // The admin cookie is scoped to /admin. The member cookie covers the rest of the app
-// (/dashboard, /customers); the audience check keeps it out of /admin.
+// (/dashboard); the audience check keeps it out of /admin.
 export const SESSION_COOKIES = {
   admin: { name: "cid_admin", path: "/admin", loginPath: "/admin/login" },
   member: { name: "cid_session", path: "/", loginPath: "/dashboard/login" },

@@ -78,15 +78,16 @@ Rules already established in this repo.
 - A client can be marked internal (our own test and demo accounts). Its calls, licenses and seats
   are hidden from every cross-client health view until "Show internal clients" is ticked in the left
   menu; a client or phone opened by id still shows (owner, 2026-11-12). Every client starts External;
-  only admins change it, with the "Mark as Internal" / "Mark as External" button on Customers or the
-  client's health page, always after a confirmation. Status shows as a coloured tag (Internal amber,
-  External green), never a bare checkbox. Customers also hides internal ones behind a "Show internal"
-  filter (owner, 2026-11-12). See `components/InternalMark.tsx`; flags live in `ca_client_flags`.
-- Every client CallAnchor lists is a customer with product CallAnchor, linked by
-  `customers.callanchor_client_id`, added on its own after each snapshot pull (`ca_map_customers()`)
-  (owner, 2026-11-12).
-- Health pages share one frame: the site header is frozen at the top; Clients, Licenses, Seats and
-  Settings are a bar frozen under it; the left menu lists the open page's sections, and picking one
+  only admins change it, with the "Mark as Internal" / "Mark as External" button on the client's
+  health page, always after a confirmation. Status shows as a coloured tag (Internal amber,
+  External green), never a bare checkbox (owner, 2026-11-12). See `components/InternalMark.tsx`;
+  flags live in `ca_client_flags`.
+- There is no Customers section: CallAnchor clients are the customers, worked from Client health
+  (owner, 2026-11-13). `/customers` redirects there. The `customers` table and `ca_map_customers()`
+  stay in the schema, unused by pages; the Salesforce connect pages went with Customers (no org was
+  connected), and `lib/salesforce/` is kept for when a client page needs it.
+- Health pages share one frame: the site header is frozen at the top; Overview, Clients, Licenses
+  and Settings are a bar frozen under it; the left menu lists the open page's sections, and picking one
   shows that section on its own. There is no whole-page view: a page opens on its first section
   (owner, 2026-11-13). See `health/HealthNav.tsx`.
 - Member and admin pages use the full window width, with no centred max-width column; content and
@@ -95,7 +96,7 @@ Rules already established in this repo.
 - Health pages are hierarchical, client on top (owner, 2026-11-13). Everything about a client lives
   under `/health/clients/<client>/`: its Health page, `licenses` (and `licenses/<license>` for one
   phone), `seats`, `items` (Calls & logs), `calls/<call>` and `issues/<issue>`. The frame says where
-  you are at every level: health tabs (Overview, Clients, Licenses, Seats, Settings), a breadcrumb
+  you are at every level: health tabs (Overview, Clients, Licenses, Settings), a breadcrumb
   that follows the URL (`HealthTrail`), the client's name and its own tabs (Health, Licenses, Seats,
   Calls & logs; `ClientTabs`), then the left menu. Build links with `clientHref`, `licenseHref`,
   `callHref`, `issueHref` and `itemsHref` in `health/format.ts`, passing the client id; flat links
@@ -133,8 +134,21 @@ Rules already established in this repo.
   by the app → Recording uploaded → Sent to the CRM → Accepted by the CRM. Each client and phone
   shows where its calls stop, and when a call last went all the way through; each call shows the
   step it stopped at and the ids that tie every step to the next (owner, 2026-11-13).
-- Seat use (purchased, assigned, logged in, calling, unused) has its own Seats tab, not issue cards.
-  Unused seats aren't issues (owner, 2026-11-05).
+- Seats are licenses, so they share the Licenses tab (owner, 2026-11-13): each license shows its
+  health and its seat state (calling, logged in but not calling, logged out, not assigned) with since
+  when; Health and Use filters; the fleet list without a filter shows licenses needing action or
+  unused; seat use per client below. `/seats` links open Licenses with `use=unused`. Unused seats
+  still aren't issues (owner, 2026-11-05).
+- Seat counts show as a number with a ring filled by its share (owner, 2026-11-13): Purchased is the
+  total; the ring of Active is active ÷ purchased, Logged in is logged in ÷ active, Calling is
+  calling ÷ active. Columns keep their plain names; the formula is in the heading's info tooltip
+  (`Ring` in `health/ui.tsx`, `Head` info in `Table`).
+- Pages never pull CallAnchor while rendering; they show the store at once, and the browser pulls
+  what's due in batches of 4 with a progress bar, a percentage and what's being pulled, then
+  refreshes (owner, 2026-11-13). One pull job runs per tab across page changes, and a scope pulled
+  in the last 2 minutes isn't pulled again (`PullProgress` in `health/Progress.tsx`, `planPull` and
+  `runPullStep` in `store.ts`). Failures are listed by cause with the streams they hit. Store reads
+  show an estimated percentage (`LoadingNote`).
 - CRM replies are custom code written per client, so their text is never a reliable error
   identifier. Severity comes from CallAnchor and HTTP signals (status code, no response, retries,
   missing events, timing). Reply text is shown as evidence only, until owner-curated suggestions and
@@ -236,6 +250,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Seats merged into Licenses (seat column, Use filter, seat-use strip and per-client table); rings with formula tooltips for seat counts; batched pulls with a progress bar, percentage, live failure list and a 2-minute cooldown, one job per tab; estimated-percentage loaders; Customers section removed (redirects to Client health; Internal flag stays on the client page); boolean arrays sent as text so the postgres.js driver can save them | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/_views/licenses.tsx`, `health/Progress.tsx`, `health/ui.tsx`, `planPull` in `store.ts` |
 | 2026-11-13 | Visual redesign after the owner's portal screenshot: hero headers with key numbers and attached stat strips on Clients, Overview, Licenses, Seats and every client page (client hero: health pill, CRM integration, last call through, reached-CRM bar, calls; strip: open issues, licenses, seats, last good sync); client tabs with icons inside the hero; tiles restyled with accents | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/ui.tsx`, `health/clients/[clientId]/layout.tsx`, `loadClientSummary` in `lib/callanchor/health.ts` |
 | 2026-11-13 | Hierarchical navigation: client pages moved under `/health/clients/<client>/` (health, licenses, phone, seats, Calls & logs, call, issue); breadcrumb from the URL on every health page; client header with its own tabs; left menu below it; fleet Licenses, Seats and items with `?client=` and old flat client, phone, call and issue links redirect there. Links restyled: row links dark, counts as chips, actions as buttons; "Back to client" footers removed. Items page: left Kind and Stage filters; a page without sections now uses the full width | Done, pushed 2026-11-13 (`dd2be81`); not yet viewed signed in | `health/HealthNav.tsx`, `health/clients/[clientId]/`, `health/_views/`, `health/format.ts` |
 | 2026-11-13 | Move the database from Neon Singapore to Supabase Mumbai (Free plan, via the Vercel Marketplace, env prefix `SB_` until cutover); driver swapped to postgres.js in `lib/db.ts` and `scripts/db.mjs`; copy all tables, then point `DATABASE_URL` at Supabase and move Vercel functions from `sin1` to `bom1` | In progress: Supabase `cid-autopsy-bom` provisioned in `ap-south-1` and connected with prefix `SB`; schema applied; tables locked from Supabase's public REST API with RLS; postgres.js set to pass JSON text through (it double-encoded it); data copy from Neon running. Production still on Neon until the owner says push. With 15/30-day retention the database should stay near 120 MB, well inside the Free plan's 500 MB | `lib/db.ts`, `scripts/db.mjs`, `vercel.json` |
@@ -264,6 +279,22 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Asked to remove `/customers` and use clients, keeping the Internal/External flag.
+  Removed the section and its Salesforce pages (54 customers, all CallAnchor clients; no org
+  connected); the flag already lives on the client page in `ca_client_flags`.
+- 2026-11-13: Asked why going from Overview to Licenses pulled again ("0 of 60"). Live edits
+  reloaded the page mid-pull, and unfinished or failed streams stay due. Made the pull one job per
+  tab that survives page changes, with a 2-minute cooldown.
+- 2026-11-13: Asked what "14 failed so far" were. All were `cannot cast type boolean to boolean[]`:
+  the uncommitted postgres.js driver sends JS boolean arrays as one boolean. Sent them as text
+  cast in SQL, and the progress panel now lists failures by cause.
+- 2026-11-13: Called the "5 · 5 · 5 · 3" seat column broken; wants each as a number with a ring
+  filled by percentage (active ÷ purchased, logged in ÷ active, calling ÷ active), keeping the column
+  names, with the formula in an info tooltip. Built the rings and tooltips.
+- 2026-11-13: Asked for a loader with a percentage, pulling batch by batch so loading doesn't look
+  endless. Moved pulls out of page rendering into batched browser-driven pulls with progress.
+- 2026-11-13: Asked to merge Licenses and Seats, since an unused seat is an unused license. Merged
+  them into Licenses.
 - 2026-11-13: Shared a screenshot of the CallAnchor support portal ("neat and eye friendly") and
   called the health UI lame. Rebuilt the page headers as dark heroes with key numbers, stat strips
   with icons and accents, and icon tabs; added the look to the SOP.

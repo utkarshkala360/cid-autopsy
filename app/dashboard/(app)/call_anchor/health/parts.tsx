@@ -4,6 +4,7 @@ import type { CallStage, Day, Issue, IssueLevel, JourneySummary, LicenseStatus, 
 import type { ReplySuggestion, StoreStatus } from "@/lib/callanchor/store";
 import { badgeClass, cardClass, secondaryButtonClass } from "@/components/ui";
 import { StatCell, type IconName, type Tone } from "./ui";
+import { EstimatedProgress } from "./Progress";
 import { DAY_STATES, ISSUE_LEVELS, LEVELS, LICENSE_STATUSES, TRENDS, ago, formatDay, formatHour, formatTime, int, issueHref, itemsHref, pct, rateClass } from "./format";
 
 // How complete and fresh the stored data is: last pull, stream errors, calls missing their ingest
@@ -578,7 +579,7 @@ function PlainStat({ label, value, detail, href, tone }: { label: string; value:
 // A client's views, all under /health/clients/<client> (owner, 2026-11-13).
 export const clientViews = (basePath: string, clientId: string) => {
   const root = `${basePath}/clients/${encodeURIComponent(clientId)}`;
-  return { health: root, licenses: `${root}/licenses`, seats: `${root}/seats`, items: `${root}/items?kind=calls&stage=all&window=1` };
+  return { health: root, licenses: `${root}/licenses`, seats: `${root}/licenses?use=unused`, items: `${root}/items?kind=calls&stage=all&window=1` };
 };
 
 // A section's anchor and its name in the left menu's "On this page": the title up to any count.
@@ -610,15 +611,29 @@ export function Collapsed({ title, note, children }: { title: string; note?: Rea
   );
 }
 
-export function Table({ head, children, empty }: { head: string[]; children: React.ReactNode; empty?: string }) {
+// A column heading, optionally with an info mark whose tooltip explains it (a formula, a rule).
+export type Head = string | { label: string; info: string };
+
+export function Table({ head, children, empty }: { head: Head[]; children: React.ReactNode; empty?: string }) {
   return (
     <div className={`${cardClass} overflow-x-auto`}>
       <table className="w-full text-left text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            {head.map((h) => (
-              <th key={h} className="whitespace-nowrap px-3 py-2 font-medium">{h}</th>
-            ))}
+            {head.map((h, i) =>
+              typeof h === "string" ? (
+                <th key={`${i}-${h}`} className="whitespace-nowrap px-3 py-2 font-medium">{h}</th>
+              ) : (
+                <th key={`${i}-${h.label}`} className="whitespace-nowrap px-3 py-2 font-medium">
+                  <span className="inline-flex items-center gap-1" title={h.info}>
+                    {h.label}
+                    <span aria-label={h.info} className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold normal-case text-slate-600">
+                      i
+                    </span>
+                  </span>
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">{children}</tbody>
@@ -630,17 +645,9 @@ export function Table({ head, children, empty }: { head: string[]; children: Rea
 
 export const td = "whitespace-nowrap px-3 py-2 align-top text-slate-700";
 
-export function LoadingNote({ text }: { text: string }) {
-  return (
-    <div className={`${cardClass} mt-6 animate-pulse p-6`} aria-busy="true">
-      <p className="text-sm text-slate-500">{text}</p>
-      <div className="mt-4 space-y-3">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-4 rounded bg-slate-100" style={{ width: `${95 - i * 10}%` }} />
-        ))}
-      </div>
-    </div>
-  );
+// While a page reads the store: a progress bar with an estimated percentage (owner, 2026-11-13).
+export function LoadingNote({ text, expectMs }: { text: string; expectMs?: number }) {
+  return <EstimatedProgress text={text} expectMs={expectMs} />;
 }
 
 // CRM syncs per bucket, stacked by HTTP class. Status colours, each named in the legend and table.

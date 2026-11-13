@@ -5,7 +5,7 @@ import { loadOverview, type Level } from "@/lib/callanchor/health";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { LEVELS, ago, callHref, int } from "../format";
 import { LoadingNote, Section, Table, clientViews, rowLinkClass, td } from "../parts";
-import { Hero, StatCell, StatStrip } from "../ui";
+import { Hero, Ring, StatCell, StatStrip } from "../ui";
 
 export const metadata: Metadata = { title: "Client health overview" };
 
@@ -77,15 +77,21 @@ async function Overview() {
             label="Seats calling"
             value={`${int(sum((r) => r.seats.calling))} / ${int(sum((r) => r.seats.active))}`}
             sub={`${purchasedKnown ? `${int(sum((r) => r.seats.purchased ?? 0))} purchased · ` : ""}${int(sum((r) => r.seats.loggedIn))} logged in`}
-            href={`${HEALTH_PATH}/seats`}
+            href={`${HEALTH_PATH}/licenses?use=unused`}
           />
-          <StatCell icon="alert" tone={sum(unused) ? "amber" : "green"} label="Unused seats" value={int(sum(unused))} sub="not assigned, logged out or not calling" href={`${HEALTH_PATH}/seats`} />
+          <StatCell icon="alert" tone={sum(unused) ? "amber" : "green"} label="Unused seats" value={int(sum(unused))} sub="not assigned, logged out or not calling" href={`${HEALTH_PATH}/licenses?use=unused`} />
         </StatStrip>
       </Hero>
 
       <Section title="Clients, phones and seats" note="Worst health first. Health opens the client, Phones its licenses, Seats how its seats are used.">
         <Table
-          head={["Client", "Health", "Open issues", "Calls 24h", "Last call through", "Licenses needing action", "Seats: purchased · active · logged in · calling", "Unused seats"]}
+          head={["Client", "Health", "Open issues", "Calls 24h", "Last call through", "Licenses needing action", 
+            { label: "Purchased", info: "Purchased: total seats the client bought" },
+            { label: "Active", info: "Ring = active ÷ purchased" },
+            { label: "Logged in", info: "Ring = logged in ÷ active" },
+            { label: "Calling", info: "Ring = calling ÷ active (a call within the unused threshold in Settings)" },
+            "Unused seats",
+          ]}
           empty={rows.length ? undefined : "No clients stored yet. Open Clients to pull them."}
         >
           {rows.map((r) => {
@@ -135,11 +141,10 @@ async function Overview() {
                     <span className="text-slate-400">of {int(r.licenses.total)}</span>
                   </Link>
                 </td>
-                <td className={`${td} tabular-nums`}>
-                  <Link href={views.seats} className="hover:underline">
-                    {int(r.seats.purchased)} · {int(r.seats.active)} · {int(r.seats.loggedIn)} · {int(r.seats.calling)}
-                  </Link>
-                </td>
+                <td className={`${td} text-right font-medium tabular-nums text-slate-900`}>{int(r.seats.purchased)}</td>
+                <td className={td}><Ring value={r.seats.active} of={r.seats.purchased} /></td>
+                <td className={td}><Ring value={r.seats.loggedIn} of={r.seats.active} /></td>
+                <td className={td}><Ring value={r.seats.calling} of={r.seats.active} /></td>
                 <td className={`${td} text-right tabular-nums ${idle ? "font-medium text-amber-800" : "text-slate-400"}`}>
                   <Link href={views.seats} className="hover:underline">{int(idle)}</Link>
                 </td>

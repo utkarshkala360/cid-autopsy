@@ -154,3 +154,27 @@ export function HeroPill({ tone, children }: { tone: "green" | "amber" | "red" |
     </span>
   );
 }
+
+// A number with a ring filled to its share of another (owner, 2026-11-13): seats active of
+// purchased, logged in and calling of active. Without a share (`of` unknown or 0) the ring stays
+// empty. `tone` follows the share unless given.
+export function Ring({ value, of, tone, title }: { value: number | null; of?: number | null; tone?: "indigo" | "green" | "amber" | "red" | "slate"; title?: string }) {
+  const share = value !== null && of ? Math.max(0, Math.min(1, value / of)) : null;
+  const colour =
+    tone ?? (share === null ? "slate" : share >= 0.8 ? "green" : share >= 0.5 ? "amber" : "red");
+  const stroke = { indigo: "stroke-indigo-500", green: "stroke-emerald-500", amber: "stroke-amber-500", red: "stroke-red-500", slate: "stroke-slate-300" }[colour];
+  const r = 9;
+  const c = 2 * Math.PI * r;
+  return (
+    <span className="inline-flex items-center gap-2" title={title ?? (share !== null ? `${value} of ${of} (${Math.round(share * 100)}%)` : undefined)}>
+      <svg viewBox="0 0 24 24" className="h-6 w-6 -rotate-90" aria-hidden>
+        <circle cx="12" cy="12" r={r} fill="none" strokeWidth="3.5" className="stroke-slate-100" />
+        {share !== null && share > 0 && (
+          <circle cx="12" cy="12" r={r} fill="none" strokeWidth="3.5" strokeLinecap="round" className={stroke} strokeDasharray={`${share * c} ${c}`} />
+        )}
+      </svg>
+      <span className="tabular-nums font-medium text-slate-900">{value === null ? "—" : value.toLocaleString("en-IN")}</span>
+      {share !== null && <span className="text-xs tabular-nums text-slate-400">{Math.round(share * 100)}%</span>}
+    </span>
+  );
+}

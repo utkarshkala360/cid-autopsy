@@ -69,9 +69,14 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
   } catch (error) {
     if (error instanceof PortalError && error.rejected) redirect(verifyUrl(path));
     if (error instanceof PortalError && error.status === 404) notFound();
+    // Only a PortalError came from CallAnchor; anything else is ours (the store, the code), so say so
+    // and log it rather than blame CallAnchor.
+    console.error(`[health] client ${clientId} failed to load`, error);
     return (
       <p className="mt-6 text-sm text-red-700">
-        Couldn&apos;t read this client from CallAnchor{error instanceof PortalError ? ` (HTTP ${error.status})` : ""}. Reload to try again.
+        {error instanceof PortalError
+          ? `Couldn't read this client from CallAnchor (HTTP ${error.status}). Reload to try again.`
+          : "Couldn't load this client's stored health data: the dashboard itself hit an error, not CallAnchor. Reload to try again; the server log has the cause."}
       </p>
     );
   }
@@ -168,7 +173,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
             </p>
             {problemPhones > 0 && <p className="mt-1 text-xs font-medium text-amber-800">{problemPhones} phones need attention</p>}
             <p className="mt-1 text-xs">
-              <Link href={`${clientHref(HEALTH_PATH, clientId)}/seats`} className={secondaryButtonClass}>
+              <Link href={`${clientHref(HEALTH_PATH, clientId)}/licenses?use=unused`} className={secondaryButtonClass}>
                 {int(seats.idle + seats.loggedOut + seats.unassigned)} unused seats →
               </Link>
             </p>

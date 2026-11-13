@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
-import { SeatsView } from "../../../_views/seats";
+import { redirect } from "next/navigation";
+import { HEALTH_PATH } from "@/lib/callanchor/session";
+import { clientHref } from "../../../format";
 
-export const metadata: Metadata = { title: "Seats" };
-
+// Seats merged into Licenses (owner, 2026-11-13): old links open this client's unused licenses.
 export default async function ClientSeatsPage({ params }: PageProps<"/dashboard/call_anchor/health/clients/[clientId]/seats">) {
-  return <SeatsView clientId={(await params).clientId} />;
+  redirect(`${clientHref(HEALTH_PATH, (await params).clientId)}/licenses?use=unused`);
 }

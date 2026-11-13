@@ -44,9 +44,14 @@ async function FleetHealth({ all }: { all: boolean }) {
     data = await loadFleetHealth(cookie, member.id, await showInternal());
   } catch (error) {
     if (error instanceof PortalError && error.rejected) redirect(verifyUrl(HEALTH_PATH));
+    // Only a PortalError came from CallAnchor; anything else is ours (the store, the code), so say so
+    // and log it rather than blame CallAnchor.
+    console.error("[health] fleet failed to load", error);
     return (
       <p className="mt-6 text-sm text-red-700">
-        Couldn&apos;t read the fleet from CallAnchor{error instanceof PortalError ? ` (HTTP ${error.status})` : ""}. Reload to try again.
+        {error instanceof PortalError
+          ? `Couldn't read the fleet from CallAnchor (HTTP ${error.status}). Reload to try again.`
+          : "Couldn't load the stored health data: the dashboard itself hit an error, not CallAnchor. Reload to try again; the server log has the cause."}
       </p>
     );
   }
@@ -103,7 +108,7 @@ async function FleetHealth({ all }: { all: boolean }) {
             label="Seats calling"
             value={`${int(seats.calling)} / ${int(seats.active)}`}
             sub={`${int(seats.loggedIn)} logged in${seats.purchased !== null ? ` · ${int(seats.purchased)} purchased` : ""} · ${int(seats.idle + seats.loggedOut + seats.unassigned)} unused`}
-            href={`${HEALTH_PATH}/seats`}
+            href={`${HEALTH_PATH}/licenses?use=unused`}
           />
         </StatStrip>
       </Hero>

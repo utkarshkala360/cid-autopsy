@@ -15,6 +15,10 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const PAGE_SIZE = 100; // CallAnchor caps callout-logs and support/logs at 100 rows a page
+// Boolean arrays go to Postgres as text and are cast there: postgres.js sends a JS array of booleans
+// as one boolean ("cannot cast type boolean to boolean[]"), and text arrays work with every driver.
+const boolText = (values: (boolean | null | undefined)[]) => values.map((v) => (v === null || v === undefined ? null : v ? "true" : "false"));
+
 const CONCURRENCY = 4;
 const FLEET_TIMEOUT_MS = 45_000; // /api/fleet is 1.3 MB and took 7s on 3 Nov 2026
 const ROWS_PER_INSERT = 1000;
@@ -304,12 +308,12 @@ async function saveCallouts(clientId: string, events: CalloutEvent[]) {
         ${rows.map((e) => e.at)}::timestamptz[],
         ${rows.map((e) => deliveryLabel(e))}::text[],
         ${rows.map((e) => e.requestId ?? null)}::text[],
-        ${facts.map((f) => f?.hasRecording ?? null)}::boolean[],
+        ${boolText(facts.map((f) => f?.hasRecording ?? null))}::text[]::boolean[],
         ${facts.map((f) => f?.callType ?? null)}::text[],
         ${facts.map((f) => f?.seconds ?? null)}::int[],
         ${facts.map((f) => f?.startedAt ?? null)}::timestamptz[],
         ${facts.map((f) => f?.agentLast4 ?? null)}::text[],
-        ${facts.map((f) => f !== null)}::boolean[]
+        ${boolText(facts.map((f) => f !== null))}::text[]::boolean[]
       )
       ON CONFLICT (id) DO UPDATE SET
         attempt = EXCLUDED.attempt, status = EXCLUDED.status, http_status = EXCLUDED.http_status,
@@ -454,16 +458,16 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         ${licenses.map((l) => l.assignedTo?.id ?? null)}::text[],
         ${licenses.map((l) => (l.number ? l.number.slice(-4) : null))}::text[],
         ${licenses.map((l) => l.status ?? null)}::text[],
-        ${licenses.map((l) => l.isActive)}::boolean[],
-        ${licenses.map((l) => l.isLoggedIn)}::boolean[],
+        ${boolText(licenses.map((l) => l.isActive))}::text[]::boolean[],
+        ${boolText(licenses.map((l) => l.isLoggedIn))}::text[]::boolean[],
         ${licenses.map((l) => l.lastLoginLabel ?? null)}::text[],
         ${licenses.map((l) => l.lastLoginAndroidBrand ?? null)}::text[],
         ${licenses.map((l) => l.lastLoginAndroidModel ?? null)}::text[],
         ${licenses.map((l) => l.lastLoginFirmwareVersion ?? null)}::text[],
-        ${licenses.map((l) => l.lastLoginGoogleDialerPresent ?? null)}::boolean[],
+        ${boolText(licenses.map((l) => l.lastLoginGoogleDialerPresent ?? null))}::text[]::boolean[],
         ${licenses.map((l) => l.lastLoginAppVersion ?? null)}::text[],
         ${licenses.map((l) => l.lastLoginAppVersionCode ?? null)}::int[],
-        ${licenses.map((l) => l.recordingEnabled ?? null)}::boolean[],
+        ${boolText(licenses.map((l) => l.recordingEnabled ?? null))}::text[]::boolean[],
         ${licenses.map((l) => l.callCapturePolicy ?? null)}::text[],
         ${licenses.map((l) => l.lifetimeCallRecordCount ?? 0)}::int[]
       )
@@ -524,7 +528,7 @@ export async function saveIntegrations(clientId: string, integrations: Integrati
       INSERT INTO ca_integrations (client_id, platform_id, platform_name, active, event_types)
       SELECT ${clientId}, * FROM unnest(
         ${integrations.map((i) => i.platformId)}::text[], ${integrations.map((i) => i.platformName)}::text[],
-        ${integrations.map((i) => i.active)}::boolean[], ${integrations.map((i) => INTEGRATION_FIELDS.event_types(i))}::text[]
+        ${boolText(integrations.map((i) => i.active))}::text[]::boolean[], ${integrations.map((i) => INTEGRATION_FIELDS.event_types(i))}::text[]
       )
       ON CONFLICT (client_id, platform_id) DO UPDATE SET
         platform_name = EXCLUDED.platform_name, active = EXCLUDED.active, event_types = EXCLUDED.event_types, updated_at = now(), removed_at = NULL
@@ -805,6 +809,51 @@ export async function pullFleet(cookie: string): Promise<PullReport> {
 }
 
 // Brings one client up to date: its CRM syncs and the shared system logs.
+// ---- Pulling step by step, so the page can show progress (owner, 2026-11-13) ----
+// The browser asks for the plan, runs it a few steps at a time and shows how far it got, instead of
+// one long pull hidden inside the page render.
+
+export type PullStep = { key: string; label: string };
+const STEP_KEY = /^(snapshots|logs|audit|logs:[\w-]{1,100}|callouts:[\w-]{1,100})$/;
+export const isPullStep = (key: string) => STEP_KEY.test(key);
+
+// The streams due now, for every client or one. Before the client list was ever pulled, that's the
+// only step: the rest can't be planned without it.
+export async function planPull(clientId: string | null): Promise<PullStep[]> {
+  const states = await readStates();
+  const snapshots = states.get("snapshots");
+  if (!snapshots?.refreshedAt) return [{ key: "snapshots", label: "Client list" }];
+  const steps: PullStep[] = [];
+  if (!clientId && Date.now() - snapshots.refreshedAt >= SYNC.snapshotEveryMs) steps.push({ key: "snapshots", label: "Client list" });
+  if (isDue(states.get("logs"), "latest")) steps.push({ key: "logs", label: "System logs" });
+  if (isDue(states.get("audit"), "latest")) steps.push({ key: "audit", label: "Portal events" });
+  const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots WHERE data IS NOT NULL`;
+  const names = new Map(rows.map((r) => [r.client_id as string, (r.company_name as string | null) ?? "client"]));
+  const clients = clientId ? (names.has(clientId) ? [clientId] : []) : [...names.keys()];
+  for (const c of clients) if (isDue(states.get(`callouts:${c}`), "latest")) steps.push({ key: `callouts:${c}`, label: `CRM syncs · ${names.get(c)}` });
+  for (const c of await busyClients()) {
+    if (clients.includes(c) && isDue(states.get(`logs:${c}`), "latest")) steps.push({ key: `logs:${c}`, label: `System logs · ${names.get(c)}` });
+  }
+  return steps;
+}
+
+// Runs one planned step. Returns its error, if any; a rejected CallAnchor session is rethrown. The
+// daily 5-day refresh for the stream runs after the response, as before.
+export async function runPullStep(cookie: string, key: string): Promise<string | null> {
+  if (!isPullStep(key)) return "Unknown step";
+  const report: PullReport = { errors: [] };
+  const states = await readStates();
+  await attempt(report, key, async () => {
+    if (key === "snapshots") await pullSnapshots(cookie);
+    else if (key === "logs") await pullLogs(cookie, "latest");
+    else if (key === "audit") await pullAudit(cookie, "latest");
+    else if (key.startsWith("logs:")) await pullLogs(cookie, "latest", key.slice("logs:".length));
+    else await pullCallouts(cookie, key.slice("callouts:".length), "latest");
+  });
+  if (key !== "snapshots") refreshLater(cookie, [key], states);
+  return report.errors[0] ?? null;
+}
+
 export async function pullClient(cookie: string, clientId: string): Promise<PullReport> {
   const report: PullReport = { errors: [] };
   const states = await readStates();

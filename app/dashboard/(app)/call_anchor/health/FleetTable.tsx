@@ -139,7 +139,7 @@ export function FleetTable({ rows, basePath }: { rows: FleetTableRow[]; basePath
                   <td className={`${td} text-xs`}>
                     {r.seats.active ? (
                       <>
-                        <Link href={`${clientHref(basePath, r.clientId)}/seats`} className="hover:text-indigo-700 hover:underline" title="Open this client's seats">
+                        <Link href={`${clientHref(basePath, r.clientId)}/licenses`} className="hover:text-indigo-700 hover:underline" title="Open this client's licenses and how they're used">
                           {r.seats.loggedIn}/{r.seats.active} logged in · {r.seats.calling} calling
                         </Link>
                         {r.seats.purchased !== null && r.seats.purchased !== r.seats.active && <span className="text-slate-400"> · {r.seats.purchased} bought</span>}

@@ -38,8 +38,6 @@ import { getJson, PortalError } from "@/lib/callanchor/portal";
 import {
   SYNC,
   optional,
-  pullClient,
-  pullFleet,
   readAudit,
   readCall,
   readCallouts,
@@ -396,7 +394,10 @@ function errorGroups(events: StoredCallout[], names: Map<string, string>): Error
 export async function loadFleetHealth(cookie: string, memberId: string, showInternal = false) {
   const started = Date.now();
   await loadSettings();
-  const pull = await pullFleet(cookie);
+  // The browser pulls what's new batch by batch with a progress bar (PullProgress); the page reads the
+  // store as it stands (owner, 2026-11-13).
+  void cookie;
+  const pull = { errors: [] as string[] };
   const now = Date.now();
   const [everyClient, everyLog, store, cover, lastVisit, scope] = await Promise.all([
     assess(now, null),
@@ -624,7 +625,7 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     optional(getJson<OneApiStatus>(cookie, `${base}/oneapi/status`)),
     optional(getJson<{ stats: ContactStats }>(cookie, `${base}/call-contacts?page=1&limit=1`)),
     optional(getJson<{ items: AuditLog[] }>(cookie, `/api/support/audit-logs?page=1&limit=25&clientId=${clientId}`)),
-    pullClient(cookie, clientId),
+    Promise.resolve({ errors: [] as string[] }), // pulled by the browser with progress (PullProgress)
   ]);
   const tenant = summarizeTenant(tenantBody, client.status);
   await Promise.all([saveLicenses(clientId, tenantBody.licenses), saveIntegrations(clientId, tenant.integrations)]);
@@ -719,7 +720,12 @@ export async function loadFleetLicenses(showInternal = false) {
   const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
   const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
   const licenses: FleetLicense[] = assessments.flatMap((a) => a.licenses.map((h) => ({ ...h, companyName: a.snapshot.companyName ?? a.snapshot.clientId })));
-  return { licenses, hiddenInternal: everyClient.length - assessments.length, loadedAt: new Date(now).toISOString() };
+  // Seat use per client, for the merged Licenses view: a seat is a license, and an unused seat an
+  // unused license (owner, 2026-11-13).
+  const clients = assessments
+    .filter((a) => a.seats.active > 0 || (a.seats.purchased ?? 0) > 0)
+    .map((a) => ({ clientId: a.snapshot.clientId, companyName: a.snapshot.companyName ?? a.snapshot.clientId, status: a.snapshot.status ?? "unknown", seats: a.seats }));
+  return { licenses, clients, hiddenInternal: everyClient.length - assessments.length, unusedAfterMs: RULES.seatUnusedMs, loadedAt: new Date(now).toISOString() };
 }
 
 // ---- Overview: clients, their phones and their seats side by side ----
@@ -785,29 +791,6 @@ export async function loadClientSummary(clientId: string) {
     hasIntegration: a.ctx.hasIntegration,
     loadedAt: new Date(now).toISOString(),
   };
-}
-
-// ---- Seats ----
-
-export type SeatRow = { license: LicenseHealth["license"]; seat: LicenseHealth["seat"]; lastCallAt: string | null; lastSyncAt: string | null; status: LicenseHealth["status"] };
-
-// Every client's seats from the store, by use: purchased, active, assigned, logged in and calling, with
-// each seat that isn't being used and since when (owner, 2026-11-05).
-export async function loadSeats(showInternal = false) {
-  await loadSettings();
-  const now = Date.now();
-  const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
-  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
-  const clients = assessments
-    .filter((a) => a.seats.active > 0 || (a.seats.purchased ?? 0) > 0)
-    .map((a) => ({
-      clientId: a.snapshot.clientId,
-      companyName: a.snapshot.companyName ?? a.snapshot.clientId,
-      status: a.snapshot.status ?? "unknown",
-      seats: a.seats,
-      rows: a.licenses.map((h): SeatRow => ({ license: h.license, seat: h.seat, lastCallAt: h.lastCallAt, lastSyncAt: h.pulse.lastSyncAt, status: h.status })),
-    }));
-  return { clients, hiddenInternal: everyClient.length - assessments.length, unusedAfterMs: RULES.seatUnusedMs, loadedAt: new Date(now).toISOString() };
 }
 
 const LICENSE_FIELD_LABELS: Record<string, string> = {

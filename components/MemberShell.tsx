@@ -4,7 +4,7 @@ import { ConsoleHeader } from "@/components/ConsoleHeader";
 import { memberLogoutAction } from "@/app/dashboard/actions";
 import { AuditNoteButton } from "@/components/AuditNoteButton";
 
-// Header and page frame for everything members sign in to: the dashboard and customers.
+// Header and page frame for everything members sign in to: the dashboard and its sub apps.
 export async function MemberShell({ children }: { children: React.ReactNode }) {
   const member = await requireMember();
   return (
@@ -15,7 +15,6 @@ export async function MemberShell({ children }: { children: React.ReactNode }) {
         userLabel={member.fullName}
         logoutAction={memberLogoutAction}
         nav={[
-          { href: "/customers", label: "Customers" },
           ...SUB_APPS.map((app) => ({ href: `/dashboard/${app.slug}`, label: app.name })),
         ]}
       />

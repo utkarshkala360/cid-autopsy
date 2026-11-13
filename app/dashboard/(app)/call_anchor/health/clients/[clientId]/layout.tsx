@@ -74,10 +74,10 @@ export default async function ClientLayout({ children, params }: LayoutProps<"/d
             <StatCell
               icon="seats"
               tone={unused ? "amber" : "blue"}
-              label="Seats calling"
+              label="Licenses calling"
               value={`${int(summary.seats.calling)} / ${int(summary.seats.active)}`}
               sub={`${summary.seats.purchased !== null ? `${int(summary.seats.purchased)} purchased · ` : ""}${int(unused)} unused`}
-              href={`${root}/seats`}
+              href={`${root}/licenses?use=unused`}
             />
             <StatCell
               icon="activity"
