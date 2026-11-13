@@ -5,9 +5,9 @@ import { loadFleetHealth, type Level } from "@/lib/callanchor/health";
 import { MODULES, issueModule, type Issue, type IssueModule } from "@/lib/callanchor/issues";
 import { PortalError } from "@/lib/callanchor/portal";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal, storedCookie, verifyUrl } from "@/lib/callanchor/session";
-import { FleetTable, CLIENT_VIEWS, type ClientView } from "../FleetTable";
+import { FleetTable } from "../FleetTable";
 import { Hero } from "../ui";
-import { ago, int, pct } from "../format";
+import { CLIENT_VIEWS, ago, int, pct, type ClientView } from "../format";
 import { CoverageNote, LoadingNote } from "../parts";
 
 export const metadata: Metadata = { title: "Clients" };

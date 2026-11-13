@@ -5,7 +5,8 @@ import Link from "next/link";
 import type { FleetRow, Level } from "@/lib/callanchor/health";
 import { MODULES, type IssueModule } from "@/lib/callanchor/modules";
 import { cardClass, inputClass } from "@/components/ui";
-import { DAY_STATES, LEVELS, callHref, clientHref, int, itemsHref, pct, rateClass, severityTone } from "./format";
+import { CLIENT_VIEWS, DAY_STATES, LEVELS, callHref, clientHref, int, itemsHref, pct, rateClass, severityTone } from "./format";
+import type { ClientView } from "./format";
 import { ItemLink, JourneyDots, rowLinkClass } from "./parts";
 import { Ring } from "./ui";
 import { MenuLayout } from "./FilterMenu";
@@ -17,12 +18,6 @@ export type FleetTableRow = Omit<FleetRow, "issues"> & { lastActivityLabel: stri
 const FILTERS: (Level | "all")[] = ["all", "critical", "warning", "healthy", "idle", "unknown"];
 // Client stats by module (owner, 2026-11-13): the client and its health always show, then one
 // module's columns.
-export const CLIENT_VIEWS = [
-  { id: "journey", label: "Call journey", note: "Calls, CRM reach, sync days and recordings" },
-  { id: "licenses", label: "Licenses", note: "Licenses needing action and seat use" },
-  { id: "issues", label: "Issues", note: "Open issues per module" },
-] as const;
-export type ClientView = (typeof CLIENT_VIEWS)[number]["id"];
 const RANK: Record<Level, number> = { critical: 0, warning: 1, unknown: 2, healthy: 3, idle: 4 };
 const MODULE_IDS = Object.keys(MODULES) as IssueModule[];
 const info = (label: string, tip: string) => (

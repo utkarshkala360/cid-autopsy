@@ -202,6 +202,10 @@ What a good change looks like here.
 - New sub apps follow "Adding a sub app" in `README.md`.
 - Salesforce access goes through `withStoredOrg`, not a new client.
 - Secrets are encrypted at rest and never sent back to the browser.
+- A server page imports only components from a `"use client"` file, never constants or helpers: on
+  the server those arrive as references, not values, and the page crashes at runtime while the build
+  passes. Shared values go in a plain module such as `health/format.ts` (the Clients tab broke this
+  way on 2026-11-13).
 - Profile live CallAnchor data before designing a view. Print counts and shapes only, never
   customer data. The health dashboard's design came from this.
 - Read CallAnchor through `getJson` in `lib/callanchor/portal.ts`, which can only send GET.
@@ -314,6 +318,8 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Reported the new Clients tab failing to load in production. The page read its module
+  list from the browser-only Clients table file; moved it to `health/format.ts` and added the rule.
 - 2026-11-13: Asked to split the tabs: Overview is Needs action with its modules as the left menu;
   Clients a tab with its modules as the left menu and Health counted within the picked module;
   Licenses a tab with its modules, and Health and Use as proper filters, hiding options with nothing
