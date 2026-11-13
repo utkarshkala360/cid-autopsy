@@ -208,7 +208,22 @@ function NeedsCell({ needs, href }: { needs: Needs; href: string }) {
         {needs.critical > 0 && <span className="text-red-700">{needs.critical} critical</span>}
         {needs.warning > 0 && <span className="text-amber-800">{needs.warning} warning</span>}
       </Link>
-      {needs.top && <p className="mt-0.5 truncate text-slate-600" title={needs.top}>{needs.top}</p>}
+      {needs.calls > 0 ? (
+        <p className="mt-0.5 flex items-center gap-1 text-slate-800">
+          <span className="font-medium">{int(needs.calls)} {needs.calls === 1 ? "call" : "calls"} not in the CRM</span>
+          {needs.top && (
+            <span
+              title={`${int(needs.calls)} ${needs.calls === 1 ? "call" : "calls"} not in the CRM · ${needs.top}`}
+              aria-label={`Worst issue: ${needs.top}`}
+              className="inline-flex h-3.5 w-3.5 shrink-0 cursor-help items-center justify-center rounded-full bg-red-100 text-[9px] font-bold text-red-700 ring-1 ring-red-200"
+            >
+              i
+            </span>
+          )}
+        </p>
+      ) : (
+        needs.top && <p className="mt-0.5 truncate text-slate-600" title={needs.top}>{needs.top}</p>
+      )}
     </td>
   );
 }
@@ -287,7 +302,7 @@ function SeatsCell({ seats, root }: { seats: ClientEntity["seats"]; root: string
 const CORE_HEAD = (days: WindowDays) => [
   { label: "Call journey", info: `Phone → app → recording uploaded → sent to the CRM → accepted, for calls in the last ${rangeLabel(days)}. A red dot is a step where calls stopped, with how many` },
   { label: "CRM syncs", info: `The ring: due calls in the last ${rangeLabel(days)} that the CRM accepted (2xx), of all due. The strip: each ${CELL_WORD[days][0]}, synced when ${"≥"} the synced-day rate in Settings reached it. Then when a call last went all the way through` },
-  { label: "Needs action", info: "Open issues right now, critical and warning, with the worst one. Opens them in the Issues tab" },
+  { label: "Needs action", info: "Open issues right now, critical and warning. Counts issues, not calls: one issue covers every call it affects. Under it, the calls not in the CRM across those issues, each counted once, back 15 days, and the worst issue. Opens them in the Issues tab" },
 ];
 
 // ---- The range picker and search, above every table ----

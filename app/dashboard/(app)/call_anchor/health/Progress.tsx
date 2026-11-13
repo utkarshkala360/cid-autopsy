@@ -93,34 +93,105 @@ async function follow(clientId: string | null, refresh: () => void) {
   }
 }
 
-async function start(clientId: string | null, verifyHref: string, refresh: () => void) {
+type StartState = "started" | "running" | "nothing" | "cooldown";
+async function start(clientId: string | null, verifyHref: string, refresh: () => void, force = false): Promise<StartState | null> {
   const scope = clientId ?? "fleet";
   job.asked.set(scope, Date.now());
   try {
-    const res = await fetch(`${API}${query(clientId)}`, { method: "POST", cache: "no-store" });
-    if (!res.ok) return;
-    const body = (await res.json()) as { verify?: true; state?: "started" | "running" | "nothing"; status?: Status | null };
-    if (body.verify) return window.location.assign(verifyHref);
-    if (body.state === "nothing") {
+    const url = `${API}${query(clientId)}${force ? `${clientId ? "&" : "?"}force=1` : ""}`;
+    const res = await fetch(url, { method: "POST", cache: "no-store" });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { verify?: true; state?: StartState; status?: Status | null };
+    if (body.verify) {
+      window.location.assign(verifyHref);
+      return null;
+    }
+    if (body.state === "nothing" || body.state === "cooldown") {
       markDone(scope);
-      return;
+      if (force) refresh();
+      return body.state;
     }
     if (body.status?.running) job.set({ phase: "pulling", done: body.status.done, total: body.status.total, current: body.status.current, failures: body.status.failures });
     void follow(clientId, refresh);
+    return body.state ?? null;
   } catch {
     // Offline or the server restarted: the next page asks again.
     job.asked.delete(scope);
+    return null;
   }
+}
+
+// The scope of the page open now: a client's pages pull that client, the rest the whole fleet.
+function usePullScope() {
+  const pathname = usePathname();
+  const clientId = pathname.startsWith(`${BASE}/clients/`) ? decodeURIComponent(pathname.split("/")[5] ?? "") || null : null;
+  return { clientId, scope: clientId ?? "fleet" };
+}
+
+// Manual refresh, top right of the health bar (owner, 2026-11-13): pulls now instead of waiting for
+// the 5-minute auto-sync, then can't be clicked again for 30 seconds. The server enforces the same.
+const MANUAL_COOLDOWN_MS = 30_000;
+// When this tab last clicked it, kept across page changes; a reload forgets it, and the server's
+// own 30-second check still holds.
+let lastManualAt = 0;
+export function RefreshButton({ verifyHref }: { verifyHref: string }) {
+  const router = useRouter();
+  const { clientId } = usePullScope();
+  const state = useSyncExternalStore(subscribe, () => job.state, () => job.state);
+  const [lastAt, setLastAt] = useState(() => lastManualAt);
+  const [now, setNow] = useState(() => lastManualAt);
+  const [note, setNote] = useState<string | null>(null);
+
+  const waitMs = Math.max(0, lastAt + MANUAL_COOLDOWN_MS - now);
+  useEffect(() => {
+    if (waitMs <= 0) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [waitMs]);
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => setNote(null), 4000);
+    return () => clearTimeout(t);
+  }, [note]);
+
+  const pulling = state.phase === "pulling";
+  const disabled = pulling || waitMs > 0;
+  const click = async () => {
+    const at = Date.now();
+    lastManualAt = at;
+    setLastAt(at);
+    setNow(at);
+    const result = await start(clientId, verifyHref, () => router.refresh(), true);
+    if (result === "nothing") setNote("Already up to date");
+    else if (result === "cooldown") setNote("Pulled under 30 s ago");
+    else if (result === "running") setNote("A pull is already running");
+  };
+  const seconds = Math.ceil(waitMs / 1000);
+  return (
+    <span className="flex shrink-0 items-center gap-2">
+      {note && <span role="status" className="whitespace-nowrap text-xs text-slate-500">{note}</span>}
+      <button
+        type="button"
+        onClick={click}
+        disabled={disabled}
+        title={pulling ? "Pulling from CallAnchor now" : waitMs > 0 ? `Can refresh again in ${seconds}s` : "Pull new data from CallAnchor now, without waiting for the 5-minute auto-sync"}
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden className={`h-3.5 w-3.5 ${pulling ? "animate-spin" : ""}`}>
+          <path fillRule="evenodd" d="M15.31 4.69a7 7 0 0 0-11.03 1.86.75.75 0 1 0 1.34.68 5.5 5.5 0 0 1 8.63-1.48l-1.5 1.5a.5.5 0 0 0 .35.85h3.65a.5.5 0 0 0 .5-.5V3.95a.5.5 0 0 0-.85-.35l-1.09 1.09ZM4.69 15.31a7 7 0 0 0 11.03-1.86.75.75 0 1 0-1.34-.68 5.5 5.5 0 0 1-8.63 1.48l1.5-1.5a.5.5 0 0 0-.35-.85H3.25a.5.5 0 0 0-.5.5v3.65c0 .45.54.67.85.35l1.09-1.09Z" clipRule="evenodd" />
+        </svg>
+        {pulling ? "Refreshing" : waitMs > 0 ? `Refresh in ${seconds}s` : "Refresh"}
+      </button>
+    </span>
+  );
 }
 
 // Asks the server to pull what's new from CallAnchor and shows how far it got, small, in the corner
 // (owner, 2026-11-13). Fleet pages pull every client; a client's pages pull only that client. The
 // page underneath already shows the stored data and stays usable throughout.
 export function PullProgress({ verifyHref }: { verifyHref: string }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const clientId = pathname.startsWith(`${BASE}/clients/`) ? decodeURIComponent(pathname.split("/")[5] ?? "") || null : null;
-  const scope = clientId ?? "fleet";
+  const { clientId, scope } = usePullScope();
   const state = useSyncExternalStore(subscribe, () => job.state, () => job.state);
   const [open, setOpen] = useState(false);
 

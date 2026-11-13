@@ -17,7 +17,7 @@ export default async function HealthLayout({ children }: LayoutProps<"/dashboard
   return (
     <>
       <Suspense>
-        <HealthSubBar isAdmin={member.role === "admin"} showInternal={internal} />
+        <HealthSubBar isAdmin={member.role === "admin"} showInternal={internal} verifyHref={verifyUrl(HEALTH_PATH)} />
       </Suspense>
       <Suspense>
         <HealthTrail clients={Object.fromEntries(names)} phones={phones} />

@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
   const cookie = await storedCookie(member.id);
   if (!cookie) return NextResponse.json({ verify: true }, { headers: noStore });
   const clientId = clientOf(request);
-  const state = await startPullJob(cookie, clientId);
+  // `?force=1` is the Refresh button: past the 5-minute wait, at most once in 30 seconds.
+  const state = await startPullJob(cookie, clientId, request.nextUrl.searchParams.get("force") === "1");
   return NextResponse.json({ state, status: await readPullJob(clientId) }, { headers: noStore });
 }

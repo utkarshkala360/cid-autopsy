@@ -155,6 +155,8 @@ export type Issue = {
   // Up to 3 masked CRM replies, shown as what the CRM said. Never used for severity.
   samples: string[];
   drill: IssueDrill | null;
+  // The affected calls not in the CRM, so a row can count its calls once across its issues.
+  notInCrm?: string[];
   // A license issue that most of the client's licenses share is raised once at client level instead.
   rolledUp?: boolean;
   // Opened since the member's last visit to the fleet page.
@@ -282,6 +284,11 @@ export const CALL_STAGES = {
     title: "Recordings still open: on the phone, stuck after upload, or not synced",
     test: (c, ctx, now) => isWaiting(c, now) || stuckStage(c, now) !== null || isUnsynced(c, ctx, now),
   },
+  // Stopped at the upload for neither waiting nor stuck: the phone reported no recording file.
+  unsaved: {
+    title: "Recordings the phone couldn't save",
+    test: (c, _ctx, now) => c.unavailableAt !== null && !isUploaded(c) && !isWaiting(c, now) && stuckStage(c, now) === null,
+  },
   uploadFailed: { title: "Recordings that failed to upload", test: (c) => c.uploadFailedAt !== null && !isVerified(c) },
   // Late from when the call was ready to send, so the phone's upload wait doesn't count (QA R7).
   late: {
@@ -298,6 +305,7 @@ export const CALL_STAGES = {
   stopUpload: { title: "Calls stopped at the recording upload", test: (c, ctx, now) => journeyStop(c, ctx, now) === "upload" },
   stopSent: { title: "Calls stopped before being sent to the CRM", test: (c, ctx, now) => journeyStop(c, ctx, now) === "sent" },
   stopCrm: { title: "Calls the CRM didn't accept", test: (c, ctx, now) => journeyStop(c, ctx, now) === "crm" },
+  stopped: { title: "Calls that stopped before reaching the CRM", test: (c, ctx, now) => journeyStop(c, ctx, now) !== null },
   complete: { title: "Calls that went all the way through", test: (c, ctx) => isComplete(c, ctx) },
   moving: { title: "Calls still on their way", test: (c, ctx, now) => !isComplete(c, ctx) && journeyStop(c, ctx, now) === null },
 } satisfies Record<string, { title: string; test: (call: StoredCall, ctx: ClientContext, now: number) => boolean }>;
@@ -575,6 +583,7 @@ function issue(scope: Scope, kind: string, level: IssueLevel, title: string, now
     evidence: extra.evidence ?? [],
     samples: extra.samples ?? [],
     drill: extra.drill ?? null,
+    notInCrm: calls.filter((c) => !isDelivered(c)).map((c) => c.callId),
   };
 }
 
@@ -620,7 +629,12 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
   const stage = (s: CallStage, list = day) => list.filter((c) => inStage(s, c, ctx, now));
   const drill = (s: CallStage, window = 1): IssueDrill => ({ kind: "calls", stage: s, ...(window > 1 ? { window: String(window) } : {}) });
   const issues: Issue[] = [];
-  const add = (kind: string, level: IssueLevel, title: string, extra?: IssueExtra) => issues.push(issue(scope, kind, level, title, now, extra));
+  // Calls some critical or warning issue already stands for, so the catch-all below adds only the rest.
+  const covered = new Set<string>();
+  const add = (kind: string, level: IssueLevel, title: string, extra?: IssueExtra) => {
+    if (level !== "info") for (const c of extra?.calls ?? []) covered.add(c.callId);
+    issues.push(issue(scope, kind, level, title, now, extra));
+  };
   const lastSync = lastSyncText(input.lastSyncAt, now);
   // A run of bad days before today means the problem is older than the 24 hours (QA T1).
   const run = shortfall(input.days);
@@ -669,26 +683,17 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
       drill: drill("rejected"),
     }));
   } else if (rejected.length > 0) {
+    // The success rate only picks the level; every rejected call is raised (owner, 2026-11-13).
     const kept = 100 - rejectedShare;
-    const level: IssueLevel | null =
-      settled < RULES.minCallsForRate
-        ? "warning"
-        : kept < RULES.criticalSuccessRate
-          ? rejected.length >= RULES.criticalMinFailures
-            ? "critical"
-            : "warning"
-          : kept < RULES.warningSuccessRate
-            ? "warning"
-            : null;
-    if (level) {
-      add("crm_rejecting", level, "CRM is rejecting calls", crm({
-        calls: rejected,
-        impactText: `${n(rejected.length, "call")} not in the CRM`,
-        evidence: [rejectedText, reachedText, httpCodes(rejected), persistent],
-        samples: samples(rejected),
-        drill: drill("rejected"),
-      }));
-    }
+    const level: IssueLevel =
+      settled >= RULES.minCallsForRate && kept < RULES.criticalSuccessRate && rejected.length >= RULES.criticalMinFailures ? "critical" : "warning";
+    add("crm_rejecting", level, "CRM is rejecting calls", crm({
+      calls: rejected,
+      impactText: `${n(rejected.length, "call")} not in the CRM`,
+      evidence: [rejectedText, reachedText, httpCodes(rejected), persistent],
+      samples: samples(rejected),
+      drill: drill("rejected"),
+    }));
   }
 
   if (unreachable.length > 0) {
@@ -869,6 +874,34 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
       evidence: ["A new success reply shape appeared in the last 24 hours. The webhook code may have changed"],
       samples: fresh.slice(0, 3).map((s) => `New: ${s.label} (${n(s.count, "reply", "replies")})`),
       drill: { kind: "syncs", status: "delivered" },
+    });
+  }
+
+  // No call that stopped short of the CRM is left out (owner, 2026-11-13): any the issues above don't
+  // stand for, such as a recording the phone couldn't save or an older failed callout, are raised here.
+  // A phone with its own issue for recordings on the phone keeps those calls.
+  const seen = new Set<string>();
+  const leftover = pool.filter((c) => {
+    if (seen.has(c.callId) || covered.has(c.callId)) return false;
+    seen.add(c.callId);
+    if (input.perPhone.has(c.licenseId ?? "") && inStage("onPhone", c, ctx, now)) return false;
+    return journeyStop(c, ctx, now) !== null;
+  });
+  if (leftover.length > 0) {
+    const reasons = new Map<string, number>();
+    for (const c of leftover) {
+      const why = callProblem(c, ctx, now) ?? "Didn't reach the CRM";
+      reasons.set(why, (reasons.get(why) ?? 0) + 1);
+    }
+    add("calls_not_synced", leftover.length >= RULES.criticalStuck ? "critical" : "warning", "Other calls that didn't reach the CRM", {
+      calls: leftover,
+      impactText: openText(leftover, now, "call", "not in the CRM"),
+      evidence: [
+        ...[...reasons.entries()].sort((a, b) => b[1] - a[1]).map(([why, count]) => `${why}: ${n(count, "call")}`),
+        "Calls no other issue covers. Stays flagged until each reaches the CRM, back to 15 days",
+      ],
+      samples: samples(leftover),
+      drill: drill("stopped", RULES.openLookbackDays),
     });
   }
 

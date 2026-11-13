@@ -822,13 +822,14 @@ export type PullStep = { key: string; label: string };
 const STEP_KEY = /^(snapshots|logs|audit|logs:[\w-]{1,100}|callouts:[\w-]{1,100})$/;
 export const isPullStep = (key: string) => STEP_KEY.test(key);
 
-// A stream a page should pull: never pulled, or last pulled longer ago than pageEveryMs.
-const pageDue = (state: StreamState | undefined, now = Date.now()) =>
-  !state?.refreshedAt || !state.pulledAt || now - state.pulledAt >= Math.max(SYNC.pullEveryMs, SYNC.pageEveryMs);
+// A stream a page should pull: never pulled, or last pulled longer ago than pageEveryMs. The manual
+// Refresh button (`force`) skips that wait down to pullEveryMs (owner, 2026-11-13).
+const pageDue = (state: StreamState | undefined, force = false, now = Date.now()) =>
+  !state?.refreshedAt || !state.pulledAt || now - state.pulledAt >= (force ? SYNC.pullEveryMs : Math.max(SYNC.pullEveryMs, SYNC.pageEveryMs));
 
 // The streams due now, for every client or one. Before the client list was ever pulled, that's the
 // only step: the rest can't be planned without it.
-export async function planPull(clientId: string | null): Promise<PullStep[]> {
+export async function planPull(clientId: string | null, force = false): Promise<PullStep[]> {
   const states = await readStates();
   const snapshots = states.get("snapshots");
   if (!snapshots?.refreshedAt) return [{ key: "snapshots", label: "Client list" }];
@@ -839,15 +840,16 @@ export async function planPull(clientId: string | null): Promise<PullStep[]> {
     (rows) => rows.length > 0,
     () => false,
   );
-  if (namesMissing || (!clientId && Date.now() - snapshots.refreshedAt >= SYNC.snapshotEveryMs)) steps.push({ key: "snapshots", label: "Client list" });
-  if (pageDue(states.get("logs"))) steps.push({ key: "logs", label: "System logs" });
-  if (pageDue(states.get("audit"))) steps.push({ key: "audit", label: "Portal events" });
+  const snapshotsDue = Date.now() - snapshots.refreshedAt >= (force ? SYNC.pullEveryMs : SYNC.snapshotEveryMs);
+  if (namesMissing || (!clientId && snapshotsDue)) steps.push({ key: "snapshots", label: "Client list" });
+  if (pageDue(states.get("logs"), force)) steps.push({ key: "logs", label: "System logs" });
+  if (pageDue(states.get("audit"), force)) steps.push({ key: "audit", label: "Portal events" });
   const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots WHERE data IS NOT NULL`;
   const names = new Map(rows.map((r) => [r.client_id as string, (r.company_name as string | null) ?? "client"]));
   const clients = clientId ? (names.has(clientId) ? [clientId] : []) : [...names.keys()];
-  for (const c of clients) if (pageDue(states.get(`callouts:${c}`))) steps.push({ key: `callouts:${c}`, label: `CRM syncs · ${names.get(c)}` });
+  for (const c of clients) if (pageDue(states.get(`callouts:${c}`), force)) steps.push({ key: `callouts:${c}`, label: `CRM syncs · ${names.get(c)}` });
   for (const c of await busyClients()) {
-    if (clients.includes(c) && pageDue(states.get(`logs:${c}`))) steps.push({ key: `logs:${c}`, label: `System logs · ${names.get(c)}` });
+    if (clients.includes(c) && pageDue(states.get(`logs:${c}`), force)) steps.push({ key: `logs:${c}`, label: `System logs · ${names.get(c)}` });
   }
   return steps;
 }
@@ -1109,6 +1111,9 @@ export type StoreStatus = {
 // When the stored data was last pulled and refreshed, and how far back it goes.
 export async function readStoreStatus(clientId: string | null): Promise<StoreStatus> {
   const streams = clientId ? ["logs", `callouts:${clientId}`] : null;
+  // A client's own log stream is pulled only while it's busy; once it isn't, the shared stream covers
+  // its logs and the old stream would hold "pulled" back at when it last was busy.
+  const busyLogs = (await busyClients()).map((c) => `logs:${c}`);
   const [[state], [calls], [logs]] = await Promise.all([
     streams
       ? db()`
@@ -1120,7 +1125,7 @@ export async function readStoreStatus(clientId: string | null): Promise<StoreSta
                  min(refreshed_at) FILTER (WHERE stream <> 'snapshots') AS refreshed_at,
                  count(last_error) AS errors,
                  max(refreshed_at) FILTER (WHERE stream = 'snapshots') AS snapshot_at
-          FROM ca_sync_state`,
+          FROM ca_sync_state WHERE stream NOT LIKE 'logs:%' OR stream = ANY(${busyLogs}::text[])`,
     clientId
       ? db()`SELECT min(at) AS since FROM ca_callout_events WHERE client_id = ${clientId}`
       : db()`SELECT min(at) AS since FROM ca_callout_events`,
@@ -1514,7 +1519,7 @@ export async function readLastSyncs(clientId: string | null): Promise<LastSyncs>
 }
 
 // Calls between `since` and `before` whose recording or callout is still open: never verified, verified
-// but never in the CRM, or never sent. Issues keep these flagged until they're fixed, not only for 24
+// but never in the CRM, never sent, or sent and never accepted. Issues keep these flagged until they're fixed, not only for 24
 // hours (QA finding R1). The last two only count at clients whose integration expects them, so a
 // client without one doesn't return every call.
 export async function readOpenCalls(
@@ -1533,6 +1538,7 @@ export async function readOpenCalls(
          (${RECORDED_SQL} AND NOT ${VERIFIED_SQL})
          OR (verified_at IS NOT NULL AND first_delivered_at IS NULL AND client_id = ANY($3::text[]))
          OR (attempts = 0 AND ingested_at IS NOT NULL AND client_id = ANY($4::text[]))
+         OR (attempts > 0 AND first_delivered_at IS NULL)
        )
      ORDER BY coalesce(ingested_at, first_callout_at) DESC`,
     params,

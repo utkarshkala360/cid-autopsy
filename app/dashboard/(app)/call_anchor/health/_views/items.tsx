@@ -50,6 +50,7 @@ const STAGES: Record<CallStage, { label: string; tone: Tone }> = {
   all: { label: "All calls", tone: "info" },
   complete: { label: "Went all the way through", tone: "ok" },
   moving: { label: "Still on their way", tone: "wait" },
+  stopped: { label: "Stopped before the CRM", tone: "bad" },
   stopUpload: { label: "Stopped here", tone: "bad" },
   stopSent: { label: "Stopped here", tone: "bad" },
   stopCrm: { label: "Stopped here", tone: "bad" },
@@ -65,6 +66,7 @@ const STAGES: Record<CallStage, { label: string; tone: Tone }> = {
   waiting: { label: "Phone hasn't uploaded", tone: "bad" },
   notUploaded: { label: "Not uploaded", tone: "bad" },
   uploadFailed: { label: "Upload failed", tone: "bad" },
+  unsaved: { label: "Phone couldn't save it", tone: "bad" },
   stuck: { label: "Stuck after upload began", tone: "bad" },
   notVerified: { label: "Uploaded, not verified", tone: "bad" },
   openDrop: { label: "Still open, 15 days", tone: "bad" },
@@ -87,22 +89,27 @@ const STAGES: Record<CallStage, { label: string; tone: Tone }> = {
 };
 // The panel follows the call's journey (JOURNEY_STEPS): the whole-journey outcome on top, then each
 // step with where calls stopped there first, then what went well, then the problems.
-const OUTCOME: CallStage[] = ["all", "complete", "moving"];
+const OUTCOME: CallStage[] = ["all", "complete", "moving", "stopped"];
 const STEP_STAGES: Record<JourneyKey, { stop?: CallStage; stages: CallStage[] }> = {
   phone: { stages: ["recorded", "notConnected", "mislabeled", "notRecorded"] },
   app: { stages: ["noLog"] },
-  upload: { stop: "stopUpload", stages: ["uploaded", "verified", "skipped", "onPhone", "waiting", "notUploaded", "uploadFailed", "stuck", "notVerified", "openDrop"] },
+  upload: { stop: "stopUpload", stages: ["uploaded", "verified", "skipped", "onPhone", "waiting", "notUploaded", "uploadFailed", "stuck", "unsaved", "notVerified", "openDrop"] },
   sent: { stop: "stopSent", stages: ["due", "sent", "notSent", "notSynced", "missing", "unsynced"] },
   crm: { stop: "stopCrm", stages: ["delivered", "synced", "late", "duplicate", "notReached", "notAccepted", "failed", "rejected", "auth", "unreachable"] },
 };
 // Stages that are a subset of another, shown indented under it: why those calls didn't get through.
 // They aren't added to the step's problem count, so a call is counted once (owner, 2026-11-13).
-const UNDER: Partial<Record<CallStage, CallStage[]>> = { notReached: ["rejected", "auth", "unreachable"] };
+// The upload's reasons don't overlap: never started, stuck once begun, or no file to upload.
+const UNDER: Partial<Record<CallStage, CallStage[]>> = {
+  stopUpload: ["waiting", "stuck", "unsaved"],
+  notReached: ["rejected", "auth", "unreachable"],
+};
 const NESTED = new Set(Object.values(UNDER).flat());
-// Stages that only repeat a neighbour (sent but not accepted, and failed, are the same calls as
-// didn't reach the CRM in the stored data). Kept for links from issues and funnels; listed only
-// when picked.
-const ONLY_WHEN_PICKED = new Set<CallStage>(["notAccepted", "failed"]);
+// Stages that only repeat a neighbour: sent but not accepted, and failed, are the same calls as didn't
+// reach the CRM; still on the phone, not uploaded, upload failed, uploaded not verified and still
+// open are the upload's stopped calls cut another way (owner, 2026-11-13). Kept for links from
+// issues and funnels; listed only when picked.
+const ONLY_WHEN_PICKED = new Set<CallStage>(["notAccepted", "failed", "onPhone", "notUploaded", "uploadFailed", "notVerified", "openDrop"]);
 // A stage left out of the layout would never show in the panel: fail loudly while developing.
 if (process.env.NODE_ENV !== "production") {
   const placed = new Set<CallStage>([...OUTCOME, ...Object.values(STEP_STAGES).flatMap((g) => [...(g.stop ? [g.stop] : []), ...g.stages])]);

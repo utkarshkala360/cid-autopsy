@@ -51,11 +51,18 @@ export async function readPullJob(clientId: string | null): Promise<PullStatus |
 }
 
 // Starts a pull unless one is running for the scope (or the fleet) or nothing is due.
-export async function startPullJob(cookie: string, clientId: string | null): Promise<"started" | "running" | "nothing"> {
+// The manual Refresh can start a pull at most once in this long, per scope (owner, 2026-11-13).
+export const MANUAL_COOLDOWN_SECONDS = 30;
+
+export async function startPullJob(cookie: string, clientId: string | null, force = false): Promise<"started" | "running" | "nothing" | "cooldown"> {
   const scope = clientId ?? "fleet";
   const busy = await db()`SELECT 1 FROM ca_pull_jobs WHERE scope IN (${scope}, 'fleet') AND lease_until > now()`;
   if (busy.length) return "running";
-  const steps = await planPull(clientId);
+  if (force) {
+    const recent = await db()`SELECT 1 FROM ca_pull_jobs WHERE scope = ${scope} AND started_at > now() - make_interval(secs => ${MANUAL_COOLDOWN_SECONDS})`;
+    if (recent.length) return "cooldown";
+  }
+  const steps = await planPull(clientId, force);
   if (steps.length === 0) return "nothing";
   const claimed = await db()`
     INSERT INTO ca_pull_jobs (scope, started_at, finished_at, lease_until, total, done, current, failures)

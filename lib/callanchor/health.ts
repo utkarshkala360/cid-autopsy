@@ -839,7 +839,8 @@ export function sureShare(part: number, whole: number) {
   return Math.max(0, (p + z2 / (2 * whole) - z * Math.sqrt((p * (1 - p)) / whole + z2 / (4 * whole * whole))) / (1 + z2 / whole));
 }
 export type LastThrough = { at: string; callId: string; clientId: string } | null;
-export type Needs = { critical: number; warning: number; top: string | null };
+// `calls`: distinct calls not in the CRM across the open issues, each counted once.
+export type Needs = { critical: number; warning: number; calls: number; top: string | null };
 type EntityBase = { level: Level; levelNote: string; needs: Needs; stats: RangeStats; lastThrough: LastThrough };
 export type ClientEntity = EntityBase & { clientId: string; name: string; status: string; internal: boolean; integrations: string[]; seats: Seats; error: string | null };
 export type LicenseEntity = EntityBase & {
@@ -901,7 +902,8 @@ function finishAcc(acc: Acc, days: WindowDays, now: number): RangeStats {
 const LEVEL_WORDS: Record<Level, string> = { critical: "Critical", warning: "Warning", healthy: "Healthy", idle: "Idle: no calls", unknown: "Unknown: CallAnchor didn't return its details" };
 const needsOf = (issues: Issue[]): Needs => {
   const open = issues.filter((i) => i.level !== "info").sort(byIssue);
-  return { critical: open.filter((i) => i.level === "critical").length, warning: open.filter((i) => i.level === "warning").length, top: open[0]?.title ?? null };
+  const calls = new Set(open.flatMap((i) => i.notInCrm ?? [])).size;
+  return { critical: open.filter((i) => i.level === "critical").length, warning: open.filter((i) => i.level === "warning").length, calls, top: open[0]?.title ?? null };
 };
 const levelNote = (level: Level, needs: Needs) => (needs.top && (level === "critical" || level === "warning") ? `${LEVEL_WORDS[level]}: ${needs.top}` : LEVEL_WORDS[level]);
 const laterThrough = (a: LastThrough, b: LastThrough) => (!a ? b : !b ? a : b.at > a.at ? b : a);
@@ -1204,6 +1206,7 @@ const CHECKLISTS: Record<string, string[]> = {
   crm_rejecting_all: ["Open one failed call's CRM request and read the reply", "Ask the client whether their webhook or CRM changed today", "Retries won't fix a 4xx: the data or webhook must change"],
   crm_rejecting: ["Group the failures by reply sample to find the commonest cause", "Check whether one license or agent dominates", "Fix the data or the webhook; retries won't help a 4xx"],
   crm_unreachable: ["Check the webhook URL is reachable from outside", "Ask the client whether their server or CRM was down", "Look for 5xx replies with an error page"],
+  calls_not_synced: ["Open the calls and read each one's reason", "Fix the commonest reason first: the phone, the upload or the CRM reply", "Each stays flagged until it reaches the CRM"],
   callout_missing: ["Check the integration is active and subscribed to call.completed", "Compare with CallAnchor's portal for one affected call", "Raise with CallAnchor if the integration looks right"],
   trial_skipped: ["Raise the trial's recording limit or convert the client", "Tell the client recordings are paused"],
   recordings_stuck: ["Open a call to see where the upload stopped", "Check the phone's network and storage", "Raise upload-failed lines with CallAnchor"],

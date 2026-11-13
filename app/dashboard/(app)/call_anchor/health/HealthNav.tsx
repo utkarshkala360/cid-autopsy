@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { setShowInternalAction } from "./actions";
 import { trailFor } from "./trail";
 import { Icon, type IconName } from "./ui";
+import { RefreshButton } from "./Progress";
 
 const BASE = "/dashboard/call_anchor/health";
 
@@ -114,7 +115,7 @@ function viewOf(pathname: string) {
 }
 
 // The health views as a bar frozen under the site header, with the internal-clients switch.
-export function HealthSubBar({ isAdmin, showInternal }: { isAdmin: boolean; showInternal: boolean }) {
+export function HealthSubBar({ isAdmin, showInternal, verifyHref }: { isAdmin: boolean; showInternal: boolean; verifyHref: string }) {
   const current = viewOf(usePathname());
   const range = useRange();
   const views = VIEWS.filter((v) => !("adminOnly" in v) || isAdmin);
@@ -157,6 +158,7 @@ export function HealthSubBar({ isAdmin, showInternal }: { isAdmin: boolean; show
             Show internal clients
           </label>
         </form>
+        <RefreshButton verifyHref={verifyHref} />
       </div>
     </div>
   );

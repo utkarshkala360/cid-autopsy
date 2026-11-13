@@ -29,6 +29,9 @@ changed anything:
 Rules already established in this repo.
 
 - Commit and push straight to `main`, only when the owner asks. Vercel deploys from `main`.
+- Data auto-syncs on a visit at most every 5 minutes; the Refresh button (top right of the health
+  bar) pulls at once, at most once in 30 seconds per scope, checked in the browser and on the server
+  (owner, 2026-11-13).
 - Detailed data (system logs, CRM callouts, calls) is kept 15 days. Snapshots are kept 30 days: the
   daily counts per client and phone (`ca_daily`, saved before calls are pruned, so 30-day strips keep
   working), phone and integration change history, and portal events (owner, 2026-11-13). Lists of
@@ -132,6 +135,16 @@ Rules already established in this repo.
   100 as 5, so a big clear loss leads a tiny sample of the same severity. Clients, Licenses and
   Devices show it in an Impact column ("≈ 33 lost", then broken of calls and the share; "few calls"
   under 20); Issues show the calls each affects.
+- Every call that didn't reach the CRM is an issue, and no error or issue is ever left behind
+  (owner, 2026-11-13). Success rates and other thresholds only pick the level (critical, warning);
+  they never decide whether an issue is raised. Every unsynced call sits under some open issue at
+  Warning or above, so Needs action shows it. Issues still group calls, so Needs action counts
+  issues. Any stopped call no other issue covers goes to "Other calls that didn't reach the CRM"
+  (`calls_not_synced`, the catch-all at the end of `clientIssues` in `lib/callanchor/issues.ts`).
+- No duplicate counts (owner, 2026-11-13). On Calls & logs a step shows where calls stopped once,
+  with non-overlapping reasons indented under it; stages that repeat the same calls cut another way
+  show only when a link opens them (`UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx`). Needs
+  action counts issues, with the distinct calls not in the CRM under it.
 - A failure rate alone makes Critical only with at least `criticalMinFailures` (5, in Settings)
   failed calls; with fewer it's a Warning, never dropped: false alarms are better than leaving a
   small client out (owner, 2026-11-13). This applies to "CRM is rejecting calls" and "<CRM> is
@@ -251,6 +264,10 @@ What a good change looks like here.
   the server those arrive as references, not values, and the page crashes at runtime while the build
   passes. Shared values go in a plain module such as `health/format.ts` (the Clients tab broke this
   way on 2026-11-13).
+- Screenshots for decks: headless Chrome (playwright-core, `channel: "chrome"`) at 1600×1000, 2×
+  scale, against the running dev server, with the `nextjs-portal` badge and "Audit note" button
+  hidden. The owner chose a locally signed short-lived member session over the login form
+  (2026-11-13). Keep screenshots and decks out of the repo: they hold customer data.
 - Profile live CallAnchor data before designing a view. Print counts and shapes only, never
   customer data. The health dashboard's design came from this.
 - Read CallAnchor through `getJson` in `lib/callanchor/portal.ts`, which can only send GET.
@@ -312,7 +329,6 @@ Agent proposals awaiting the owner's decision. Newest first.
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
 | 2026-11-13 | New phone / new agent checked in 1, 3 and 7-day windows instead of waiting 7 days: after its first full day, "stopped capturing calls" compares with its last 1 day, from day 3 its last 3, from day 7 its last 7; the alert says which ("over its last 3 days"), the phone page says which window and when the next starts, and the hourly chart averages the full days before today it has. Badge "New phone · first day" with the start time on hover | Done, typechecks and lints; not pushed | `RULES.baselineWindows` and `licenseHealth` in `lib/callanchor/issues.ts`, `loadLicense` in `lib/callanchor/health.ts`, `NewPhone` in `health/_views/entities.tsx` |
-| 2026-11-13 | Merge the recording near-duplicates on Calls & logs: "Not uploaded", "Phone hasn't uploaded" and "Still on the phone" overlap (the CRM ones are now grouped, see Portal changes) | 37 stages is still more than a support person needs | Awaiting owner |
 | 2026-11-13 | Finish the Supabase Mumbai cutover for local dev too: from here, Neon Singapore returns ~32 KB/s (7 days of calls, 1.2 MB, take 37 s while the query runs in 4 ms), so a cold local read takes over a minute | Production is next to Neon and unaffected; local dev waits on every cold read | Awaiting owner |
 | 2026-11-13 | (Superseded: owner chose to move the database to Mumbai.) Make local dev usable over a slow route to Singapore: either run local against a local Postgres (own store, pulled from CallAnchor), or cut what a page reads (stop loading 8 days of every call, about 6.4 MB, on each fleet visit) and stop the page waiting on CallAnchor pulls | Local took over a minute per page on 13 Nov: the owner's ISP route to Singapore gave Neon 56–230 KB/s (5.8 MB/s elsewhere), over HTTP, WebSocket and curl alike, and transfers over ~4 MB were cut off. Production runs in `sin1` beside Neon and isn't affected | Awaiting owner |
 | 2026-11-13 | Ask CallAnchor to fill `externalCallId` on `mobile.call.create` (the phone's own call-log id) | It's empty on all 8,309 stored ingest logs, so the chain starts at CallAnchor's call id: a call on the phone can't be matched to its row here without it | Awaiting owner |
@@ -334,6 +350,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Refresh button at the right of the health tab bar: pulls now (streams older than 30 s) instead of waiting for the 5-minute auto-sync, then shows "Refresh in Ns" for 30 s; the server refuses a manual pull for the same scope started under 30 s ago | Done, typechecks and lints; pushed 2026-11-13; not yet clicked signed in | `RefreshButton` in `health/Progress.tsx`, `force` in `planPull` (`store.ts`) and `startPullJob` (`pull-job.ts`), `health/pull/route.ts` |
+| 2026-11-13 | Needs action cell: under "1 critical 4 warning", the distinct calls not in the CRM across the row's open issues, each counted once, with a red (i) whose hover adds the worst issue ("50 calls not in the CRM · Recordings stuck on the phone"); column info tip says it counts issues, not calls | Done; Manish Minerals checked read-only (49 + 1 = 50); pushed 2026-11-13 | `notInCrm` on `Issue` in `lib/callanchor/issues.ts`, `needsOf` in `lib/callanchor/health.ts`, `NeedsCell` in `health/_views/entities.tsx` |
+| 2026-11-13 | Calls & logs, Recording uploaded step: one "Stopped here" count with its non-overlapping reasons under it (Phone hasn't uploaded, Stuck after upload began, new Phone couldn't save it). Still on the phone, Not uploaded, Upload failed, Uploaded not verified and Still open 15 days repeat those calls, so they show only when a link opens them | Done; pushed 2026-11-13 | `UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx`, `unsaved` stage in `lib/callanchor/issues.ts` |
+| 2026-11-13 | No unsynced call left out of the issues: "CRM is rejecting calls" is always raised (the success rate picks Critical or Warning only); a catch-all "Other calls that didn't reach the CRM" picks up stopped calls no other issue covers (recordings the phone couldn't save, CRM failures older than 24 hours, odd reply codes), with the reasons as evidence, back 15 days; open calls now include sent-but-never-accepted ones; new "Stopped before the CRM" stage on Calls & logs | Done, typechecks and lints; checked read-only on all 54 clients: catch-all raised at 2 (1 and 34 older failed calls), always-on rejection at 1; seen locally by the owner; pushed 2026-11-13 | `clientIssues` in `lib/callanchor/issues.ts`, `readOpenCalls` in `lib/callanchor/store.ts`, `health/_views/items.tsx` |
 | 2026-11-13 | Calls & logs, Accepted by the CRM step: one "Didn't reach the CRM" stage with its reasons indented under it (CRM rejected it (4xx), sign-in 401/403, no response or 5xx; empty ones hidden), counted once in the step. "Sent, not accepted" and "Sync failed" were the same calls (15 days: 45 in each, all 4xx), so they show only when a link opens them | Done, not pushed | `UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx` |
 | 2026-11-13 | Unified entity tabs: Overview, Issues, Clients, Licenses, Devices, Settings; shared columns (Health chip, Call journey, CRM syncs, Needs action) on a range (24h, 3, 7, 15 days) carried between tabs; module switches, the Clients table and the old Licenses panel removed; a client's tabs are Overview, Issues, Licenses, Devices and Calls & logs, the same tables scoped; Overview shows the worst five of each entity, failed CRM syncs and system logs | Done, builds; loader checked read-only against the store (counts add up across clients, licenses and devices); pushed 2026-11-13, not yet viewed signed in | `health/_views/entities.tsx`, `loadEntities` in `lib/callanchor/health.ts`, `health/HealthNav.tsx` |
 | 2026-11-13 | Licenses tab: each module has its own left-menu filters (Calls & CRM: calls, reach, sync days; Device: model, app, recording, dialer); module change clears filters. Rings in a fixed colour per metric with "of Y" under the number and the share on hover; Purchased column removed; Reached CRM and Recordings as rings; CRM sync, 7 days as one shared cell in both Clients modules and the Licenses tab | Done, pushed 2026-11-13; not yet viewed signed in | `health/_views/licenses.tsx`, `MetricRing` in `health/ui.tsx`, `SyncCell` in `health/parts.tsx`, `health/FleetTable.tsx` |
@@ -369,6 +389,45 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-13: Asked why a client stopping 20 calls at upload (24h) shows only "1 critical 3 warning".
+  Explained: Needs action counts open issues, not calls; one issue (per phone, or per client)
+  covers every call it affects, and it is right now over 15 days, not the picked range. Proposed
+  showing the call count in the chip (Recommendations).
+- 2026-11-13: Asked for a manual Refresh button, top right, that skips the 5-minute auto-sync but
+  can be clicked only once in 30 seconds; then commit and push. Built it and pushed today's work.
+- 2026-11-13: Asked why the data line read "pulled 5 h ago · 5-day refresh 7 h ago · system logs
+  from 10 Nov · loaded in 25.6s". "Pulled" is the oldest stream, and VM German's own log stream had
+  stopped (it is no longer among the busy clients; the shared stream covers it). Fixed: the fleet
+  status leaves out retired per-client log streams (`readStoreStatus` in `store.ts`). The refresh is
+  daily, so 7 h is normal; "from" is the oldest stored log; 25.6 s was a cold recompute.
+- 2026-11-13: Needs action line was cut off. Wanted a red info icon instead: the cell shows "50
+  calls not in the CRM" and a red (i); hovering it reads "50 calls not in the CRM · Recordings stuck
+  on the phone". With no calls behind the issues, the worst issue shows as text, as before.
+- 2026-11-13: Calls & logs upload step showed the same 49 calls as five problems ("still duplicate
+  errors"), and asked to build the call count in Needs action. Folded the upload step like the CRM
+  step and built the cell. Rule added to the SOP: a step's stages never count the same call twice.
+- 2026-11-13: Still saw only 5 issues for Manish Minerals (20 stopped at upload). Checked: all 20
+  are on one phone, under its one critical "Recordings stuck on the phone" (49 recordings, 29 older
+  than 24 hours); the fifth issue is the new catch-all. Fleet-wide the catch-all found 2 clients, one
+  with 34 failed CRM syncs older than 24 hours that no issue showed before. Re-offered the call count
+  in the Needs action cell.
+- 2026-11-13: "Success range percentage is only to categorize critical, warning, healthy, but I
+  don't need any errors/issues to be left behind." Made thresholds pick the level only, added the
+  catch-all issue, and widened the SOP rule.
+- 2026-11-13: "If a call is not synced it's also an issue." Added it to the SOP. Checked the code:
+  two kinds of unsynced call raise no issue today (Recommendations).
+- 2026-11-13: Asked for a PPT of the dashboard with screenshots, pitched as: what it helps with;
+  still under audit and being optimised; makes CS proactive instead of reactive to escalations;
+  shows where critical action is needed instead of searching log dumps. Built a 12-slide .pptx
+  (real data kept, by the owner's choice), now in the git-ignored `deck/` folder with its
+  screenshots. See "Screenshots for decks" under Happy implementation. Then asked for a team email
+  showcasing it, with long-term impact and a request for a demo slot; drafted in chat.
+- 2026-11-13: Asked what "Open items" on Kohinoor - Pune's critical "Verified recordings not synced
+  to the CRM" opens, given the journey shows 1 stopped at upload and 44 at the CRM. It opens the
+  `unsynced` list over 15 days (verified 5+ min ago, never accepted by the CRM), which spans the
+  journey's "never sent" and "refused by the CRM" stops; the journey counts only the page window.
+  Answered; nothing changed.
 
 - 2026-11-13: Asked to commit and push everything, including the Supabase driver and `bom1` region
   changes that were waiting. Pushed to main.
