@@ -6,6 +6,7 @@ import type { FleetRow, Level } from "@/lib/callanchor/health";
 import { cardClass, inputClass } from "@/components/ui";
 import { DAY_STATES, LEVELS, callHref, clientHref, int, itemsHref, pct, rateClass } from "./format";
 import { ItemLink, JourneyDots, rowLinkClass } from "./parts";
+import { Ring } from "./ui";
 
 // Times are formatted on the server, so the client doesn't re-render them in another zone. Issues
 // stay on the server: a row carries only its worst one's title.
@@ -66,7 +67,12 @@ export function FleetTable({ rows, basePath }: { rows: FleetTableRow[]; basePath
               <th className="px-3 py-2 text-right font-medium" title="Calls due at the CRM in the last 24 hours that it accepted (2xx). Calls with nowhere to go aren't due">Reached CRM</th>
               <th className="px-3 py-2 font-medium" title="The last 7 days (a day is synced when 80% of its due calls reached the CRM), and when a call last went all the way from the phone to the CRM">CRM sync, 7 days</th>
               <th className="px-3 py-2 text-right font-medium" title="Recordings synced to the CRM / verified, last 24 hours. Open drops are kept for 15 days until fixed">Recordings</th>
-              <th className="px-3 py-2 font-medium" title="Active seats logged in, and seats seen calling in 24 hours. Then phones needing action">Seats</th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium" title="Licenses with critical or warning health, of all the client's licenses">Licenses needing action</th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium"><span className="inline-flex items-center gap-1" title="Purchased: total seats the client bought">Purchased<span className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold normal-case text-slate-600">i</span></span></th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium"><span className="inline-flex items-center gap-1" title="Ring = active ÷ purchased">Active<span className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold normal-case text-slate-600">i</span></span></th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium"><span className="inline-flex items-center gap-1" title="Ring = logged in ÷ active">Logged in<span className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold normal-case text-slate-600">i</span></span></th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium"><span className="inline-flex items-center gap-1" title="Ring = calling ÷ active (a call within the unused threshold in Settings)">Calling<span className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold normal-case text-slate-600">i</span></span></th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium"><span className="inline-flex items-center gap-1" title="Unused = not assigned + logged out + logged in but not calling">Unused<span className="inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold normal-case text-slate-600">i</span></span></th>
               <th className="px-3 py-2 font-medium">Open issues</th>
             </tr>
           </thead>
@@ -136,25 +142,30 @@ export function FleetTable({ rows, basePath }: { rows: FleetTableRow[]; basePath
                       </p>
                     )}
                   </td>
-                  <td className={`${td} text-xs`}>
-                    {r.seats.active ? (
-                      <>
-                        <Link href={`${clientHref(basePath, r.clientId)}/licenses`} className="hover:text-indigo-700 hover:underline" title="Open this client's licenses and how they're used">
-                          {r.seats.loggedIn}/{r.seats.active} logged in · {r.seats.calling} calling
-                        </Link>
-                        {r.seats.purchased !== null && r.seats.purchased !== r.seats.active && <span className="text-slate-400"> · {r.seats.purchased} bought</span>}
-                        {(r.licenses.critical > 0 || r.licenses.warning > 0) && (
-                          <p>
-                            <Link href={`${clientHref(basePath, r.clientId)}/licenses`} className="hover:underline" title="Open this client's licenses">
-                              {r.licenses.critical > 0 && <span className="text-red-700">{r.licenses.critical} critical </span>}
-                              {r.licenses.warning > 0 && <span className="text-amber-800">{r.licenses.warning} warning</span>}
-                              <span className="text-slate-500"> phones</span>
-                            </Link>
-                          </p>
-                        )}
-                      </>
+                  <td className={`${td} tabular-nums`}>
+                    <Link href={`${clientHref(basePath, r.clientId)}/licenses`} className="hover:underline" title="Open this client's licenses">
+                      {r.licenses.critical + r.licenses.warning > 0 ? (
+                        <>
+                          {r.licenses.critical > 0 && <span className="text-red-700">{r.licenses.critical} critical </span>}
+                          {r.licenses.warning > 0 && <span className="text-amber-800">{r.licenses.warning} warning </span>}
+                        </>
+                      ) : (
+                        <span className="text-slate-500">none </span>
+                      )}
+                      <span className="text-slate-400">of {r.licenses.total}</span>
+                    </Link>
+                  </td>
+                  <td className={`${td} text-right font-medium tabular-nums text-slate-900`}>{int(r.seats.purchased)}</td>
+                  <td className={td}><Ring value={r.seats.active} of={r.seats.purchased} /></td>
+                  <td className={td}><Ring value={r.seats.loggedIn} of={r.seats.active} /></td>
+                  <td className={td}><Ring value={r.seats.calling} of={r.seats.active} /></td>
+                  <td className={`${td} text-right tabular-nums`}>
+                    {r.seats.idle + r.seats.loggedOut + r.seats.unassigned > 0 ? (
+                      <Link href={`${clientHref(basePath, r.clientId)}/licenses?use=unused`} className="font-medium text-amber-800 hover:underline">
+                        {int(r.seats.idle + r.seats.loggedOut + r.seats.unassigned)}
+                      </Link>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-slate-400">0</span>
                     )}
                   </td>
                   <td className="min-w-56 px-3 py-2 align-top text-xs">

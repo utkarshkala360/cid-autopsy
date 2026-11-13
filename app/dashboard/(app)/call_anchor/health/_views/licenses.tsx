@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { loadFleetLicenses, type FleetLicense } from "@/lib/callanchor/health";
+import { loadFleetLicenses, type FleetLicense, type Seats } from "@/lib/callanchor/health";
 import { durationText, type SeatState } from "@/lib/callanchor/issues";
-import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
+import { HEALTH_PATH, requireCallAnchorSession } from "@/lib/callanchor/session";
 import { LICENSE_STATUSES, STATUS_RANK, ago, clientHref, formatTime, int, licenseHref, pct, rateClass } from "../format";
-import { Hero, Ring, StatCell, StatStrip } from "../ui";
+import { StatCell, StatStrip } from "../ui";
 import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, Section, StatusBadge, Table, issueLinks, td } from "../parts";
 
 // Licenses and seats in one view (owner, 2026-11-13): a seat is a license, so an unused seat is an
@@ -34,28 +34,35 @@ const needsAction = (h: FleetLicense) => h.status === "critical" || h.status ===
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1 text-xs font-medium ${on ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`;
 
-export async function LicensesView({ query, clientId }: { query: Query; clientId: string | null }) {
-  const PATH = `${clientId ? clientHref(HEALTH_PATH, clientId) : HEALTH_PATH}/licenses`;
+export type LicenseFilters = Filters;
+type Href = (changes: Record<string, string | null | undefined>) => string;
+
+// The license filters a URL carries, and links that change them. `keep` holds other query values
+// the page needs to keep (the merged page's `issues=all`); `hash` lands on the list.
+export function licenseFilters(query: Query, path: string, keep: Record<string, string> = {}, hash = "") {
   const filters: Filters = {};
   for (const key of Object.keys(FILTERS) as (keyof typeof FILTERS)[]) {
     const value = query[key];
     if (typeof value === "string" && value.length <= 200) filters[key] = value;
   }
-  const href = (changes: Filters & Record<string, string | null | undefined>) => {
+  const href: Href = (changes) => {
     const next = new URLSearchParams();
-    for (const [key, value] of Object.entries({ ...filters, ...changes })) if (value) next.set(key, value);
-    return next.size ? `${PATH}?${next}` : PATH;
+    for (const [key, value] of Object.entries({ ...keep, ...filters, ...changes })) if (value) next.set(key, value);
+    return `${path}${next.size ? `?${next}` : ""}${hash}`;
   };
+  return { filters, href };
+}
+
+// One client's Licenses tab (/health/clients/<client>/licenses).
+export async function LicensesView({ query, clientId }: { query: Query; clientId: string }) {
+  const PATH = `${clientHref(HEALTH_PATH, clientId)}/licenses`;
+  const { filters, href } = licenseFilters(query, PATH);
   await requireCallAnchorSession(href({}));
 
   return (
     <div>
-      {clientId && (
-        <>
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Licenses</h2>
-          <p className="mt-1 text-sm text-slate-500">Every license (seat) of this client: its health and how it&apos;s used, worst first.</p>
-        </>
-      )}
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900">Licenses</h2>
+      <p className="mt-1 text-sm text-slate-500">Every license (seat) of this client: its health and how it&apos;s used, worst first.</p>
       <Suspense key={href({})} fallback={<LoadingNote text="Reading every license…" />}>
         <Licenses filters={filters} href={href} clientId={clientId} />
       </Suspense>
@@ -63,12 +70,48 @@ export async function LicensesView({ query, clientId }: { query: Query; clientId
   );
 }
 
-async function Licenses({ filters, href, clientId }: { filters: Filters; href: (changes: Record<string, string | null | undefined>) => string; clientId: string | null }) {
+async function Licenses({ filters, href, clientId }: { filters: Filters; href: Href; clientId: string }) {
   // A client asked for by id is shown even when it's internal.
-  const { licenses: every, clients: everyClient, hiddenInternal, unusedAfterMs, loadedAt } = await loadFleetLicenses(Boolean(clientId) || (await showInternal()));
-  const licenses = clientId ? every.filter((h) => h.license.clientId === clientId) : every;
-  const clients = (clientId ? everyClient.filter((c) => c.clientId === clientId) : everyClient).filter((c) => c.status !== "inactive");
-  const now = Date.parse(loadedAt);
+  const { licenses: every, clients: everyClient, hiddenInternal, unusedAfterMs, loadedAt } = await loadFleetLicenses(true);
+  return (
+    <LicensesPanel
+      licenses={every.filter((h) => h.license.clientId === clientId)}
+      clients={everyClient.filter((c) => c.clientId === clientId)}
+      filters={filters}
+      href={href}
+      clientId={clientId}
+      now={Date.parse(loadedAt)}
+      unusedAfterMs={unusedAfterMs}
+      hiddenInternal={hiddenInternal}
+    />
+  );
+}
+
+type SeatClient = { clientId: string; companyName: string; status: string; seats: Seats };
+
+// The license list with its filters and breakdowns, from data already read. On a client's tab it
+// leads with that client's seat strip; on the merged Client health page (`embedded`) the clients table
+// above already carries seat use, so only the filters, the list and the breakdowns show (clientId null).
+export function LicensesPanel({
+  licenses,
+  clients: allClients,
+  filters,
+  href,
+  clientId,
+  now,
+  unusedAfterMs,
+  hiddenInternal,
+}: {
+  licenses: FleetLicense[];
+  clients: SeatClient[];
+  filters: Filters;
+  href: Href;
+  clientId: string | null;
+  now: number;
+  unusedAfterMs: number;
+  hiddenInternal: number;
+}) {
+  const clients = allClients.filter((c) => c.status !== "inactive");
   const model = (h: FleetLicense) => [h.license.deviceBrand, h.license.deviceModel].filter(Boolean).join(" ") || "Unknown device";
   // Without a filter the fleet view lists what needs a look: a health problem or an unused license.
   // One client's view lists every license.
@@ -106,7 +149,7 @@ async function Licenses({ filters, href, clientId }: { filters: Filters; href: (
   const useCounts = USES.map((u) => ({ use: u, count: licenses.filter((h) => matches(h, "use") && isUse(h, u)).length }));
 
   const strip = (
-    <StatStrip attached={!clientId}>
+    <StatStrip>
       <StatCell
         icon="licenses"
         tone={needs ? "amber" : "green"}
@@ -137,24 +180,7 @@ async function Licenses({ filters, href, clientId }: { filters: Filters; href: (
 
   return (
     <>
-      {clientId ? (
-        <div className="mt-4">{strip}</div>
-      ) : (
-        <Hero
-          eyebrow={{ icon: "licenses", label: "Client health" }}
-          title="Licenses"
-          meta={
-            <>
-              Every license across clients: its health and how its seat is used. Without a filter, the list shows licenses needing action or
-              unused. A seat is unused when it&apos;s not assigned, logged out, or logged in with no call for {durationText(unusedAfterMs)}.
-              {hiddenInternal > 0 && ` ${hiddenInternal} internal clients hidden.`}
-            </>
-          }
-          kpis={[{ label: "In use", value: pct(sum("active") ? Math.round((sum("calling") / sum("active")) * 100) : null), bar: sum("active") ? (sum("calling") / sum("active")) * 100 : null, note: "calling, of active" }]}
-        >
-          {strip}
-        </Hero>
-      )}
+      {clientId && <div className="mt-4">{strip}</div>}
 
       <div className="mt-5 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -182,7 +208,11 @@ async function Licenses({ filters, href, clientId }: { filters: Filters; href: (
         </div>
       </div>
 
-      <Section title={`Licenses: ${shown.length}`} note={unfiltered && !clientId ? "Needing action or unused. Pick a filter above for the rest." : undefined}>
+      <Section title={`Licenses: ${shown.length}`} note={
+          clientId
+            ? undefined
+            : `${unfiltered ? "Needing action or unused; pick a filter for the rest. " : ""}A seat is unused when it's not assigned, logged out, or logged in with no call for ${durationText(unusedAfterMs)}.${hiddenInternal > 0 ? ` ${hiddenInternal} internal clients hidden.` : ""}`
+        }>
         <Table
           head={["Phone", ...(clientId ? [] : ["Client"]), "Health", "Seat", "Issues", "Calls 24h", "Reached CRM", "CRM sync, 7 days · last call through", "App", "Device"]}
           empty={shown.length ? undefined : "No licenses match."}
@@ -241,43 +271,6 @@ async function Licenses({ filters, href, clientId }: { filters: Filters; href: (
           })}
         </Table>
       </Section>
-
-      {!clientId && (
-        <Section title="Seat use by client" note="Most unused first. Open a client for its licenses.">
-          <Table head={[
-              "Client",
-              { label: "Purchased", info: "Purchased: total seats the client bought" },
-              { label: "Active", info: "Ring = active ÷ purchased" },
-              { label: "Assigned", info: "Ring = assigned ÷ active" },
-              { label: "Logged in", info: "Ring = logged in ÷ active" },
-              { label: "Calling", info: "Ring = calling ÷ active (a call within the unused threshold in Settings)" },
-              { label: "Unused", info: "Unused = not assigned + logged out + logged in but not calling" },
-            ]} empty={clients.length ? undefined : "No licenses stored yet."}>
-            {[...clients]
-              .sort((a, b) => b.seats.idle + b.seats.loggedOut + b.seats.unassigned - (a.seats.idle + a.seats.loggedOut + a.seats.unassigned) || b.seats.active - a.seats.active)
-              .map((c) => {
-                const idle = c.seats.idle + c.seats.loggedOut + c.seats.unassigned;
-                const root = `${clientHref(HEALTH_PATH, c.clientId)}/licenses`;
-                return (
-                  <tr key={c.clientId} className="hover:bg-slate-50">
-                    <td className={td}>
-                      <Link href={root} className={rowLinkClass}>{c.companyName}</Link>
-                      <p className="text-xs text-slate-500">{c.status}</p>
-                    </td>
-                    <td className={`${td} text-right font-medium tabular-nums text-slate-900`}>{int(c.seats.purchased)}</td>
-                    <td className={td}><Ring value={c.seats.active} of={c.seats.purchased} /></td>
-                    <td className={td}><Ring value={c.seats.assigned} of={c.seats.active} /></td>
-                    <td className={td}><Ring value={c.seats.loggedIn} of={c.seats.active} /></td>
-                    <td className={td}><Ring value={c.seats.calling} of={c.seats.active} /></td>
-                    <td className={`${td} text-right tabular-nums ${idle ? "font-medium text-amber-800" : "text-slate-400"}`}>
-                      {idle ? <ItemLink href={`${root}?use=unused`}>{int(idle)}</ItemLink> : int(idle)}
-                    </td>
-                  </tr>
-                );
-              })}
-          </Table>
-        </Section>
-      )}
 
       <GroupPanel title="By device model" rows={group(model)} href={(value) => href({ model: value })} />
       <GroupPanel title="By app version" rows={group((h) => h.license.appVersion ?? "Unknown")} href={(value) => href({ app: value })} />

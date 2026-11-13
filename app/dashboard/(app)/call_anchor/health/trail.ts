@@ -11,7 +11,7 @@ const FLEET_LABELS: Record<string, string> = {
   calls: "Calls",
 };
 
-// Where you are, from the URL: Client health › Clients › <client> › Licenses › Phone …1234, and so
+// Where you are, from the URL: Client health › Overview › <client> › Licenses › Phone …1234, and so
 // on. Every step but the last opens that level (owner, 2026-11-13). Names come from the layout: client
 // names, and each license's last four digits. `back` is the items list a call was opened from.
 export type Crumb = { label: string; href?: string };
@@ -23,7 +23,7 @@ export function trailFor(pathname: string, back: string | null, clients: Record<
 
   if (segs[0] === "clients" && segs[1]) {
     const root = `${BASE}/clients/${encodeURIComponent(segs[1])}`;
-    crumbs.push({ label: "Clients", href: BASE }, { label: clients[segs[1]] ?? "Client", href: root });
+    crumbs.push({ label: "Overview", href: BASE }, { label: clients[segs[1]] ?? "Client", href: root });
     const [, , view, id] = segs;
     if (view === "licenses") {
       crumbs.push({ label: "Licenses", href: `${root}/licenses` });
@@ -39,7 +39,7 @@ export function trailFor(pathname: string, back: string | null, clients: Record<
     } else crumbs.push({ label: "Health" });
   } else {
     const [view, id] = segs;
-    crumbs.push({ label: FLEET_LABELS[view ?? ""] ?? "Clients", href: view && id ? `${BASE}/${view === "calls" ? "items?kind=calls&stage=all&window=1" : view}` : undefined });
+    crumbs.push({ label: FLEET_LABELS[view ?? ""] ?? "Overview", href: view && id ? `${BASE}/${view === "calls" ? "items?kind=calls&stage=all&window=1" : view}` : undefined });
     if (id) crumbs.push({ label: view === "calls" ? `Call …${id.slice(-8)}` : view === "issues" ? "Issue" : id });
   }
   const last = crumbs.length - 1;

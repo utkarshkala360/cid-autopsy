@@ -27,7 +27,7 @@ export default async function ClientLayout({ children, params }: LayoutProps<"/d
   return (
     <>
       <Hero
-        back={{ href: HEALTH_PATH, label: "Back to Clients" }}
+        back={{ href: HEALTH_PATH, label: "Back to Overview" }}
         eyebrow={{ icon: "building", label: "Client account" }}
         title={snapshot?.companyName ?? "Client"}
         badge={pill && <HeroPill tone={pill[0]}>{pill[1]}</HeroPill>}

@@ -7,5 +7,5 @@ import { withoutClient } from "../_views/query";
 // unused licenses.
 export default async function SeatsPage({ searchParams }: PageProps<"/dashboard/call_anchor/health/seats">) {
   const moved = withoutClient(await searchParams);
-  redirect(`${moved ? clientHref(HEALTH_PATH, moved.client) : HEALTH_PATH}/licenses?use=unused`);
+  redirect(moved ? `${clientHref(HEALTH_PATH, moved.client)}/licenses?use=unused` : `${HEALTH_PATH}?use=unused#s-licenses`);
 }

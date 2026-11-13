@@ -86,8 +86,8 @@ Rules already established in this repo.
   (owner, 2026-11-13). `/customers` redirects there. The `customers` table and `ca_map_customers()`
   stay in the schema, unused by pages; the Salesforce connect pages went with Customers (no org was
   connected), and `lib/salesforce/` is kept for when a client page needs it.
-- Health pages share one frame: the site header is frozen at the top; Overview, Clients, Licenses
-  and Settings are a bar frozen under it; the left menu lists the open page's sections, and picking one
+- Health pages share one frame: the site header is frozen at the top; Overview and Settings are a
+  bar frozen under it (more tabs to be chosen later); the left menu lists the open page's sections, and picking one
   shows that section on its own. There is no whole-page view: a page opens on its first section
   (owner, 2026-11-13). See `health/HealthNav.tsx`.
 - Member and admin pages use the full window width, with no centred max-width column; content and
@@ -96,14 +96,20 @@ Rules already established in this repo.
 - Health pages are hierarchical, client on top (owner, 2026-11-13). Everything about a client lives
   under `/health/clients/<client>/`: its Health page, `licenses` (and `licenses/<license>` for one
   phone), `seats`, `items` (Calls & logs), `calls/<call>` and `issues/<issue>`. The frame says where
-  you are at every level: health tabs (Overview, Clients, Licenses, Settings), a breadcrumb
+  you are at every level: health tabs (Overview, Settings), a breadcrumb
   that follows the URL (`HealthTrail`), the client's name and its own tabs (Health, Licenses, Seats,
   Calls & logs; `ClientTabs`), then the left menu. Build links with `clientHref`, `licenseHref`,
   `callHref`, `issueHref` and `itemsHref` in `health/format.ts`, passing the client id; flat links
   (`/health/licenses/<id>`, `/health/calls/<id>`, `?client=`) still work by redirecting. Pages shown
   both fleet-wide and per client are views in `health/_views/`.
-- The Overview tab lists every client with its health, licenses needing action and seat use in one
-  row, each opening that client's tab (owner, 2026-11-13).
+- Overview, Clients and Licenses are one page, Overview, at `/health` (owner, 2026-11-13): the hero
+  and strip, Needs action, one Clients table row per client with everything about it (journey,
+  calls, CRM reach, 7-day sync, recordings, open issues, licenses needing action, Purchased, Active,
+  Logged in and Calling with rings, Unused), then Licenses with its Health and Use filters and the
+  device and app breakdowns, Trials, CRM errors and log sources. One store read serves the page
+  (`loadFleetHealth` returns the licenses). `/health/overview`, `/health/licenses` and `/health/seats`
+  redirect there, keeping filters and opening the Licenses section. A link to `#s-…` opens that
+  section in the left menu.
 - Health pages look like the CallAnchor support portal the owner pointed to (owner, 2026-11-13): a
   dark gradient hero per page with an eyebrow, title, status pill and two key numbers, a strip of
   stat cells (icon, coloured accent, number, one line) attached under it, tabs with icons, white
@@ -251,6 +257,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Overview, Clients and Licenses merged into one Overview page at `/health`: clients table with seat rings and licenses needing action, Licenses section below with filters; tabs now Overview and Settings; old routes redirect; section links open their section | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `LicensesPanel` in `health/_views/licenses.tsx` |
 | 2026-11-13 | Seats merged into Licenses (seat column, Use filter, seat-use strip and per-client table); rings with formula tooltips for seat counts; batched pulls with a progress bar, percentage, live failure list and a 2-minute cooldown, one job per tab; estimated-percentage loaders; Customers section removed (redirects to Client health; Internal flag stays on the client page); boolean arrays sent as text so the postgres.js driver can save them | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/_views/licenses.tsx`, `health/Progress.tsx`, `health/ui.tsx`, `planPull` in `store.ts` |
 | 2026-11-13 | Visual redesign after the owner's portal screenshot: hero headers with key numbers and attached stat strips on Clients, Overview, Licenses, Seats and every client page (client hero: health pill, CRM integration, last call through, reached-CRM bar, calls; strip: open issues, licenses, seats, last good sync); client tabs with icons inside the hero; tiles restyled with accents | Done, builds; pushed with this turn's commit; not yet viewed signed in | `health/ui.tsx`, `health/clients/[clientId]/layout.tsx`, `loadClientSummary` in `lib/callanchor/health.ts` |
 | 2026-11-13 | Hierarchical navigation: client pages moved under `/health/clients/<client>/` (health, licenses, phone, seats, Calls & logs, call, issue); breadcrumb from the URL on every health page; client header with its own tabs; left menu below it; fleet Licenses, Seats and items with `?client=` and old flat client, phone, call and issue links redirect there. Links restyled: row links dark, counts as chips, actions as buttons; "Back to client" footers removed. Items page: left Kind and Stage filters; a page without sections now uses the full width | Done, pushed 2026-11-13 (`dd2be81`); not yet viewed signed in | `health/HealthNav.tsx`, `health/clients/[clientId]/`, `health/_views/`, `health/format.ts` |
@@ -280,6 +287,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-13: Said "great job with the overview" and asked to merge Overview, Licenses and Clients
+  with all details together; tabs to be split out later. Merged them into one Overview page read
+  once from the store. Earlier: the Clients page sat at 95% for 70 seconds; not yet diagnosed (the
+  owner stopped the timing run), but the merge removes a second full assessment.
 - 2026-11-13: Asked why every page change pulls streams again. A stream counted as due 30 seconds
   after its last pull, and the browser's 2-minute cooldown lived in memory. Pages now pull a stream
   only after 5 minutes, and the cooldown is 5 minutes, kept in session storage (`a00357c`). All 60

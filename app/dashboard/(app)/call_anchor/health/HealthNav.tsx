@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { setShowInternalAction } from "./actions";
@@ -9,10 +9,9 @@ import { Icon, type IconName } from "./ui";
 
 const BASE = "/dashboard/call_anchor/health";
 
+// Overview holds clients, licenses and seats together (owner, 2026-11-13); more tabs come later.
 const VIEWS = [
-  { key: "overview", label: "Overview", path: "/overview" },
-  { key: "clients", label: "Clients", path: "" },
-  { key: "licenses", label: "Licenses", path: "/licenses" },
+  { key: "overview", label: "Overview", path: "" },
   { key: "settings", label: "Settings", path: "/settings", adminOnly: true },
 ] as const;
 
@@ -85,10 +84,10 @@ export function ClientTabs({ root }: { root: string }) {
   );
 }
 
-// Which view a path belongs to. Client, call, issue and item pages sit under Clients.
+// Which view a path belongs to. Client, call, issue and item pages sit under Overview.
 function viewOf(pathname: string) {
   for (const v of VIEWS) if (v.path && (pathname === BASE + v.path || pathname.startsWith(`${BASE}${v.path}/`))) return v.key;
-  return "clients";
+  return "overview";
 }
 
 // The health views as a bar frozen under the site header, with the internal-clients switch.
@@ -155,6 +154,26 @@ export function HealthSections() {
   }));
   const focus = chosen.path === pathname ? chosen.id : null;
 
+  // A link to a section (#s-…), from a card or a filter, opens that section like picking it here.
+  const lastHash = useRef<string | null>(null);
+  useEffect(() => {
+    const sync = () => {
+      const h = window.location.hash.slice(1);
+      if (h.startsWith("s-") && h !== lastHash.current) {
+        lastHash.current = h;
+        setChosen({ path: window.location.pathname, id: h });
+      }
+    };
+    const onClick = () => setTimeout(sync, 0);
+    sync();
+    window.addEventListener("hashchange", sync);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [pathname]);
+
   useEffect(() => {
     const main = document.querySelector("main");
     if (!main) return;
@@ -178,6 +197,7 @@ export function HealthSections() {
   if (sections.length === 0) return null;
 
   const pick = (id: string) => {
+    lastHash.current = id;
     setChosen({ path: pathname, id });
     window.history.replaceState(null, "", `#${id}`);
     window.scrollTo({ top: 0 });

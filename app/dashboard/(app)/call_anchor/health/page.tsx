@@ -7,6 +7,7 @@ import { PortalError } from "@/lib/callanchor/portal";
 import { secondaryButtonClass } from "@/components/ui";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { FleetTable } from "./FleetTable";
+import { LicensesPanel, licenseFilters } from "./_views/licenses";
 import { Hero, StatCell, StatStrip } from "./ui";
 import { ago, clientHref, formatTime, int, itemsHref, pct } from "./format";
 import { Collapsed, CoverageNote, IssueList, ItemLink, LoadingNote, Section, Table, issueLinks, rowLinkClass, td } from "./parts";
@@ -18,23 +19,27 @@ export const maxDuration = 300;
 // How many issue cards show before "show all".
 const BAND_SIZE = 9;
 
+// Overview, Clients and Licenses in one page (owner, 2026-11-13): the hero with the fleet's numbers,
+// what needs action, one row per client with everything about it, then every license with its
+// filters. One read of the store serves all of it.
 export default async function ClientHealthPage({ searchParams }: PageProps<"/dashboard/call_anchor/health">) {
   const { profile } = await requireCallAnchorSession(HEALTH_PATH);
-  const all = (await searchParams).issues === "all";
+  const query = await searchParams;
+  const all = query.issues === "all";
 
   return (
     <div>
       {!profile && <p className="text-sm text-slate-500">CallAnchor can&apos;t be reached right now.</p>}
       {profile && (
         <Suspense fallback={<LoadingNote text="Pulling what's new from CallAnchor. The very first load also stores the last 5 days, which takes up to a minute." />}>
-          <FleetHealth all={all} />
+          <FleetHealth all={all} query={query} />
         </Suspense>
       )}
     </div>
   );
 }
 
-async function FleetHealth({ all }: { all: boolean }) {
+async function FleetHealth({ all, query }: { all: boolean; query: Record<string, string | string[] | undefined> }) {
   const { member } = await requireCallAnchorSession(HEALTH_PATH);
   const cookie = await storedCookie(member.id);
   if (!cookie) redirect(verifyUrl(HEALTH_PATH));
@@ -65,13 +70,15 @@ async function FleetHealth({ all }: { all: boolean }) {
   const shown = all ? needsAction : needsAction.slice(0, BAND_SIZE);
   const { seats } = totals;
   const reach = totals.due ? Math.round((totals.reached / totals.due) * 1000) / 10 : null;
+  const { filters, href: licenseHref } = licenseFilters(query, HEALTH_PATH, all ? { issues: "all" } : {}, "#s-licenses");
+  const needLicenses = data.licenses.filter((h) => h.status === "critical" || h.status === "warning").length;
 
   return (
     <>
       <Hero
         eyebrow={{ icon: "activity", label: "Client health" }}
-        title="Clients"
-        meta="What's broken, how bad, and since when, across every client and phone. Each visit pulls only what's new from CallAnchor."
+        title="Overview"
+        meta="Every client, its licenses and seats, and what's broken, how bad and since when. Stored data, brought up to date by the pull above."
         kpis={[
           { label: "Reached CRM, 24h", value: pct(reach), bar: reach, note: `${int(totals.reached)} of ${int(totals.due)} due` },
           { label: "Calls, 24h", value: int(totals.calls), note: `${int(totals.callsToday)} since midnight IST` },
@@ -84,7 +91,7 @@ async function FleetHealth({ all }: { all: boolean }) {
             label="Clients"
             value={int(totals.clients)}
             sub={`${levels("critical")} critical · ${levels("warning")} warning · ${levels("healthy")} healthy · ${levels("idle")} idle${data.hiddenInternal ? ` · ${data.hiddenInternal} internal hidden` : ""}`}
-            href={`${HEALTH_PATH}/overview`}
+            href="#s-clients"
           />
           <StatCell
             icon="alert"
@@ -105,10 +112,10 @@ async function FleetHealth({ all }: { all: boolean }) {
           <StatCell
             icon="seats"
             tone="blue"
-            label="Seats calling"
+            label="Licenses calling"
             value={`${int(seats.calling)} / ${int(seats.active)}`}
-            sub={`${int(seats.loggedIn)} logged in${seats.purchased !== null ? ` · ${int(seats.purchased)} purchased` : ""} · ${int(seats.idle + seats.loggedOut + seats.unassigned)} unused`}
-            href={`${HEALTH_PATH}/licenses?use=unused`}
+            sub={`${needLicenses ? `${int(needLicenses)} need action · ` : ""}${int(seats.idle + seats.loggedOut + seats.unassigned)} unused${seats.purchased !== null ? ` · ${int(seats.purchased)} purchased` : ""}`}
+            href={licenseHref({ use: "unused", status: null })}
           />
         </StatStrip>
       </Hero>
@@ -165,6 +172,17 @@ async function FleetHealth({ all }: { all: boolean }) {
           }))}
         />
       </Section>
+
+      <LicensesPanel
+        licenses={data.licenses}
+        clients={rows.map((r) => ({ clientId: r.clientId, companyName: r.companyName, status: r.status, seats: r.seats }))}
+        filters={filters}
+        href={licenseHref}
+        clientId={null}
+        now={now}
+        unusedAfterMs={data.unusedAfterMs}
+        hiddenInternal={data.hiddenInternal}
+      />
 
       {data.trials.length > 0 && (
         <Collapsed title={`Trials: ${data.trials.length}`} note="Is each trial on track to convert: phones calling, recordings against the limit, and an integration in place.">

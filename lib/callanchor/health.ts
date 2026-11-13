@@ -505,6 +505,10 @@ export async function loadFleetHealth(cookie: string, memberId: string, showInte
       .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999)),
     coverage: coverage(cover, allCalls),
     pullErrors: [...new Set(pull.errors)],
+    // The merged Client health page lists every license from this same read, so it doesn't assess
+    // the fleet twice (owner, 2026-11-13).
+    licenses: assessments.flatMap((a) => a.licenses.map((h): FleetLicense => ({ ...h, companyName: a.snapshot.companyName ?? a.snapshot.clientId }))),
+    unusedAfterMs: RULES.seatUnusedMs,
     store,
     loadedAt: new Date(now).toISOString(),
     tookMs: Date.now() - started,
@@ -726,48 +730,6 @@ export async function loadFleetLicenses(showInternal = false) {
     .filter((a) => a.seats.active > 0 || (a.seats.purchased ?? 0) > 0)
     .map((a) => ({ clientId: a.snapshot.clientId, companyName: a.snapshot.companyName ?? a.snapshot.clientId, status: a.snapshot.status ?? "unknown", seats: a.seats }));
   return { licenses, clients, hiddenInternal: everyClient.length - assessments.length, unusedAfterMs: RULES.seatUnusedMs, loadedAt: new Date(now).toISOString() };
-}
-
-// ---- Overview: clients, their phones and their seats side by side ----
-
-export type OverviewRow = {
-  clientId: string;
-  companyName: string;
-  status: string;
-  level: Level;
-  openIssues: number;
-  criticalIssues: number;
-  calls24h: number;
-  lastComplete: Pulse["lastComplete"];
-  licenses: ReturnType<typeof licenseCounts>;
-  seats: Seats;
-};
-
-// Every client with its health, phones and seats in one row, from the store, so the three views can be
-// read together and each opens the other two (owner, 2026-11-13).
-export async function loadOverview(showInternal = false) {
-  await loadSettings();
-  const now = Date.now();
-  const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
-  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
-  const rows: OverviewRow[] = assessments
-    .map((a) => {
-      const open = a.issues.filter((i) => i.level !== "info");
-      return {
-        clientId: a.snapshot.clientId,
-        companyName: a.snapshot.companyName ?? a.snapshot.clientId,
-        status: a.snapshot.status ?? "unknown",
-        level: a.level,
-        openIssues: open.length,
-        criticalIssues: open.filter((i) => i.level === "critical").length,
-        calls24h: a.calls.length,
-        lastComplete: a.pulse.lastComplete,
-        licenses: licenseCounts(a.licenses),
-        seats: a.seats,
-      };
-    })
-    .sort((a, b) => byLevel(a.level, b.level) || b.criticalIssues - a.criticalIssues || b.openIssues - a.openIssues || a.companyName.localeCompare(b.companyName));
-  return { rows, hiddenInternal: everyClient.length - assessments.length, loadedAt: new Date(now).toISOString() };
 }
 
 // The numbers in a client's header, on every page under it: health, calls, CRM reach, licenses and
