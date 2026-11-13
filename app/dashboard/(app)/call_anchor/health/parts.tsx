@@ -3,6 +3,7 @@ import type { CoverageSummary, Drill, FunnelStep, JourneyStep, Level } from "@/l
 import type { CallStage, Day, Issue, IssueLevel, JourneySummary, LicenseStatus, Pulse } from "@/lib/callanchor/issues";
 import type { ReplySuggestion, StoreStatus } from "@/lib/callanchor/store";
 import { badgeClass, cardClass, secondaryButtonClass } from "@/components/ui";
+import { StatCell, type IconName, type Tone } from "./ui";
 import { DAY_STATES, ISSUE_LEVELS, LEVELS, LICENSE_STATUSES, TRENDS, ago, formatDay, formatHour, formatTime, int, issueHref, itemsHref, pct, rateClass } from "./format";
 
 // How complete and fresh the stored data is: last pull, stream errors, calls missing their ingest
@@ -538,24 +539,40 @@ export function ItemLink({ href, className = "", children }: { href: string; cla
 // The main link of a table row (a client, a phone): plain dark text that turns indigo on hover.
 export const rowLinkClass = "font-medium text-slate-900 underline-offset-2 hover:text-indigo-700 hover:underline";
 
-export function Tile({ label, value, detail, href }: { label: string; value: React.ReactNode; detail?: React.ReactNode; href?: string }) {
+export function Tile({ label, value, detail, href, icon, tone }: { label: string; value: React.ReactNode; detail?: React.ReactNode; href?: string; icon?: IconName; tone?: Tone }) {
+  // The same look as the stat cells under a hero: an accent, an optional icon, the number large.
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+      {icon ? (
+        <StatCell icon={icon} tone={tone ?? "slate"} label={label} value={value} sub={detail} href={href} />
+      ) : (
+        <PlainStat label={label} value={value} detail={detail} href={href} tone={tone ?? "slate"} />
+      )}
+    </div>
+  );
+}
+
+const ACCENT: Record<Tone, string> = {
+  blue: "border-l-blue-500",
+  green: "border-l-emerald-500",
+  violet: "border-l-violet-500",
+  red: "border-l-red-500",
+  amber: "border-l-amber-500",
+  slate: "border-l-slate-300",
+};
+
+function PlainStat({ label, value, detail, href, tone }: { label: string; value: React.ReactNode; detail?: React.ReactNode; href?: string; tone: Tone }) {
   const body = (
-    <>
-      <p className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-500">
+    <div className={`h-full border-l-4 bg-white px-4 py-3.5 ${ACCENT[tone]} ${href ? "transition hover:bg-slate-50" : ""}`}>
+      <p className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-500">
         {label}
-        {href && <span aria-hidden className="text-slate-300 transition group-hover:text-indigo-600">→</span>}
+        {href && <span aria-hidden className="text-slate-300">→</span>}
       </p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-      {detail && <div className="mt-1 text-xs text-slate-500">{detail}</div>}
-    </>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      {detail && <div className="mt-0.5 text-xs text-slate-500">{detail}</div>}
+    </div>
   );
-  return href ? (
-    <Link href={href} className={`${cardClass} group block p-4 transition hover:border-indigo-300 hover:bg-indigo-50/40`}>
-      {body}
-    </Link>
-  ) : (
-    <div className={`${cardClass} p-4`}>{body}</div>
-  );
+  return href ? <Link href={href} className="block h-full">{body}</Link> : body;
 }
 
 // A client's views, all under /health/clients/<client> (owner, 2026-11-13).
@@ -574,8 +591,8 @@ export function Section({ title, note, children }: { title: string; note?: React
   const anchor = sectionAnchor(title);
   return (
     <section id={anchor.id} data-section={anchor.label} className="mt-8 scroll-mt-32">
-      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      {note && <p className="mt-1 text-sm text-slate-500">{note}</p>}
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
+      {note && <p className="mt-1 max-w-4xl text-sm text-slate-500">{note}</p>}
       <div className="mt-3">{children}</div>
     </section>
   );

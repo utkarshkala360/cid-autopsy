@@ -7,8 +7,9 @@ import { PortalError } from "@/lib/callanchor/portal";
 import { secondaryButtonClass } from "@/components/ui";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { FleetTable } from "./FleetTable";
-import { ago, clientHref, formatTime, int, itemsHref, pct, rateClass } from "./format";
-import { Collapsed, CoverageNote, IssueList, ItemLink, LoadingNote, Section, Table, Tile, issueLinks, rowLinkClass, td } from "./parts";
+import { Hero, StatCell, StatStrip } from "./ui";
+import { ago, clientHref, formatTime, int, itemsHref, pct } from "./format";
+import { Collapsed, CoverageNote, IssueList, ItemLink, LoadingNote, Section, Table, issueLinks, rowLinkClass, td } from "./parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores 5 days for every client, and the daily refresh runs after the response.
@@ -23,12 +24,7 @@ export default async function ClientHealthPage({ searchParams }: PageProps<"/das
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-slate-900">Clients</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        {profile
-          ? "What's broken, how bad, and since when, across every client and phone. Each visit pulls only what's new from CallAnchor."
-          : "CallAnchor can't be reached right now."}
-      </p>
+      {!profile && <p className="text-sm text-slate-500">CallAnchor can&apos;t be reached right now.</p>}
       {profile && (
         <Suspense fallback={<LoadingNote text="Pulling what's new from CallAnchor. The very first load also stores the last 5 days, which takes up to a minute." />}>
           <FleetHealth all={all} />
@@ -63,48 +59,56 @@ async function FleetHealth({ all }: { all: boolean }) {
   const levels = (level: string) => working.filter((r) => r.level === level).length;
   const shown = all ? needsAction : needsAction.slice(0, BAND_SIZE);
   const { seats } = totals;
+  const reach = totals.due ? Math.round((totals.reached / totals.due) * 1000) / 10 : null;
 
   return (
     <>
+      <Hero
+        eyebrow={{ icon: "activity", label: "Client health" }}
+        title="Clients"
+        meta="What's broken, how bad, and since when, across every client and phone. Each visit pulls only what's new from CallAnchor."
+        kpis={[
+          { label: "Reached CRM, 24h", value: pct(reach), bar: reach, note: `${int(totals.reached)} of ${int(totals.due)} due` },
+          { label: "Calls, 24h", value: int(totals.calls), note: `${int(totals.callsToday)} since midnight IST` },
+        ]}
+      >
+        <StatStrip attached>
+          <StatCell
+            icon="building"
+            tone={levels("critical") ? "red" : levels("warning") ? "amber" : "green"}
+            label="Clients"
+            value={int(totals.clients)}
+            sub={`${levels("critical")} critical · ${levels("warning")} warning · ${levels("healthy")} healthy · ${levels("idle")} idle${data.hiddenInternal ? ` · ${data.hiddenInternal} internal hidden` : ""}`}
+            href={`${HEALTH_PATH}/overview`}
+          />
+          <StatCell
+            icon="alert"
+            tone={critical ? "red" : needsAction.length ? "amber" : "green"}
+            label="Needs action"
+            value={int(needsAction.length)}
+            sub={`${critical} critical${fresh ? ` · ${fresh} new since your last visit` : ""}`}
+            href="#s-needs-action"
+          />
+          <StatCell
+            icon="check"
+            tone={totals.openDrops ? "amber" : "green"}
+            label="Recordings synced, 24h"
+            value={`${int(totals.synced)} / ${int(totals.verified)}`}
+            sub={totals.openDrops ? `${int(totals.openDrops)} still open across 30 days` : "none open"}
+            href={itemsHref(HEALTH_PATH, { kind: "calls", stage: "notSynced" })}
+          />
+          <StatCell
+            icon="seats"
+            tone="blue"
+            label="Seats calling"
+            value={`${int(seats.calling)} / ${int(seats.active)}`}
+            sub={`${int(seats.loggedIn)} logged in${seats.purchased !== null ? ` · ${int(seats.purchased)} purchased` : ""} · ${int(seats.idle + seats.loggedOut + seats.unassigned)} unused`}
+            href={`${HEALTH_PATH}/seats`}
+          />
+        </StatStrip>
+      </Hero>
       <CoverageNote store={data.store} coverage={data.coverage} pullErrors={data.pullErrors} now={now} tookMs={data.tookMs} />
       {rows.length === 0 && <p className="mt-6 text-sm text-slate-500">No clients stored yet. Reload to try the first pull again.</p>}
-
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Tile
-          label="Clients"
-          value={int(totals.clients)}
-          detail={`${levels("critical")} critical · ${levels("warning")} warning · ${levels("healthy")} healthy · ${levels("idle")} idle${totals.inactive ? ` · ${totals.inactive} inactive not counted` : ""}${data.hiddenInternal ? ` · ${data.hiddenInternal} internal hidden` : ""}`}
-        />
-        <Tile
-          label="Calls, last 24 hours"
-          value={int(totals.calls)}
-          href={itemsHref(HEALTH_PATH, { kind: "calls", stage: "all" })}
-          detail={`CallAnchor counts ${int(totals.callsToday)} since midnight IST`}
-        />
-        <Tile
-          label="Reached the CRM"
-          value={<span className={rateClass(totals.due ? Math.round((totals.reached / totals.due) * 1000) / 10 : null)}>{pct(totals.due ? Math.round((totals.reached / totals.due) * 1000) / 10 : null)}</span>}
-          href={itemsHref(HEALTH_PATH, { kind: "calls", stage: "notReached" })}
-          detail={`${int(totals.reached)} of ${int(totals.due)} calls due at the CRM, 24 hours. Opens the ones that didn't`}
-        />
-        <Tile
-          label="Recordings, 24 hours"
-          value={`${int(totals.synced)} / ${int(totals.verified)}`}
-          href={itemsHref(HEALTH_PATH, { kind: "calls", stage: "notSynced" })}
-          detail={
-            <>
-              synced / verified.{" "}
-              {totals.openDrops > 0 ? <span className="font-medium text-amber-800">{int(totals.openDrops)} still open across 15 days</span> : "None open."}
-            </>
-          }
-        />
-        <Tile
-          label="Seats"
-          value={`${int(seats.loggedIn)} / ${int(seats.active)}`}
-          detail={`logged in / active${seats.purchased !== null ? ` · ${int(seats.purchased)} purchased` : ""} · ${int(seats.calling)} calling · ${int(seats.idle + seats.loggedOut + seats.unassigned)} unused`}
-          href={`${HEALTH_PATH}/seats`}
-        />
-      </div>
 
       <Section
         title={needsAction.length ? `Needs action: ${needsAction.length} issue${needsAction.length === 1 ? "" : "s"}, ${critical} critical` : "Needs action"}

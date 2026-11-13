@@ -4,6 +4,7 @@ import { loadSeats, type SeatRow } from "@/lib/callanchor/health";
 import { durationText, type SeatState } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { ago, clientHref, formatTime, int, licenseHref } from "../format";
+import { Hero } from "../ui";
 import { LoadingNote, rowLinkClass, Section, StatusBadge, Table, Tile, td } from "../parts";
 
 // How each client uses the seats it bought, and every seat not in use with since when. Seat use lives
@@ -26,7 +27,11 @@ export async function SeatsView({ clientId }: { clientId: string | null }) {
   await requireCallAnchorSession(client ? `${clientHref(HEALTH_PATH, client)}/seats` : PATH);
   return (
     <div>
-      <h1 className="text-xl font-semibold text-slate-900">Seats</h1>
+      {clientId ? (
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900">Seats</h2>
+      ) : (
+        <Hero eyebrow={{ icon: "seats", label: "Client health" }} title="Seats" meta="How each client uses the seats it bought: assigned, logged in, calling, and every seat that isn't." />
+      )}
       <Suspense key={client ?? ""} fallback={<LoadingNote text="Reading every seat…" />}>
         <Seats client={client} />
       </Suspense>

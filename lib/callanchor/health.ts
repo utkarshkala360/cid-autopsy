@@ -764,6 +764,29 @@ export async function loadOverview(showInternal = false) {
   return { rows, hiddenInternal: everyClient.length - assessments.length, loadedAt: new Date(now).toISOString() };
 }
 
+// The numbers in a client's header, on every page under it: health, calls, CRM reach, licenses and
+// seats, from the store. Null before the client's first pull.
+export async function loadClientSummary(clientId: string) {
+  await loadSettings();
+  const now = Date.now();
+  const [a] = await assess(now, clientId);
+  if (!a) return null;
+  const open = a.issues.filter((i) => i.level !== "info");
+  return {
+    level: a.level,
+    calls24h: a.calls.length,
+    reached: a.pulse.reached,
+    lastComplete: a.pulse.lastComplete,
+    lastSyncAt: a.pulse.lastSyncAt,
+    openIssues: open.length,
+    criticalIssues: open.filter((i) => i.level === "critical").length,
+    licenses: licenseCounts(a.licenses),
+    seats: a.seats,
+    hasIntegration: a.ctx.hasIntegration,
+    loadedAt: new Date(now).toISOString(),
+  };
+}
+
 // ---- Seats ----
 
 export type SeatRow = { license: LicenseHealth["license"]; seat: LicenseHealth["seat"]; lastCallAt: string | null; lastSyncAt: string | null; status: LicenseHealth["status"] };

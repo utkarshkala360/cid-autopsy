@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { setShowInternalAction } from "./actions";
 import { trailFor } from "./trail";
+import { Icon, type IconName } from "./ui";
 
 const BASE = "/dashboard/call_anchor/health";
 
@@ -61,23 +62,24 @@ export function ClientTabs({ root }: { root: string }) {
   const pathname = usePathname();
   const rest = pathname.slice(root.length);
   const current = rest.startsWith("/licenses") ? "licenses" : rest.startsWith("/seats") ? "seats" : rest.startsWith("/items") || rest.startsWith("/calls") ? "items" : "health";
-  const tabs = [
-    { key: "health", label: "Health", href: root },
-    { key: "licenses", label: "Licenses", href: `${root}/licenses` },
-    { key: "seats", label: "Seats", href: `${root}/seats` },
-    { key: "items", label: "Calls & logs", href: `${root}/items?kind=calls&stage=all&window=1` },
+  const tabs: { key: string; label: string; href: string; icon: IconName }[] = [
+    { key: "health", label: "Health", href: root, icon: "grid" },
+    { key: "licenses", label: "Licenses", href: `${root}/licenses`, icon: "licenses" },
+    { key: "seats", label: "Seats", href: `${root}/seats`, icon: "seats" },
+    { key: "items", label: "Calls & logs", href: `${root}/items?kind=calls&stage=all&window=1`, icon: "logs" },
   ];
   return (
-    <nav aria-label="This client" className="mt-2 flex gap-1 overflow-x-auto">
+    <nav aria-label="This client" className="flex gap-1 overflow-x-auto border-t border-slate-200 bg-white px-4">
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           aria-current={t.key === current ? "page" : undefined}
-          className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
+          className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3.5 text-sm font-medium ${
             t.key === current ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"
           }`}
         >
+          <Icon name={t.icon} />
           {t.label}
         </Link>
       ))}

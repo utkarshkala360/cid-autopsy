@@ -10,7 +10,7 @@ import { PortalError } from "@/lib/callanchor/portal";
 import { HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { setClientInternalAction } from "../../actions";
 import { STATUS_RANK, ago, clientHref, formatTime, int, itemsHref, licenseHref, pct, rateClass } from "../../format";
-import { Collapsed, rowLinkClass, CoverageNote, DayStrip, Funnel, HealthBadge, JourneyRollup, LastComplete, IssueList, ItemLink, issueLinks, LoadingNote, PulsePanel, Section, StatusBadge, SyncTrend, Table, Tile, td } from "../../parts";
+import { Collapsed, rowLinkClass, CoverageNote, DayStrip, Funnel, JourneyRollup, LastComplete, IssueList, ItemLink, issueLinks, LoadingNote, PulsePanel, Section, StatusBadge, SyncTrend, Table, Tile, td } from "../../parts";
 
 export const metadata: Metadata = { title: "Client health" };
 // The first pull stores this client's last 5 days, and the daily refresh runs after the response.
@@ -89,10 +89,9 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
 
   return (
     <>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <HealthBadge level={data.level} />
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm text-slate-500">
-          {client.status} · {client.plan} plan{client.accessSuspended ? " · access suspended" : ""}
+          {client.plan} plan{client.accessSuspended ? " · access suspended" : ""}
         </span>
         <div className="ml-auto">
           <InternalMark

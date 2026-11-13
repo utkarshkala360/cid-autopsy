@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { loadOverview, type Level } from "@/lib/callanchor/health";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { LEVELS, ago, callHref, int } from "../format";
-import { LoadingNote, Section, Table, Tile, clientViews, rowLinkClass, td } from "../parts";
+import { LoadingNote, Section, Table, clientViews, rowLinkClass, td } from "../parts";
+import { Hero, StatCell, StatStrip } from "../ui";
 
 export const metadata: Metadata = { title: "Client health overview" };
 
@@ -18,11 +19,6 @@ export default async function OverviewPage() {
   await requireCallAnchorSession(PATH);
   return (
     <div>
-      <h1 className="text-xl font-semibold text-slate-900">Client health overview</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Every client with its phones and seats side by side. A client&apos;s health comes from its calls reaching the CRM; its phones are the
-        licenses those calls are made on; its seats are how many of those licenses it bought and uses. Each number opens the view behind it.
-      </p>
       <Suspense fallback={<LoadingNote text="Reading clients, phones and seats…" />}>
         <Overview />
       </Suspense>
@@ -43,36 +39,53 @@ async function Overview() {
 
   return (
     <>
-      <p className="mt-2 text-xs text-slate-500">
-        {inactive > 0 && `${inactive} inactive clients left out. `}
-        {hiddenInternal > 0 && `${hiddenInternal} internal clients hidden. `}
-        From stored data; open Clients to pull what&apos;s new.
-      </p>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Tile
-          label="Clients"
-          value={int(rows.length)}
-          href={HEALTH_PATH}
-          detail={LEVEL_ORDER.filter((l) => levelCount(l) > 0).map((l) => `${levelCount(l)} ${LEVELS[l].label.toLowerCase()}`).join(" · ")}
-        />
-        <Tile
-          label="Phones"
-          value={int(sum((r) => r.licenses.total))}
-          href={`${HEALTH_PATH}/licenses`}
-          detail={`${int(phonesNeedingAction)} need action · ${int(sum((r) => r.licenses.critical))} critical · ${int(sum((r) => r.licenses.warning))} warning`}
-        />
-        <Tile
-          label="Seats"
-          value={`${int(sum((r) => r.seats.calling))} / ${int(sum((r) => r.seats.active))}`}
-          href={`${HEALTH_PATH}/seats`}
-          detail={`calling / active${purchasedKnown ? ` · ${int(sum((r) => r.seats.purchased ?? 0))} purchased` : ""} · ${int(sum((r) => r.seats.loggedIn))} logged in · ${int(sum(unused))} unused`}
-        />
-      </div>
+      <Hero
+        eyebrow={{ icon: "grid", label: "Client health" }}
+        title="Overview"
+        meta={
+          <>
+            Every client with its licenses and seats side by side. Each number opens the view behind it.
+            {inactive > 0 && ` ${inactive} inactive clients left out.`}
+            {hiddenInternal > 0 && ` ${hiddenInternal} internal clients hidden.`} From stored data; Clients pulls what&apos;s new.
+          </>
+        }
+        kpis={[
+          { label: "Calls, 24h", value: int(sum((r) => r.calls24h)) },
+          { label: "Open issues", value: int(sum((r) => r.openIssues)), note: `${int(sum((r) => r.criticalIssues))} critical` },
+        ]}
+      >
+        <StatStrip attached>
+          <StatCell
+            icon="building"
+            tone={levelCount("critical") ? "red" : levelCount("warning") ? "amber" : "green"}
+            label="Clients"
+            value={int(rows.length)}
+            sub={LEVEL_ORDER.filter((l) => levelCount(l) > 0).map((l) => `${levelCount(l)} ${LEVELS[l].label.toLowerCase()}`).join(" · ") || "none stored yet"}
+            href={HEALTH_PATH}
+          />
+          <StatCell
+            icon="licenses"
+            tone={phonesNeedingAction ? "amber" : "green"}
+            label="Licenses"
+            value={int(sum((r) => r.licenses.total))}
+            sub={`${int(phonesNeedingAction)} need action · ${int(sum((r) => r.licenses.critical))} critical`}
+            href={`${HEALTH_PATH}/licenses`}
+          />
+          <StatCell
+            icon="seats"
+            tone="blue"
+            label="Seats calling"
+            value={`${int(sum((r) => r.seats.calling))} / ${int(sum((r) => r.seats.active))}`}
+            sub={`${purchasedKnown ? `${int(sum((r) => r.seats.purchased ?? 0))} purchased · ` : ""}${int(sum((r) => r.seats.loggedIn))} logged in`}
+            href={`${HEALTH_PATH}/seats`}
+          />
+          <StatCell icon="alert" tone={sum(unused) ? "amber" : "green"} label="Unused seats" value={int(sum(unused))} sub="not assigned, logged out or not calling" href={`${HEALTH_PATH}/seats`} />
+        </StatStrip>
+      </Hero>
 
       <Section title="Clients, phones and seats" note="Worst health first. Health opens the client, Phones its licenses, Seats how its seats are used.">
         <Table
-          head={["Client", "Health", "Open issues", "Calls 24h", "Last call through", "Phones needing action", "Seats: purchased · active · logged in · calling", "Unused seats"]}
+          head={["Client", "Health", "Open issues", "Calls 24h", "Last call through", "Licenses needing action", "Seats: purchased · active · logged in · calling", "Unused seats"]}
           empty={rows.length ? undefined : "No clients stored yet. Open Clients to pull them."}
         >
           {rows.map((r) => {

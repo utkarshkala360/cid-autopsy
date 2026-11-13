@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { loadFleetLicenses, type FleetLicense } from "@/lib/callanchor/health";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { LICENSE_STATUSES, STATUS_RANK, ago, clientHref, int, licenseHref, pct, rateClass } from "../format";
+import { Hero } from "../ui";
 import { DayStrip, rowLinkClass, ItemLink, LastComplete, LoadingNote, Section, StatusBadge, Table, issueLinks, td } from "../parts";
 
 // Every license that needs action, across clients, or every license of one client (its Licenses tab,
@@ -31,13 +32,18 @@ export async function LicensesView({ query, clientId }: { query: Query; clientId
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-slate-900">Licenses</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        {clientId
-          ? "Every phone of this client, worst first."
-          : "Every phone across clients, worst first. Without a status filter, only phones that need action are listed."}{" "}
-        Notes don&apos;t change a phone&apos;s status; how each seat is used is on the Seats tab. From stored data: the dashboard brings it up to date.
-      </p>
+      {clientId ? (
+        <>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Licenses</h2>
+          <p className="mt-1 text-sm text-slate-500">Every phone of this client, worst first. How each seat is used is on the Seats tab.</p>
+        </>
+      ) : (
+        <Hero
+          eyebrow={{ icon: "licenses", label: "Client health" }}
+          title="Licenses"
+          meta="Every phone across clients, worst first. Without a status filter, only phones that need action are listed. From stored data: Clients brings it up to date."
+        />
+      )}
       <Suspense key={href({})} fallback={<LoadingNote text="Reading every license…" />}>
         <Licenses filters={filters} href={href} clientId={clientId} />
       </Suspense>
