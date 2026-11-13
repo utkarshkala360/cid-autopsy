@@ -15,7 +15,7 @@ responses, and `ca check` tells you when production no longer matches it.
 | [postman/](postman/) | Collection generated from the contract, with a sample response per request, plus an environment |
 | [docs/api-reference.md](docs/api-reference.md) | Generated curl command and redacted sample response for every operation |
 | [docs/endpoint-inventory.md](docs/endpoint-inventory.md) | Every endpoint the portal's front end calls, reads and writes split |
-| [Web console](../app/dashboard/(app)/call_anchor_config/apis/) | Browse and run these APIs at `/dashboard/call_anchor_config/apis` |
+| [Web console](../app/dashboard/(app)/call_anchor/apis/) | Browse and run these APIs at `/dashboard/call_anchor/apis` |
 | [src/](src/) | Typed client, the `ca` CLI and a mock server |
 | [fixtures/](fixtures/) | Redacted sample responses |
 | [docs/understanding.md](docs/understanding.md) | How CallAnchor fits together |

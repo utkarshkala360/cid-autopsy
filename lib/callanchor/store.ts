@@ -25,7 +25,10 @@ export const SYNC = {
   refreshDays: 5,
   refreshEveryMs: DAY,
   snapshotEveryMs: 10 * MINUTE,
-  retainDays: 90,
+  // Detailed rows (system logs, CRM callouts, calls) are kept 15 days; snapshots (daily summaries,
+  // phone and integration changes, portal events) 30 days (owner, 2026-11-13).
+  retainDays: 15,
+  snapshotDays: 30,
   leaseMs: 4 * MINUTE,
   maxPages: 150,
   // The fleet-wide log pull can't keep up with the busiest clients (finding D in
@@ -684,12 +687,17 @@ async function busyClients() {
 }
 
 async function prune() {
-  const cutoff = `${SYNC.retainDays} days`;
-  await db()`DELETE FROM ca_callout_events WHERE at < now() - ${cutoff}::interval`;
-  await db()`DELETE FROM ca_system_logs WHERE occurred_at < now() - ${cutoff}::interval`;
-  await db()`DELETE FROM ca_calls WHERE coalesce(ingested_at, first_callout_at) < now() - ${cutoff}::interval`;
-  await db()`DELETE FROM ca_license_changes WHERE at < now() - ${cutoff}::interval`;
-  await db()`DELETE FROM ca_audit_logs WHERE occurred_at < now() - ${cutoff}::interval`;
+  // Days about to lose their calls keep their counts as a snapshot first.
+  await saveDaily();
+  const detail = `${SYNC.retainDays} days`;
+  const snapshot = `${SYNC.snapshotDays} days`;
+  await db()`DELETE FROM ca_callout_events WHERE at < now() - ${detail}::interval`;
+  await db()`DELETE FROM ca_system_logs WHERE occurred_at < now() - ${detail}::interval`;
+  await db()`DELETE FROM ca_calls WHERE coalesce(ingested_at, first_callout_at) < now() - ${detail}::interval`;
+  await db()`DELETE FROM ca_license_changes WHERE at < now() - ${snapshot}::interval`;
+  await db()`DELETE FROM ca_integration_changes WHERE at < now() - ${snapshot}::interval`;
+  await db()`DELETE FROM ca_audit_logs WHERE occurred_at < now() - ${snapshot}::interval`;
+  await db()`DELETE FROM ca_daily WHERE day < to_char((now() - ${snapshot}::interval) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD')`;
 }
 
 // Fleet metrics, tenant counts and OneAPI status for every client. Not paged, so no milestone.
@@ -1232,13 +1240,11 @@ export async function readLicenseHistoryStart() {
 // Success reply shapes per client: the label, and when it was first and last seen.
 export async function readReplyShapes(clientId: string | null, since: number) {
   const from = new Date(since).toISOString();
-  const rows = clientId
-    ? await db()`
-        SELECT client_id, label, min(at) AS first_at, max(at) AS last_at, count(*) AS n FROM ca_callout_events
-        WHERE client_id = ${clientId} AND at >= ${from} AND ${db().unsafe(CRM_STATUS_SQL)} = 'delivered' GROUP BY 1, 2`
-    : await db()`
-        SELECT client_id, label, min(at) AS first_at, max(at) AS last_at, count(*) AS n FROM ca_callout_events
-        WHERE at >= ${from} AND ${db().unsafe(CRM_STATUS_SQL)} = 'delivered' GROUP BY 1, 2`;
+  const rows = await db().query(
+    `SELECT client_id, label, min(at) AS first_at, max(at) AS last_at, count(*) AS n FROM ca_callout_events
+     WHERE at >= $1 ${clientId ? "AND client_id = $2" : ""} AND ${CRM_STATUS_SQL} = 'delivered' GROUP BY 1, 2`,
+    clientId ? [from, clientId] : [from],
+  );
   return rows.map((r) => ({ clientId: r.client_id as string, label: r.label as string, firstAt: iso(r.first_at), lastAt: iso(r.last_at), count: Number(r.n) }));
 }
 
@@ -1311,6 +1317,7 @@ export async function readSuggestions(): Promise<ReplySuggestion[]> {
 const RECORDED_SQL = `(recording_detail = 'pending_upload' OR upload_started_at IS NOT NULL OR uploaded_at IS NOT NULL
   OR upload_failed_at IS NOT NULL OR verified_at IS NOT NULL OR 'recording.ready' = ANY(delivered_events))`;
 const VERIFIED_SQL = `(verified_at IS NOT NULL OR 'recording.ready' = ANY(delivered_events))`;
+const COMPLETE_SQL = `(first_delivered_at IS NOT NULL AND (NOT ${RECORDED_SQL} OR ${VERIFIED_SQL}))`;
 const UPLOADED_SQL = `(uploaded_at IS NOT NULL OR ${VERIFIED_SQL})`;
 
 // One IST day of one license's calls (license null: calls with no known license). The counts let
@@ -1332,27 +1339,54 @@ export type DayRow = {
   synced: number;
 };
 
+// One IST day of calls per client and license, counted the way CALL_STAGES counts them. `where`
+// narrows ca_calls; `grace` is the SQL for the server-grace cutoff.
+const dayRowsSql = (where: string, grace: string) => `
+  SELECT client_id, license_id, to_char(coalesce(ingested_at, first_callout_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS day,
+    count(*) AS calls,
+    count(*) FILTER (WHERE first_delivered_at IS NOT NULL) AS delivered,
+    count(*) FILTER (WHERE first_delivered_at IS NULL AND last_status = 'failed') AS failed,
+    count(*) FILTER (WHERE attempts = 0 AND ingested_at IS NOT NULL AND ingested_at < ${grace} AND verified_at IS NULL
+      AND coalesce(recording_detail, '') NOT IN ('pending_upload', 'skipped_trial_limit')) AS no_callout,
+    count(*) FILTER (WHERE verified_at IS NOT NULL AND verified_at < ${grace} AND first_delivered_at IS NULL AND coalesce(last_status, '') <> 'failed') AS verified_unsent,
+    count(*) FILTER (WHERE ${RECORDED_SQL}) AS recorded,
+    count(*) FILTER (WHERE ${UPLOADED_SQL}) AS uploaded,
+    count(*) FILTER (WHERE ${VERIFIED_SQL}) AS verified,
+    count(*) FILTER (WHERE ${VERIFIED_SQL} AND first_delivered_at IS NOT NULL) AS synced
+  FROM ca_calls ${where ? `${where} AND` : "WHERE"} client_id IS NOT NULL GROUP BY 1, 2, 3`;
+
+// Days whose calls are all still stored are counted live; older ones come from the saved snapshot.
+const LIVE_FROM_SQL = `to_char((now() - interval '${SYNC.retainDays - 1} days') AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD')`;
+
+// Saves every stored day's counts, so a day keeps its numbers once its calls are pruned. Today's row
+// is overwritten by the next save.
+export async function saveDaily() {
+  await db().query(
+    `INSERT INTO ca_daily (client_id, license_key, day, calls, delivered, failed, no_callout, verified_unsent, recorded, uploaded, verified, synced)
+     SELECT client_id, coalesce(license_id, ''), day, calls, delivered, failed, no_callout, verified_unsent, recorded, uploaded, verified, synced
+     FROM (${dayRowsSql("", "now()")}) d
+     ON CONFLICT (client_id, license_key, day) DO UPDATE SET
+       calls = EXCLUDED.calls, delivered = EXCLUDED.delivered, failed = EXCLUDED.failed, no_callout = EXCLUDED.no_callout,
+       verified_unsent = EXCLUDED.verified_unsent, recorded = EXCLUDED.recorded, uploaded = EXCLUDED.uploaded,
+       verified = EXCLUDED.verified, synced = EXCLUDED.synced, saved_at = now()`,
+  );
+}
+
 export async function readDaily(scope: { clientId?: string | null; licenseId?: string | null }, since: number, serverGraceMs: number): Promise<DayRow[]> {
   const c = conditions();
   c.add("coalesce(ingested_at, first_callout_at) >= ?", new Date(since).toISOString());
   if (scope.clientId) c.add("client_id = ?", scope.clientId);
   if (scope.licenseId) c.add("license_id = ?", scope.licenseId);
-  const graceAt = new Date(Date.now() - serverGraceMs).toISOString();
-  c.params.push(graceAt);
-  const grace = `$${c.params.length}`;
+  const grace = `$${c.params.push(new Date(Date.now() - serverGraceMs).toISOString())}`;
+  const sinceAt = `$${c.params.push(new Date(since).toISOString())}`;
+  const saved = [`day < ${LIVE_FROM_SQL}`, `day >= to_char(${sinceAt}::timestamptz AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD')`];
+  if (scope.clientId) saved.push(`client_id = $${c.params.push(scope.clientId)}`);
+  if (scope.licenseId) saved.push(`license_key = $${c.params.push(scope.licenseId)}`);
   const rows = await db().query(
-    `SELECT client_id, license_id, to_char(coalesce(ingested_at, first_callout_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS day,
-       count(*) AS calls,
-       count(*) FILTER (WHERE first_delivered_at IS NOT NULL) AS delivered,
-       count(*) FILTER (WHERE first_delivered_at IS NULL AND last_status = 'failed') AS failed,
-       count(*) FILTER (WHERE attempts = 0 AND ingested_at IS NOT NULL AND ingested_at < ${grace} AND verified_at IS NULL
-         AND coalesce(recording_detail, '') NOT IN ('pending_upload', 'skipped_trial_limit')) AS no_callout,
-       count(*) FILTER (WHERE verified_at IS NOT NULL AND verified_at < ${grace} AND first_delivered_at IS NULL AND coalesce(last_status, '') <> 'failed') AS verified_unsent,
-       count(*) FILTER (WHERE ${RECORDED_SQL}) AS recorded,
-       count(*) FILTER (WHERE ${UPLOADED_SQL}) AS uploaded,
-       count(*) FILTER (WHERE ${VERIFIED_SQL}) AS verified,
-       count(*) FILTER (WHERE ${VERIFIED_SQL} AND first_delivered_at IS NOT NULL) AS synced
-     FROM ca_calls ${c.where} AND client_id IS NOT NULL GROUP BY 1, 2, 3`,
+    `SELECT * FROM (${dayRowsSql(c.where, grace)}) live WHERE day >= ${LIVE_FROM_SQL}
+     UNION ALL
+     SELECT client_id, NULLIF(license_key, '') AS license_id, day, calls, delivered, failed, no_callout, verified_unsent, recorded, uploaded, verified, synced
+     FROM ca_daily WHERE ${saved.join(" AND ")}`,
     c.params,
   );
   return rows.map((r) => ({
@@ -1371,9 +1405,13 @@ export async function readDaily(scope: { clientId?: string | null; licenseId?: s
   }));
 }
 
+// The last 2xx, the last call, and the last call that went all the way through: accepted by the CRM,
+// with its recording when one was made (`isComplete` in issues.ts).
+export type LastSync = { syncAt: string | null; callAt: string | null; completeAt: string | null; completeCallId: string | null };
+
 export type LastSyncs = {
-  clients: Map<string, { syncAt: string | null; callAt: string | null }>;
-  licenses: Map<string, { syncAt: string | null; callAt: string | null }>;
+  clients: Map<string, LastSync>;
+  licenses: Map<string, LastSync>;
   // Keyed `${clientId}|${platformId}`: the last 2xx and the last callout of each integration.
   platforms: Map<string, { syncAt: string | null; calloutAt: string | null }>;
 };
@@ -1382,7 +1420,9 @@ export type LastSyncs = {
 export async function readLastSyncs(clientId: string | null): Promise<LastSyncs> {
   const [calls, platforms] = await Promise.all([
     db().query(
-      `SELECT client_id, license_id, GROUPING(license_id) AS by_client, max(first_delivered_at) AS sync_at, max(coalesce(ingested_at, first_callout_at)) AS call_at
+      `SELECT client_id, license_id, GROUPING(license_id) AS by_client, max(first_delivered_at) AS sync_at, max(coalesce(ingested_at, first_callout_at)) AS call_at,
+         (array_agg(call_id ORDER BY first_delivered_at DESC) FILTER (WHERE ${COMPLETE_SQL}))[1] AS complete_call,
+         max(first_delivered_at) FILTER (WHERE ${COMPLETE_SQL}) AS complete_at
        FROM ca_calls WHERE client_id IS NOT NULL ${clientId ? "AND client_id = $1" : ""}
        GROUP BY GROUPING SETS ((client_id), (client_id, license_id))`,
       clientId ? [clientId] : [],
@@ -1395,7 +1435,7 @@ export async function readLastSyncs(clientId: string | null): Promise<LastSyncs>
   ]);
   const result: LastSyncs = { clients: new Map(), licenses: new Map(), platforms: new Map() };
   for (const r of calls) {
-    const value = { syncAt: isoOrNull(r.sync_at), callAt: isoOrNull(r.call_at) };
+    const value = { syncAt: isoOrNull(r.sync_at), callAt: isoOrNull(r.call_at), completeAt: isoOrNull(r.complete_at), completeCallId: r.complete_call ?? null };
     if (Number(r.by_client) === 1) result.clients.set(r.client_id, value);
     else if (r.license_id) result.licenses.set(r.license_id, value);
   }
@@ -1530,4 +1570,44 @@ export async function readCoverage(clientId: string | null): Promise<Coverage> {
     snapshotAt: isoOrNull(meta?.snapshot_at),
     logsSince: isoOrNull(meta?.logs_since),
   };
+}
+
+// ---- Find a call by any id along its journey ----
+
+export type IdMatch = { kind: string; callId: string | null; clientId: string | null; licenseId: string | null; at: string | null };
+
+// Every stored call, phone or log an id names: CallAnchor's call id, a CRM request id, a log line's
+// id, the upload session, recording file or processing job, or a correlation id; or a phone's license
+// id. The CRM's own record id isn't stored (it's read live on the call page), so it can't be found.
+export async function findById(id: string): Promise<IdMatch[]> {
+  const [calls, callouts, logs, licenses] = await Promise.all([
+    db()`SELECT call_id, client_id, license_id, coalesce(ingested_at, first_callout_at) AS at FROM ca_calls WHERE call_id = ${id}`,
+    db()`SELECT DISTINCT ON (call_id) call_id, client_id, at FROM ca_callout_events WHERE request_id = ${id} OR id = ${id} ORDER BY call_id, at`,
+    db()`SELECT DISTINCT ON (call_id, source) call_id, client_id, occurred_at, source,
+           CASE WHEN id = ${id} THEN 'Log line'
+                WHEN raw->'metadata'->>'uploadSessionId' = ${id} THEN 'Upload session'
+                WHEN raw->'metadata'->>'s3Key' = ${id} THEN 'Recording file'
+                WHEN raw->'metadata'->>'jobId' = ${id} THEN 'Processing job'
+                ELSE 'Correlation id' END AS kind
+         FROM ca_system_logs
+         WHERE call_id IS NOT NULL AND (id = ${id} OR raw->'metadata'->>'uploadSessionId' = ${id} OR raw->'metadata'->>'s3Key' = ${id}
+           OR raw->'metadata'->>'jobId' = ${id} OR raw->>'correlationId' = ${id})
+         ORDER BY call_id, source, occurred_at
+         LIMIT 50`,
+    db()`SELECT license_id, client_id FROM ca_licenses WHERE license_id = ${id}`,
+  ]);
+  const matches: IdMatch[] = [
+    ...calls.map((r) => ({ kind: "CallAnchor call id", callId: r.call_id, clientId: r.client_id, licenseId: r.license_id, at: isoOrNull(r.at) })),
+    ...callouts.map((r) => ({ kind: "CRM request", callId: r.call_id, clientId: r.client_id, licenseId: null, at: isoOrNull(r.at) })),
+    ...logs.map((r) => ({ kind: r.kind as string, callId: r.call_id, clientId: r.client_id, licenseId: null, at: isoOrNull(r.occurred_at) })),
+    ...licenses.map((r) => ({ kind: "Phone (license)", callId: null, clientId: r.client_id, licenseId: r.license_id, at: null })),
+  ];
+  // One row per call or phone, keeping the first (most specific) kind.
+  const seen = new Set<string>();
+  return matches.filter((m) => {
+    const key = m.callId ? `call|${m.callId}` : `license|${m.licenseId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

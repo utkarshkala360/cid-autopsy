@@ -8,8 +8,8 @@ export type SubApp = {
 
 export const SUB_APPS: SubApp[] = [
   {
-    slug: "call_anchor_config",
-    name: "CallAnchor Config",
+    slug: "call_anchor",
+    name: "CallAnchor",
     description: "Configure CallAnchor.",
     status: "coming-soon",
   },

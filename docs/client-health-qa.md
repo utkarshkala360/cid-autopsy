@@ -5,7 +5,7 @@ the store (the shared production database). Counts only, no customer data, no Ca
 as of 5 Nov, 03:05 IST. No code was changed.
 
 Scope: `lib/callanchor/issues.ts`, `health.ts`, `store.ts`, `labels.ts`, `db/schema.sql`, and every
-page under `app/dashboard/(app)/call_anchor_config/health/`. Measured against the owner's goals:
+page under `app/dashboard/(app)/call_anchor/health/`. Measured against the owner's goals:
 
 - A recorded call must be uploaded, have its recording, and be synced to the CRM. Any drop is
   flagged early.

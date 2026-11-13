@@ -7,7 +7,7 @@ import { checkSession, type SessionCheck } from "@/lib/callanchor/portal";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 
-export const CALLANCHOR_PATH = "/dashboard/call_anchor_config";
+export const CALLANCHOR_PATH = "/dashboard/call_anchor";
 export const VERIFY_PATH = `${CALLANCHOR_PATH}/verify`;
 export const APIS_PATH = `${CALLANCHOR_PATH}/apis`;
 export const HEALTH_PATH = `${CALLANCHOR_PATH}/health`;

@@ -268,6 +268,25 @@ CREATE TABLE IF NOT EXISTS ca_calls (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Each IST day's call counts per client and license (license_key '' when unknown), saved before the
+-- day's calls are pruned at 15 days and kept 30 days, so 30-day strips survive (owner, 2026-11-13).
+CREATE TABLE IF NOT EXISTS ca_daily (
+  client_id        TEXT        NOT NULL,
+  license_key      TEXT        NOT NULL DEFAULT '',
+  day              TEXT        NOT NULL,
+  calls            INTEGER     NOT NULL DEFAULT 0,
+  delivered        INTEGER     NOT NULL DEFAULT 0,
+  failed           INTEGER     NOT NULL DEFAULT 0,
+  no_callout       INTEGER     NOT NULL DEFAULT 0,
+  verified_unsent  INTEGER     NOT NULL DEFAULT 0,
+  recorded         INTEGER     NOT NULL DEFAULT 0,
+  uploaded         INTEGER     NOT NULL DEFAULT 0,
+  verified         INTEGER     NOT NULL DEFAULT 0,
+  synced           INTEGER     NOT NULL DEFAULT 0,
+  saved_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (client_id, license_key, day)
+);
+
 CREATE INDEX IF NOT EXISTS ca_calls_client_idx ON ca_calls (client_id, ingested_at DESC);
 CREATE INDEX IF NOT EXISTS ca_calls_license_idx ON ca_calls (license_id, ingested_at DESC);
 CREATE INDEX IF NOT EXISTS ca_calls_callout_idx ON ca_calls (client_id, first_callout_at DESC);

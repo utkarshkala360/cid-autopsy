@@ -38,7 +38,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
       LEFT JOIN ca_client_flags f ON f.client_id = c.callanchor_client_id
       GROUP BY c.id, f.internal ORDER BY lower(c.name)
     `,
-  ])) as [Awaited<ReturnType<typeof requireMember>>, CustomerRow[]];
+  ])) as unknown as [Awaited<ReturnType<typeof requireMember>>, CustomerRow[]];
   const internalCount = all.filter((c) => c.internal).length;
   const customers = showInternal ? all : all.filter((c) => !c.internal);
 
@@ -98,7 +98,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
                   <td className="px-4 py-3 text-slate-700">
                     {c.product ?? <span className="text-slate-400">—</span>}
                     {c.callanchor_client_id && (
-                      <Link href={`${HEALTH_PATH}/${c.callanchor_client_id}`} className="block text-xs text-indigo-700 hover:underline">
+                      <Link href={`${HEALTH_PATH}/clients/${encodeURIComponent(c.callanchor_client_id)}`} className="mt-1 inline-flex rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
                         Client health
                       </Link>
                     )}

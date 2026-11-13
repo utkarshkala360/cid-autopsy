@@ -2,6 +2,7 @@ import "server-only";
 import { isAuthFailure } from "@/lib/callanchor/labels";
 import type {
   DayRow,
+  LastSync,
   IntegrationChange,
   LicenseChange,
   OneApiStatus,
@@ -40,7 +41,7 @@ export const RULES = {
   lateWarningCalls: 5,
   // Recordings and calls that never reached the CRM stay flagged this far back, not only for 24
   // hours. It matches the items page's longest window, so a count and its rows agree.
-  openLookbackDays: 30,
+  openLookbackDays: 15, // calls are kept 15 days (owner, 2026-11-13)
   duplicateDays: 7,
   // Time is plain elapsed time, judged day by day: no working-hours filter (owner, 2026-11-05).
   // A client is quiet when it usually calls but nothing arrived for this long.
@@ -284,6 +285,13 @@ export const CALL_STAGES = {
   },
   duplicate: { title: "Calls the CRM accepted more than once for the same event", test: (c) => c.duplicateDeliveries > 0 },
   noLog: { title: "Calls with CRM callouts but no stored ingest log", test: (c) => c.attempts > 0 && c.ingestedAt === null },
+  // The journey: phone → app → recording uploaded → sent to the CRM → accepted. Each call stops at most
+  // once, at the first step that broke (see journeyStop); the roll-ups count with these same tests.
+  stopUpload: { title: "Calls stopped at the recording upload", test: (c, ctx, now) => journeyStop(c, ctx, now) === "upload" },
+  stopSent: { title: "Calls stopped before being sent to the CRM", test: (c, ctx, now) => journeyStop(c, ctx, now) === "sent" },
+  stopCrm: { title: "Calls the CRM didn't accept", test: (c, ctx, now) => journeyStop(c, ctx, now) === "crm" },
+  complete: { title: "Calls that went all the way through", test: (c, ctx) => isComplete(c, ctx) },
+  moving: { title: "Calls still on their way", test: (c, ctx, now) => !isComplete(c, ctx) && journeyStop(c, ctx, now) === null },
 } satisfies Record<string, { title: string; test: (call: StoredCall, ctx: ClientContext, now: number) => boolean }>;
 
 export type CallStage = keyof typeof CALL_STAGES;
@@ -307,6 +315,53 @@ export function stuckStage(c: StoredCall, now: number): string | null {
   if (older(c.uploadedAt, now, RULES.serverGraceMs)) return "Uploaded, not verified";
   if (!c.uploadedAt && older(c.uploadStartedAt, now, RULES.phoneGraceMs)) return STUCK_ON_PHONE;
   return null;
+}
+
+// ---- The journey, in plain steps ----
+
+// The steps a call passes, in the words the support team uses. "phone" and "app" never stop a call:
+// a call we know about was made and picked up. A connected call with no recording still goes through;
+// the call page notes it on the upload step.
+export const JOURNEY_STEPS = [
+  { key: "phone", label: "Call made on the phone" },
+  { key: "app", label: "Picked up by the app" },
+  { key: "upload", label: "Recording uploaded" },
+  { key: "sent", label: "Sent to the CRM" },
+  { key: "crm", label: "Accepted by the CRM" },
+] as const;
+export type JourneyKey = (typeof JOURNEY_STEPS)[number]["key"];
+export type JourneyStop = Extract<JourneyKey, "upload" | "sent" | "crm">;
+export const STOP_STAGE: Record<JourneyStop, CallStage> = { upload: "stopUpload", sent: "stopSent", crm: "stopCrm" };
+
+const uploadBroken = (c: StoredCall, now: number) => isWaiting(c, now) || stuckStage(c, now) !== null || (c.unavailableAt !== null && !isUploaded(c));
+
+// The first step where the call broke, or null if nothing broke (yet). Waiting inside a grace period
+// isn't broken. `readLastSyncs` in store.ts finds the last complete call the same way.
+export function journeyStop(c: StoredCall, ctx: ClientContext, now: number): JourneyStop | null {
+  if (uploadBroken(c, now)) return "upload";
+  if (isDelivered(c) || !isDue(c, ctx, now)) return null;
+  return c.attempts === 0 ? "sent" : "crm";
+}
+
+// All the way through: the CRM accepted it, with its recording when one was made. A client with no
+// integration ends at the recording.
+export const isComplete = (c: StoredCall, ctx: ClientContext) =>
+  (!isRecorded(c) || isVerified(c)) && (ctx.takesAny ? isDelivered(c) : true);
+
+export type JourneySummary = { calls: number; complete: number; moving: number; stops: Record<JourneyStop, number>; recorded: number; picked: number; sent: number };
+
+export function journeySummary(calls: StoredCall[], ctx: ClientContext, now: number): JourneySummary {
+  const out: JourneySummary = { calls: calls.length, complete: 0, moving: 0, stops: { upload: 0, sent: 0, crm: 0 }, recorded: 0, picked: 0, sent: 0 };
+  for (const c of calls) {
+    const stop = journeyStop(c, ctx, now);
+    if (stop) out.stops[stop]++;
+    else if (isComplete(c, ctx)) out.complete++;
+    else out.moving++;
+    if (isRecorded(c)) out.recorded++;
+    if (c.ingestedAt) out.picked++;
+    if (c.attempts > 0) out.sent++;
+  }
+  return out;
 }
 
 // The one place a call stops, for the call page and recording lists.
@@ -395,6 +450,10 @@ function shortfall(days: Day[]) {
 // far its recordings get.
 export type Pulse = {
   lastSyncAt: string | null;
+  // The last call that went all the way through, phone to CRM (with its recording when made).
+  lastComplete: { at: string; callId: string } | null;
+  // Where the last 24 hours' calls stopped, by journey step.
+  journey: JourneySummary;
   lastCallAt: string | null;
   // The last 30 days, oldest first.
   days: Day[];
@@ -408,7 +467,10 @@ export type Pulse = {
   openDrops: number;
 };
 
-export function pulse(input: { rows: DayRow[]; calls24h: StoredCall[]; pool: StoredCall[]; ctx: ClientContext; now: number; lastSyncAt: string | null; lastCallAt: string | null; marks?: Map<string, string[]> }): Pulse {
+export const lastCompleteOf = (last: LastSync | undefined): Pulse["lastComplete"] =>
+  last?.completeAt && last.completeCallId ? { at: last.completeAt, callId: last.completeCallId } : null;
+
+export function pulse(input: { rows: DayRow[]; calls24h: StoredCall[]; pool: StoredCall[]; ctx: ClientContext; now: number; lastSyncAt: string | null; lastCallAt: string | null; lastComplete?: Pulse["lastComplete"]; marks?: Map<string, string[]> }): Pulse {
   const { ctx, now } = input;
   const days = dayStrip(input.rows, ctx, now, 30, input.marks);
   const due = input.calls24h.filter((c) => inStage("due", c, ctx, now));
@@ -424,6 +486,8 @@ export function pulse(input: { rows: DayRow[]; calls24h: StoredCall[]; pool: Sto
   }
   return {
     lastSyncAt: input.lastSyncAt,
+    lastComplete: input.lastComplete ?? null,
+    journey: journeySummary(input.calls24h, ctx, now),
     lastCallAt: input.lastCallAt,
     days,
     week: consistency(days.slice(-7)),
@@ -630,7 +694,7 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
       evidence: [
         `Came in more than ${RULES.serverGraceMs / MINUTE} minutes ago with an integration that takes call.completed, and CallAnchor sent no callout`,
         `Integrations: ${tenant?.activeIntegrations.join(", ") || "none"}`,
-        "Stays flagged until a callout reaches the CRM, back to 30 days",
+        "Stays flagged until a callout reaches the CRM, back to 15 days",
       ],
       drill: drill("missing", RULES.openLookbackDays),
     }));
@@ -1001,7 +1065,7 @@ export type LicenseInput = {
   calls: StoredCall[];
   open: StoredCall[];
   rows: DayRow[];
-  lastSyncs: Map<string, { syncAt: string | null; callAt: string | null }>;
+  lastSyncs: Map<string, LastSync>;
   clientLastSyncAt: string | null;
   // The last 30 days.
   changes: (LicenseChange & { licenseId: string })[];
@@ -1057,7 +1121,7 @@ export function licenseHealth(input: LicenseInput, now: number): LicenseHealth[]
       const label = MARKED_FIELDS[c.field];
       if (label) marks.set(istDay(Date.parse(c.at)), [...new Set([...(marks.get(istDay(Date.parse(c.at))) ?? []), label])]);
     }
-    const health = pulse({ rows: rowsByLicense.get(license.licenseId) ?? [], calls24h: calls, pool, ctx, now, lastSyncAt, lastCallAt, marks });
+    const health = pulse({ rows: rowsByLicense.get(license.licenseId) ?? [], calls24h: calls, pool, ctx, now, lastSyncAt, lastCallAt, lastComplete: lastCompleteOf(linked), marks });
 
     // Not capturing, against its own history and absolute limits; other phones are only a hint (QA L2, L8).
     const silent = now - Date.parse(lastCallAt ?? license.firstSeenAt);

@@ -31,6 +31,14 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // CallAnchor Config was renamed CallAnchor (owner, 2026-11-13); old links and saved audit-note
+  // URLs still land on the right page.
+  async redirects() {
+    return [
+      { source: "/dashboard/call_anchor_config", destination: "/dashboard/call_anchor", permanent: true },
+      { source: "/dashboard/call_anchor_config/:path*", destination: "/dashboard/call_anchor/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

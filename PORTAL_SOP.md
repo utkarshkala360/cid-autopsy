@@ -29,9 +29,17 @@ changed anything:
 Rules already established in this repo.
 
 - Commit and push straight to `main`, only when the owner asks. Vercel deploys from `main`.
+- Detailed data (system logs, CRM callouts, calls) is kept 15 days. Snapshots are kept 30 days: the
+  daily counts per client and phone (`ca_daily`, saved before calls are pruned, so 30-day strips keep
+  working), phone and integration change history, and portal events (owner, 2026-11-13). Lists of
+  individual calls therefore reach back 15 days at most. See `SYNC` and `prune()` in `store.ts`.
+- The database lives near India because this is an internal app used from India: Supabase Postgres
+  in Mumbai (`bom1`, Free plan), with Vercel functions in Mumbai too. Neon has no India region
+  (owner, 2026-11-13). The app reaches it through `lib/db.ts` (postgres.js, transaction pooler) and
+  scripts through `scripts/db.mjs`.
 - Every page and server action re-checks the session, even though `proxy.ts` also checks it.
 - CallAnchor pages and actions call `requireCallAnchorSession()`.
-- The API console (`call_anchor_config/apis`) is for members with the Admin role only. Its page and
+- The API console (`call_anchor/apis`) is for members with the Admin role only. Its page and
   action call `requireApiConsoleAccess()`, others get a 404 and don't see the link. Roles are set in
   the Admin Console (owner, 2026-11-05).
 - The CallAnchor contract changes in `callanchor-apis/openapi/callanchor.openapi.yaml` first, then
@@ -77,8 +85,49 @@ Rules already established in this repo.
 - Every client CallAnchor lists is a customer with product CallAnchor, linked by
   `customers.callanchor_client_id`, added on its own after each snapshot pull (`ca_map_customers()`)
   (owner, 2026-11-12).
-- Health pages share a left menu: the health views first, then the open page's sections (owner,
-  2026-11-12).
+- Health pages share one frame: the site header is frozen at the top; Clients, Licenses, Seats and
+  Settings are a bar frozen under it; the left menu lists the open page's sections, and picking one
+  shows that section on its own. There is no whole-page view: a page opens on its first section
+  (owner, 2026-11-13). See `health/HealthNav.tsx`.
+- Member and admin pages use the full window width, with no centred max-width column; content and
+  tables stretch to the right edge. A page section is never squeezed into a side column (owner,
+  2026-11-13).
+- Health pages are hierarchical, client on top (owner, 2026-11-13). Everything about a client lives
+  under `/health/clients/<client>/`: its Health page, `licenses` (and `licenses/<license>` for one
+  phone), `seats`, `items` (Calls & logs), `calls/<call>` and `issues/<issue>`. The frame says where
+  you are at every level: health tabs (Overview, Clients, Licenses, Seats, Settings), a breadcrumb
+  that follows the URL (`HealthTrail`), the client's name and its own tabs (Health, Licenses, Seats,
+  Calls & logs; `ClientTabs`), then the left menu. Build links with `clientHref`, `licenseHref`,
+  `callHref`, `issueHref` and `itemsHref` in `health/format.ts`, passing the client id; flat links
+  (`/health/licenses/<id>`, `/health/calls/<id>`, `?client=`) still work by redirecting. Pages shown
+  both fleet-wide and per client are views in `health/_views/`.
+- The Overview tab lists every client with its health, licenses needing action and seat use in one
+  row, each opening that client's tab (owner, 2026-11-13).
+- Links are not the way to show data (owner, 2026-11-13): a table row's main item (client, phone,
+  call) is dark text (`rowLinkClass`), a number that opens its rows is a quiet chip (`ItemLink`), and
+  an action ("Open items", "Show all", "Verify") is a button (`secondaryButtonClass`). No bare blue
+  underlined links.
+- The items page (Calls & logs) has a left filter panel that follows the call's journey (owner,
+  2026-11-13): Kind is a switch on top (Calls, CRM syncs, System logs); for calls, the outcome (all,
+  went all the way through, still on their way), then the five journey steps as a numbered stepper,
+  each holding its stages: "Stopped here" first, then what went well, then problems. Standard status
+  notation everywhere: green went well, amber in progress or worth a look, red a problem, grey a plain
+  count; each step's number is coloured the same way and shows how many calls stopped there; every
+  stage shows its count, empty ones dimmed, with a legend underneath. A new stage needs an entry in
+  `STAGES` (type check) and a place in `STEP_STAGES` (`health/_views/items.tsx`, checked in dev).
+- Wherever several sections or groups sit together, they are collapsible and only one is open at a
+  time (an accordion), opening on the one that holds the current pick; a closed group names its pick
+  in its heading (owner, 2026-11-13). Use `<details name="...">` with a shared name, as the journey
+  steps in `ItemFilters` (`health/_views/items.tsx`) do. Health page sections already show one at a time via the left menu.
+- Lists of issues are table rows, one per issue (severity, issue, client and phone, impact, since,
+  status, last 24h, open), not cards, to use the space well (owner, 2026-11-13). See `IssueList` in
+  `health/parts.tsx`.
+- The sub app is called CallAnchor and lives at `/dashboard/call_anchor` (was CallAnchor Config at
+  `call_anchor_config`; `next.config.ts` redirects old links) (owner, 2026-11-13).
+- The health pages speak in the call's journey, for non-developers: Call made on the phone → Picked up
+  by the app → Recording uploaded → Sent to the CRM → Accepted by the CRM. Each client and phone
+  shows where its calls stop, and when a call last went all the way through; each call shows the
+  step it stopped at and the ids that tie every step to the next (owner, 2026-11-13).
 - Seat use (purchased, assigned, logged in, calling, unused) has its own Seats tab, not issue cards.
   Unused seats aren't issues (owner, 2026-11-05).
 - CRM replies are custom code written per client, so their text is never a reliable error
@@ -126,13 +175,19 @@ What a good change looks like here.
 - Run slow background work, like the 5-day refresh, with `after()`, so it doesn't block the page.
 - To make a threshold editable, add it to `SETTINGS` in `lib/callanchor/issues.ts`; every loader in
   `health.ts` calls `loadSettings()` first, so pages and actions see the saved values.
+- Journey counts come from `journeyStop()` and `isComplete()` in `lib/callanchor/issues.ts`, exposed as
+  the `stopUpload`, `stopSent`, `stopCrm`, `complete` and `moving` stages, so a roll-up and the calls
+  it opens agree. Each call stops at most once, at the first broken step. "Last call through" is
+  `COMPLETE_SQL` in `store.ts`, which must match `isComplete` for delivered calls.
+- A new id along the journey goes on its step in `journey()` (`health.ts`) and into `findById()`
+  (`store.ts`), so Find by ID can open the call from it.
 - Give every client and phone the same three numbers (`Pulse` in `lib/callanchor/issues.ts`): last good
   CRM sync, synced days out of days with due calls (7 and 30 days, as a day strip), and the recording
   chain. Judge each against its own history and absolute limits; other phones are only a hint.
 - "Reached the CRM" is delivered out of due (`CALL_STAGES.due`) everywhere. Day counts come from SQL
   (`readDaily`), so `RECORDED_SQL` and `dueOf` must agree with the stage tests.
 - A drop that loses data (a recording not uploaded, verified but not synced, a call never sent) stays
-  flagged until it's fixed, back 30 days (`readOpenCalls`), not only for 24 hours. A rate problem says
+  flagged until it's fixed, back 15 days (`readOpenCalls`, `RULES.openLookbackDays`), not only for 24 hours. A rate problem says
   how many days it has run.
 - Link events through `lib/callanchor/links.ts`: `callFacts()` reads a callout's payload preview
   (type, length, recording, start, agent last 4; never the recording URL) and `auditLinks()` finds the
@@ -155,6 +210,9 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-13 | Merge near-duplicate stages on Calls & logs: "Due, didn't reach it", "Sent, not accepted" and "Sync failed" overlap, as do "Not uploaded", "Phone hasn't uploaded" and "Still on the phone" | The panel now follows the journey with counts, but 37 stages is still more than a support person needs | Awaiting owner |
+| 2026-11-13 | (Superseded: owner chose to move the database to Mumbai.) Make local dev usable over a slow route to Singapore: either run local against a local Postgres (own store, pulled from CallAnchor), or cut what a page reads (stop loading 8 days of every call, about 6.4 MB, on each fleet visit) and stop the page waiting on CallAnchor pulls | Local took over a minute per page on 13 Nov: the owner's ISP route to Singapore gave Neon 56–230 KB/s (5.8 MB/s elsewhere), over HTTP, WebSocket and curl alike, and transfers over ~4 MB were cut off. Production runs in `sin1` beside Neon and isn't affected | Awaiting owner |
+| 2026-11-13 | Ask CallAnchor to fill `externalCallId` on `mobile.call.create` (the phone's own call-log id) | It's empty on all 8,309 stored ingest logs, so the chain starts at CallAnchor's call id: a call on the phone can't be matched to its row here without it | Awaiting owner |
 | 2026-11-12 | Give "phone couldn't save the recording" its own issue, apart from "Recordings stuck on the phone" | 12 stored calls have `mobile.recording.mark-unavailable`: the phone found no file, so waiting won't help. They still count as stuck on the phone (only the reason is shown now); the fix is the phone's microphone permission or dialer recording setting | Awaiting owner |
 | 2026-11-12 | Decide what deleting an auto-added CallAnchor customer means | `ca_map_customers()` adds it back on the next snapshot pull. Either block deleting them, or keep a "not a customer" mark | Awaiting owner |
 | 2026-11-05 | Alerts for new critical issues and a phone with no sync, by Slack or email (QA O1) | Nobody is told until someone opens the page. Needs a channel and the scheduled pull | Awaiting owner |
@@ -164,7 +222,6 @@ Agent proposals awaiting the owner's decision. Newest first.
 | 2026-11-03 | Give local dev its own Neon branch (set a branch `DATABASE_URL` in `.env.local` and Vercel's Development env) | Local, preview and production all use the same database, so a local visit moves the live milestones and writes live rows, and local schema changes hit production at once | Awaiting owner |
 | 2026-11-03 | Raise the S3 purge failure with CallAnchor | Every post-sync S3 deletion failed (0 of 228 succeeded on 3 Nov): their AWS user lacks `s3:DeleteObject`, and the logs mark it `info`. Recordings stay in S3 longer than intended | Awaiting owner |
 | 2026-11-03 | Pull on a schedule (Vercel cron) as well as on visits (QA D3) | Data only moves when someone opens the dashboard: 6.5 hours stale on 5 Nov, and an unvisited weekend loses logs for good beyond CallAnchor's ~3-day retention. Needs unattended access (open question 1) | Awaiting owner |
-| 2026-11-03 | Confirm 90-day retention for the stored health data | Older rows are deleted to keep the tables small | Awaiting owner |
 | 2026-11-03 | Review `OPPORTUNITY_NOT_FOUND` with the affected client | It was the top CRM error fleet-wide on 3 Nov, so data matching, not an outage, drives the worst sync rates (open question 5) | Awaiting owner |
 | 2026-11-02 | Rotate the session cookie exposed in the "CallAnchor x APIs" sheet and restrict access to the sheet | It also holds recording links, customer phone numbers and an AWS access key ID | Awaiting owner |
 
@@ -174,26 +231,80 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Hierarchical navigation: client pages moved under `/health/clients/<client>/` (health, licenses, phone, seats, Calls & logs, call, issue); breadcrumb from the URL on every health page; client header with its own tabs; left menu below it; fleet Licenses, Seats and items with `?client=` and old flat client, phone, call and issue links redirect there. Links restyled: row links dark, counts as chips, actions as buttons; "Back to client" footers removed. Items page: left Kind and Stage filters; a page without sections now uses the full width | Done in code, builds and lints; not pushed and not yet viewed signed in | `health/HealthNav.tsx`, `health/clients/[clientId]/`, `health/_views/`, `health/format.ts` |
+| 2026-11-13 | Move the database from Neon Singapore to Supabase Mumbai (Free plan, via the Vercel Marketplace, env prefix `SB_` until cutover); driver swapped to postgres.js in `lib/db.ts` and `scripts/db.mjs`; copy all tables, then point `DATABASE_URL` at Supabase and move Vercel functions from `sin1` to `bom1` | In progress: Supabase `cid-autopsy-bom` provisioned in `ap-south-1` and connected with prefix `SB`; schema applied; tables locked from Supabase's public REST API with RLS; postgres.js set to pass JSON text through (it double-encoded it); data copy from Neon running. Production still on Neon until the owner says push. With 15/30-day retention the database should stay near 120 MB, well inside the Free plan's 500 MB | `lib/db.ts`, `scripts/db.mjs`, `vercel.json` |
+| 2026-11-13 | Client health Overview tab (`health/overview`, first in the sub-bar): totals for clients, phones and seats, and one row per client with health, open issues, calls, last call through, phones needing action, seat use and unused seats, each opening its view. Cross-links: Health · Phones · Seats on the client page, phone page, filtered Licenses and Seats pages and their rows; the Clients table's seat and phone counts open that client's Seats and Licenses. Licenses rows' client name now opens the client (Phones filters) | Done in code, builds; not pushed and not yet viewed signed in. Clients stays the default landing tab | `health/overview/page.tsx`, `loadOverview` in `lib/callanchor/health.ts`, `ClientLinks` in `health/parts.tsx` |
+| 2026-11-13 | Issue lists ("Needs action" and the client, phone and fleet lists) are a table, one row per issue, instead of a card grid | Done in code, type-checks; not pushed and not yet viewed signed in | `IssueList` in `health/parts.tsx` |
+| 2026-11-13 | Full-width frame (header, member and admin pages); "Whole page" removed from the health left menu, each page opens on its first section; licenses page's phone table is its own section and the device-model and app-version lists are full-width sections; Settings form full width; CallAnchor Config renamed CallAnchor, route `call_anchor_config` → `call_anchor` with permanent redirects | Done in code, builds; not pushed and not yet viewed signed in | `components/MemberShell.tsx`, `health/HealthNav.tsx`, `next.config.ts` |
+| 2026-11-13 | Journey view: call page leads with where the call stopped, a five-step journey (phone, app, recording, sent, CRM) and the reference ids per step, with the log tables as technical detail; client and phone pages lead with a journey roll-up (stops per step, each opening its calls; old funnels under "Step-by-step counts"); fleet table has a Journey 24h column; client, phone and fleet rows show the last call that went all the way through; Find by ID (call, CRM request, upload session, recording file, job, log line, correlation or license id). Frame: frozen header, Clients/Licenses/Seats/Settings sub-bar with Find by ID and Show internal, left menu of sections that open on their own | Done in code, builds; not pushed and not yet viewed signed in. No schema change | `health/parts.tsx`, `health/HealthNav.tsx`, `health/find/`, `journeyStop` in `lib/callanchor/issues.ts` |
 | 2026-11-12 | Audit notes 1–7: phone's "recording unavailable" reason on calls (`ca_calls.unavailable_at`/`unavailable_reason`, items page, call problem and journey); "CRM reply" heading for delivered syncs; license issue titles link to their rows (client and licenses pages); left menu for health pages with "On this page" sections, replacing the tabs; internal clients with Mark internal (admins) and Show internal clients; Settings admins only; CallAnchor clients become customers with a Product column | Done, pushed 2026-11-12 (`b27945b`); notes 1–7 marked done. Not yet viewed signed in. The deploy's migration adds all 54 clients as customers | `health/HealthNav.tsx`, `health/actions.ts`, `db/schema.sql` |
 | 2026-11-12 | `npm run audit:notes -- --mark <ids> <done\|wontfix\|open> "what changed" [--commit <ref>]` closes notes from the review, same rules as the admin page; `--commit` adds the short hash to the resolution | Done, pushed 2026-11-12 (`b27945b`) | `scripts/audit-notes.mjs` |
 | 2026-11-12 | Auditor permission: Admin Console checkbox on create and Make/Remove auditor per member; floating Audit note button on member pages (type, comment, highlighted text) saving URL, title, heading, query, viewport, browser and host to `audit_notes`; `/admin/audit-notes` review page with open/done/won't fix; `npm run audit:notes` for the weekly review | Done, pushed 2026-11-12 (`c882582`); tables created by that deploy. Not yet viewed signed in | `components/AuditNoteButton.tsx`, `app/admin/(console)/audit-notes/`, `scripts/audit-notes.mjs` |
-| 2026-11-05 | Global search bar in CallAnchor Config over `ca_events`, for quick search and analysis | Planned; owner said it comes next | |
+| 2026-11-05 | Global search bar in CallAnchor over `ca_events`, for quick search and analysis | Planned; owner said it comes next | |
 | 2026-11-05 | Linked events: callouts keep their call's type, length, recording flag, start and agent last 4 from the payload; calls with no ingest log get their phone from the agent number; portal events (audit log) stored as a stream, linked to license, integration and callout; `ca_events` view joins all three; "didn't connect" now uses the real call length; call page shows the call facts, license page its portal events | Done in code, checked in PGlite; not applied to the shared DB (the agent's apply was blocked) and not pushed. Applies on the next deploy; the next dashboard visit then backfills stored callouts and 90 days of portal events in the background | `lib/callanchor/links.ts`, `db/schema.sql`, `lib/callanchor/store.ts` |
 | 2026-11-05 | Calls that didn't connect (missed, rejected, or synced only by `call.completed`) no longer count as "not recorded" or toward "Phone isn't recording calls"; new `notConnected` stage; `ca_calls.call_type` from the ingest log, shown on the items page | Done; column and backfill applied to the shared DB (not recorded: 4,372 → 109). Not pushed | `isUnconnected` in `lib/callanchor/issues.ts`, `db/schema.sql` |
 | 2026-11-05 | API console for admins only: new member role `admin`, settable on create and per member in the Admin Console; console page, run action and its link gated | Done; role constraint applies on the next deploy, then set your own role to Admin | `requireApiConsoleAccess` in `lib/callanchor/session.ts`, `app/admin/` |
 | 2026-11-05 | Owner's QA answers: both sync events valid (R3 note removed); no working-hours filter, elapsed time day by day; Settings tab for 13 thresholds; Seats tab with seat use per client and every unused seat since when (seat notes left the issue lists); Clients / Licenses / Seats / Settings tabs | Done; `ca_health_settings` applies on the next deploy. Not yet viewed signed in | `health/settings/`, `health/seats/`, `SETTINGS` in `lib/callanchor/issues.ts` |
 | 2026-11-05 | QA follow-up: last good sync, synced days and recording chain for every client and phone; one "reached the CRM" (delivered out of due); recordings and unsent calls flagged until fixed; 5-minute grace for server steps; "since" from the run of bad days; issue episodes tied to the data; phone rules that work with one phone; seat use; integration changes recorded and each integration checked alone; duplicate 2xx flagged; fleet stall; inactive clients muted; issue cards open their rows with the evidence above; "new since your last visit"; trials section; busy-client log streams chosen by stored calls | Done; schema applies on the next deploy. Not yet viewed signed in | `docs/client-health-qa.md` §14, `lib/callanchor/issues.ts` |
 | 2026-11-05 | CallAnchor contract 17 → 29 operations, checked live: 12 new reads (callee, AI insights, AI credits, seat compliance and settings, disposition sets, portal admins, notifications, onboarding, audit log entry, `auth/me`, latest app build) and new fields on tenant, call contacts and disposition fields. Every operation now has a generated curl and redacted sample (`docs/api-reference.md`), and every Postman request carries its sample response. The API console page shows each operation's curl and sample too (`src/reference.ts` feeds both) | Done; console not yet viewed signed in, not pushed | `callanchor-apis/openapi/`, `callanchor-apis/docs/api-reference.md` |
-| 2026-11-05 | Client health plan, all four phases: fixes A, E, F, J; calls linked to licenses through `metadata.licenseId`; `ca_calls`, `ca_licenses` (with change history), `ca_issue_state`, `ca_reply_suggestions`; issue engine; fleet triage, client page redesign, licenses, license and issue pages, call journey; coverage line; own log streams for the 3 busiest clients | Done, schema applied to the shared DB; not yet viewed signed in. License statuses fill in as new mobile logs are pulled | `docs/client-health-plan.md` §11, `lib/callanchor/issues.ts`, `app/dashboard/(app)/call_anchor_config/health/` |
+| 2026-11-05 | Client health plan, all four phases: fixes A, E, F, J; calls linked to licenses through `metadata.licenseId`; `ca_calls`, `ca_licenses` (with change history), `ca_issue_state`, `ca_reply_suggestions`; issue engine; fleet triage, client page redesign, licenses, license and issue pages, call journey; coverage line; own log streams for the 3 busiest clients | Done, schema applied to the shared DB; not yet viewed signed in. License statuses fill in as new mobile logs are pulled | `docs/client-health-plan.md` §11, `lib/callanchor/issues.ts`, `app/dashboard/(app)/call_anchor/health/` |
 | 2026-11-04 | Full payloads and metadata: call pages read each CRM request live (payload, endpoint, attempts, replies, errors); log lines are stored whole and shown with their metadata; CRM sync log lines now join their call through `metadata.callRecordId` | Done, not yet viewed signed in. Older rows fill in on the next background 5-day refresh | `health/calls/[callId]/`, `lib/callanchor/store.ts`, `db/schema.sql` |
-| 2026-11-04 | Item-level drill-down: every flag, error, outcome and count links to its rows (syncs, recordings, system logs), with per-call timelines | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor_config/health/items/`, `health/calls/[callId]/` |
+| 2026-11-04 | Item-level drill-down: every flag, error, outcome and count links to its rows (syncs, recordings, system logs), with per-call timelines | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor/health/items/`, `health/calls/[callId]/` |
 | 2026-11-04 | Count a 2xx CRM reply as success, and either `call.completed` or `recording.ready` as a synced recording | Done | `lib/callanchor/labels.ts`, `lib/callanchor/health.ts` |
 | 2026-11-03 | Store health data in Postgres and pull only what's new from each stream's milestone; refresh the last 5 days once a day | Done; tables exist in the shared Neon DB (local `predev` migrated them) | `lib/callanchor/store.ts`, `db/schema.sql` |
-| 2026-11-03 | Client health dashboard: consolidated and per-client view of calls, recordings, uploads, CRM syncs, CRM replies and errors | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor_config/health/` |
+| 2026-11-03 | Client health dashboard: consolidated and per-client view of calls, recordings, uploads, CRM syncs, CRM replies and errors | Done, not yet viewed signed in | `app/dashboard/(app)/call_anchor/health/` |
 
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-13: Asked for the Calls & logs filters to follow the actual flow, with standard UI
+  notation so one view gives clear visibility. Rebuilt the panel as the journey stepper with status
+  colours, per-step "stopped" counts, a count on every stage and a legend.
+- 2026-11-13: Asked for collapsible sections, one open at a time, everywhere there are several.
+  Made the Calls & logs filter panel an accordion (Kind and each Stage group); added the SOP rule.
+- 2026-11-13: Accepted Supabase's terms, and set retention: detailed data 15 days, snapshots (cached
+  info, so pages needn't pull each time) up to a month. Provisioned Supabase in Mumbai, added the
+  `ca_daily` snapshot so 30-day day strips survive the 15-day prune, and cut call lists and open
+  drops to 15 days. Made the retention rule an SOP rule.
+
+- 2026-11-13: Asked what the Stage list on Calls & logs is and whether it looks clean. Explained it
+  filters calls by where they are in the journey; agreed it isn't clean (37 options, no counts). Added a
+  recommendation; nothing built yet.
+- 2026-11-13: Said the navigation is bad: from an error they can't trace back where they came from.
+  Wants every page hierarchical, client on top with everything inside it, visible in the URL, tabs,
+  sub-tabs and left menus; and buttons and readable sections instead of hyperlinks everywhere. Moved
+  client pages under `/health/clients/<client>/`, added the breadcrumb and client tabs, and restyled
+  links as row text, chips and buttons. Rules added to the SOP.
+- 2026-11-13: Asked for Stage and Kind filters on the left of the items page. Built the filter panel.
+- 2026-11-13: Asked to move the database near India, as an internal app. Neon has no India region
+  (Singapore is its closest); Mumbai connects in ~35 ms from the owner's machine against ~140 ms.
+  Owner chose Supabase in Mumbai on the Free plan. Swapped the driver to postgres.js and started
+  provisioning; the Supabase terms need the owner's acceptance in the browser.
+
+- 2026-11-13: Said local takes too long to pull data and render. Measured it: the database round trip
+  is ~140 ms, but throughput from the owner's machine to Neon in Singapore was 56–230 KB/s while the
+  internet elsewhere ran at 5.8 MB/s, and a Singapore test server sent nothing in 60 s, so it's the
+  ISP's route, not the code or Node. A fleet visit reads ~6.4 MB of calls (65 s at that speed) and
+  waits on ~57 CallAnchor pulls first. No code changed; added a recommendation with the options.
+
+- 2026-11-13: Said Seats, Licenses and Clients are related and should link to each other, with a
+  Client Health Overview page. Built the Overview tab and Health · Phones · Seats links on every
+  client-scoped page and row.
+- 2026-11-13: Asked for the "Needs action" issues as rows, not cards, for better use of space.
+  `IssueList` now renders a table, one row per issue, everywhere it's used.
+- 2026-11-13: Showed the "By device model" list squeezed into a side column and blank space beside
+  the page; wants content shifted left and stretched to the right, no side margins, no "Whole page"
+  option anywhere, and CallAnchor Config / `call_anchor_config` renamed CallAnchor / `call_anchor`.
+  Built all four; old URLs redirect.
+- 2026-11-13: Said the health UI is tacky and confusing for non-devs; liked the call page's journey
+  and wants the whole UI at journey level (phone → app → upload → CRM → synced with recording), to
+  see which client faces what issue, the last successful call per license and client, and the ids
+  linked from phone to CRM. Built the journey roll-ups, call journey with ids, last call through and
+  Find by ID. Found the phone's own call id is never sent; added a recommendation.
+- 2026-11-13: Asked to freeze the top bar, move Clients/Licenses/Seats/Settings into a top sub-bar,
+  and make the On this page sections a left menu where each opens on its own. Built it and replaced
+  the left-menu rule.
 
 - 2026-11-12: Objected to a bare checkbox for marking internal: wants a confirmation and a coloured
   "Mark as Internal" / "Mark as External" tag, and a "Show internal" filter on Customers. Built
@@ -224,7 +335,7 @@ One line per piece of feedback, newest first: date, what the owner said, and wha
   role, linked events, didn't-connect fix), since they share files.
 
 - 2026-11-05: Asked for better correlation between mobile, portal and CRM events, properly linked and
-  structured, ahead of a global search bar in CallAnchor Config. Found that the callout list already
+  structured, ahead of a global search bar in CallAnchor. Found that the callout list already
   carries each call's payload (length, type, agent number) and that half the stored calls had no
   phone; linked all three streams and stored portal events. Added the linking rule to the SOP.
 

@@ -4,6 +4,7 @@ import {
   applySettings,
   byIssue,
   callProblem,
+  CALL_STAGES,
   callTime,
   clientContext,
   clientIssues,
@@ -18,6 +19,12 @@ import {
   perPhoneLicenses,
   platformIssues,
   pulse,
+  lastCompleteOf,
+  journeySummary,
+  JOURNEY_STEPS,
+  journeyStop,
+  isComplete,
+  type JourneySummary,
   rollUp,
   RULES,
   stageTitle,
@@ -81,7 +88,7 @@ const DAY = 24 * HOUR;
 // Calls read for issues: today plus a full 7-day baseline before it.
 const ASSESS_DAYS = 8;
 
-export const WINDOW_DAYS = [1, 3, 7, 30] as const;
+export const WINDOW_DAYS = [1, 3, 7, 15] as const;
 export type WindowDays = (typeof WINDOW_DAYS)[number];
 
 type Client = { id: string; companyName: string; plan: string; status: string; accessSuspended: boolean; licenseCount: number };
@@ -257,7 +264,7 @@ async function assess(now: number, only: string | null, live?: { tenant: TenantS
       const clientOpen = openByClient.get(clientId) ?? [];
       const day = calls.filter((c) => within(c, now, DAY));
       const last = lastSyncs.clients.get(clientId);
-      const pulseOf = pulse({ rows: rowsByClient.get(clientId) ?? [], calls24h: day, pool: [...calls, ...clientOpen], ctx, now, lastSyncAt: last?.syncAt ?? null, lastCallAt: last?.callAt ?? null });
+      const pulseOf = pulse({ rows: rowsByClient.get(clientId) ?? [], calls24h: day, pool: [...calls, ...clientOpen], ctx, now, lastSyncAt: last?.syncAt ?? null, lastCallAt: last?.callAt ?? null, lastComplete: lastCompleteOf(last) });
       const own = clientIssues(
         {
           clientId,
@@ -345,6 +352,9 @@ export type FleetRow = {
   openIssues: number;
   lastActivityAt: string | null;
   lastSyncAt: string | null;
+  lastComplete: Pulse["lastComplete"];
+  // Where the last 24 hours' calls stopped, by journey step.
+  journey: JourneySummary;
   // Synced days out of days with due calls, last 7 days, and the 7-day strip.
   week: Pulse["week"];
   days: Pulse["days"];
@@ -425,6 +435,8 @@ export async function loadFleetHealth(cookie: string, memberId: string, showInte
       openIssues: issues.filter((i) => i.level !== "info").length,
       lastActivityAt: lastActivityAt ?? p.lastCallAt ?? snapshot.tenant?.lastCallAt ?? null,
       lastSyncAt: p.lastSyncAt,
+      lastComplete: p.lastComplete,
+      journey: p.journey,
       week: p.week,
       days: p.days.slice(-7),
       openDrops: p.openDrops,
@@ -679,6 +691,7 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     integrations,
     integrationChanges,
     funnel: funnel(calls, assessment.ctx, now),
+    journey: journeySummary(calls, assessment.ctx, now),
     callCount: calls.length,
     replies: summarizeReplies(events),
     suggestions: suggestions.filter((s) => s.scope === "client" ? s.scopeId === clientId : events.some((e) => e.platformId === s.scopeId)),
@@ -707,6 +720,48 @@ export async function loadFleetLicenses(showInternal = false) {
   const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
   const licenses: FleetLicense[] = assessments.flatMap((a) => a.licenses.map((h) => ({ ...h, companyName: a.snapshot.companyName ?? a.snapshot.clientId })));
   return { licenses, hiddenInternal: everyClient.length - assessments.length, loadedAt: new Date(now).toISOString() };
+}
+
+// ---- Overview: clients, their phones and their seats side by side ----
+
+export type OverviewRow = {
+  clientId: string;
+  companyName: string;
+  status: string;
+  level: Level;
+  openIssues: number;
+  criticalIssues: number;
+  calls24h: number;
+  lastComplete: Pulse["lastComplete"];
+  licenses: ReturnType<typeof licenseCounts>;
+  seats: Seats;
+};
+
+// Every client with its health, phones and seats in one row, from the store, so the three views can be
+// read together and each opens the other two (owner, 2026-11-13).
+export async function loadOverview(showInternal = false) {
+  await loadSettings();
+  const now = Date.now();
+  const [everyClient, scope] = await Promise.all([assess(now, null), internalScope(showInternal)]);
+  const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
+  const rows: OverviewRow[] = assessments
+    .map((a) => {
+      const open = a.issues.filter((i) => i.level !== "info");
+      return {
+        clientId: a.snapshot.clientId,
+        companyName: a.snapshot.companyName ?? a.snapshot.clientId,
+        status: a.snapshot.status ?? "unknown",
+        level: a.level,
+        openIssues: open.length,
+        criticalIssues: open.filter((i) => i.level === "critical").length,
+        calls24h: a.calls.length,
+        lastComplete: a.pulse.lastComplete,
+        licenses: licenseCounts(a.licenses),
+        seats: a.seats,
+      };
+    })
+    .sort((a, b) => byLevel(a.level, b.level) || b.criticalIssues - a.criticalIssues || b.openIssues - a.openIssues || a.companyName.localeCompare(b.companyName));
+  return { rows, hiddenInternal: everyClient.length - assessments.length, loadedAt: new Date(now).toISOString() };
 }
 
 // ---- Seats ----
@@ -756,9 +811,9 @@ export async function loadLicense(licenseId: string, cookie: string | null) {
   const [[assessment], calls, changes, tenant, portal] = await Promise.all([
     assess(now, stored.clientId),
     readCalls({ licenseId }, now - ASSESS_DAYS * DAY),
-    readLicenseChanges({ licenseId }, now - SYNC.retainDays * DAY),
+    readLicenseChanges({ licenseId }, now - SYNC.snapshotDays * DAY),
     cookie ? optional(getJson<Tenant>(cookie, `/api/clients/${stored.clientId}/tenant`)) : Promise.resolve(null),
-    readAudit({ licenseId }, now - SYNC.retainDays * DAY),
+    readAudit({ licenseId }, now - SYNC.snapshotDays * DAY),
   ]);
   const health = assessment?.licenses.find((h) => h.license.licenseId === licenseId) ?? null;
   const ctx = assessment?.ctx ?? clientContext(null);
@@ -778,6 +833,7 @@ export async function loadLicense(licenseId: string, cookie: string | null) {
     agent: live?.assignedTo?.name ?? null,
     health,
     funnel: funnel(day, ctx, now),
+    journey: journeySummary(day, ctx, now),
     hourly,
     calls: day.length,
     // Agents' names aren't stored, so a reassignment names only the current agent, read live (QA L10).
@@ -902,13 +958,20 @@ export async function loadCallItems(
   const last4 = new Map(licenses.map((l) => [l.licenseId, l.last4]));
   const none = clientContext(null);
   const phones = scope.licenseIds?.length ? new Set(scope.licenseIds) : null;
-  const matching = calls.filter((c) => !internal.hidden.has(c.clientId ?? "") && (!phones || phones.has(c.licenseId ?? "")) && inStage(stage, c, contexts.get(c.clientId ?? "") ?? none, now));
+  const scoped = calls.filter((c) => !internal.hidden.has(c.clientId ?? "") && (!phones || phones.has(c.licenseId ?? "")));
+  const matching = scoped.filter((c) => inStage(stage, c, contexts.get(c.clientId ?? "") ?? none, now));
+  // Every stage's count in the same scope and window, for the filter panel; the same tests as the rows.
+  const counts = Object.fromEntries((Object.keys(CALL_STAGES) as CallStage[]).map((s) => [s, 0])) as Record<CallStage, number>;
+  for (const c of scoped) {
+    const ctx = contexts.get(c.clientId ?? "") ?? none;
+    for (const s of Object.keys(counts) as CallStage[]) if (inStage(s, c, ctx, now)) counts[s]++;
+  }
   const items = matching.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((c) => ({
     ...c,
     problem: callProblem(c, contexts.get(c.clientId ?? "") ?? none, now),
     last4: c.licenseId ? (last4.get(c.licenseId) ?? null) : null,
   }));
-  return { items, total: matching.length, title: stageTitle(stage), last4: Object.fromEntries(last4), loadedAt: new Date(now).toISOString() };
+  return { items, total: matching.length, counts, title: stageTitle(stage), last4: Object.fromEntries(last4), loadedAt: new Date(now).toISOString() };
 }
 
 // ---- One call ----
@@ -917,26 +980,139 @@ export type AnchorResult = { requestId: string; log: AnchorLog | null; error: st
 
 const REQUEST_ID = /^[\w-]{1,100}$/;
 
-export type JourneyStep = { label: string; at: string | null; state: "done" | "failed" | "missing" | "skipped" | "pending" };
+// A reference id along the journey: what it is, its value, and where it opens, if anywhere.
+export type JourneyId = { label: string; value: string | null; href?: string; note?: string };
+export type JourneyStep = {
+  key: (typeof JOURNEY_STEPS)[number]["key"];
+  label: string;
+  at: string | null;
+  // done; stopped (broke here); waiting (inside its grace); skipped (not needed for this call);
+  // unknown (we hold no record of the step).
+  state: "done" | "stopped" | "waiting" | "skipped" | "unknown";
+  // One plain sentence on what happened at this step.
+  note: string;
+  ids: JourneyId[];
+};
 
-// Ingested → Uploaded → Verified → Sent → Accepted, with what was expected at each step. A call with no
-// integration to send it to shows Sent and Accepted as not expected, not "not yet" forever (QA N7).
-function journey(call: StoredCall | null, callouts: StoredCallout[], ctx: ClientContext): JourneyStep[] {
+const metaOf = (log: StoredLog | undefined) => (log?.raw?.metadata && typeof log.raw.metadata === "object" ? (log.raw.metadata as Record<string, unknown>) : {});
+const text = (value: unknown) => (typeof value === "string" && value ? value : typeof value === "number" ? String(value) : null);
+
+// Phone → app → recording uploaded → sent to the CRM → accepted, in plain words, with every id that
+// links the step to the next: the phone (license), CallAnchor's call record, the upload session and
+// recording file, the CRM request and the CRM's own record id.
+function journey(call: StoredCall | null, callouts: StoredCallout[], logs: StoredLog[], requests: AnchorResult[], ctx: ClientContext, now: number, license: { licenseId: string; last4: string | null } | null): JourneyStep[] {
+  const by = (source: string) => logs.find((l) => l.source === source);
+  const ingest = by("mobile.call.create");
+  const upload = by("mobile.recording.upload-complete") ?? by("mobile.recording.upload-init") ?? by("mobile.recording.upload-failed");
+  const job = by("mobile.recording.job-processed") ?? by("mobile.recording.job-failed");
+  const sync = logs.find((l) => l.source === "custom-webhook-sync" && metaOf(l).integrationId);
+  const stop = call ? journeyStop(call, ctx, now) : null;
+  const problem = call ? callProblem(call, ctx, now) : null;
   const recorded = call ? isRecorded(call) : false;
   const expected = ctx.takesAny || callouts.length > 0;
-  const firstSent = callouts[0]?.at ?? null;
-  const accepted = callouts.find((e) => e.status === "delivered")?.at ?? null;
-  const failed = callouts.length > 0 && !accepted && callouts[callouts.length - 1].status === "failed";
-  const recordingStep = (at: string | null | undefined, failedAt?: string | null): JourneyStep["state"] =>
-    !recorded ? "skipped" : at ? "done" : failedAt ? "failed" : "pending";
-  return [
-    { label: "Ingested", at: call?.ingestedAt ?? null, state: call?.ingestedAt ? "done" : "missing" },
-    { label: "Uploaded", at: call?.uploadedAt ?? call?.uploadFailedAt ?? call?.unavailableAt ?? null, state: recordingStep(call?.uploadedAt, call?.uploadFailedAt ?? call?.unavailableAt) },
-    { label: "Verified", at: call?.verifiedAt ?? null, state: recordingStep(call?.verifiedAt) },
-    { label: "Sent", at: firstSent, state: firstSent ? "done" : expected ? "pending" : "skipped" },
-    { label: "Accepted", at: accepted, state: accepted ? "done" : failed ? "failed" : expected ? "pending" : "skipped" },
+  const accepted = callouts.find((e) => e.status === "delivered") ?? null;
+  const lastCallout = callouts.at(-1) ?? null;
+  const attempts = requests.flatMap((r) => r.log?.events ?? []);
+  const crmRecords = [...new Set(attempts.map((a) => a.externalRecordId).filter((id): id is string => !!id))];
+  const requestIds = [...new Set(callouts.map((e) => e.requestId).filter((id): id is string => !!id))];
+  const platforms = [...new Set(callouts.map((e) => e.platformId))];
+  const length = call?.callSeconds;
+
+  const phone: JourneyStep = {
+    key: "phone",
+    label: "Call made on the phone",
+    at: call?.startedAt ?? call?.ingestedAt ?? null,
+    state: call ? "done" : "unknown",
+    note: call
+      ? [
+          call.callType ? `${call.callType[0].toUpperCase()}${call.callType.slice(1)} call` : "A call",
+          length === null || length === undefined ? null : length === 0 ? "that didn't connect" : `of ${length} s`,
+          license?.last4 ? `on phone …${license.last4}` : call.agentLast4 ? `by agent number …${call.agentLast4}` : null,
+        ].filter(Boolean).join(" ") + "."
+      : "No record of this call is stored.",
+    ids: [
+      { label: "Phone (license)", value: license?.licenseId ?? null, href: license ? licensePath(license.licenseId) : undefined, note: license ? undefined : "phone not known" },
+      { label: "Phone's own call id", value: text(metaOf(ingest).externalCallId), note: "the app doesn't send it yet" },
+    ],
+  };
+
+  const app: JourneyStep = {
+    key: "app",
+    label: "Picked up by the app",
+    at: call?.ingestedAt ?? null,
+    state: call?.ingestedAt ? "done" : "unknown",
+    note: call?.ingestedAt
+      ? "The CallAnchor app sent the call to CallAnchor."
+      : "Not in our stored logs. CallAnchor keeps them about 3 days, so this call came in before we stored it, or the log was missed.",
+    ids: [
+      { label: "CallAnchor call id", value: call?.callId ?? callouts[0]?.callId ?? null },
+      { label: "Ingest log", value: ingest?.id ?? null },
+    ],
+  };
+
+  const uploadIds: JourneyId[] = [
+    { label: "Upload session", value: text(metaOf(upload).uploadSessionId) },
+    { label: "Recording file", value: text(metaOf(upload).s3Key) },
+    { label: "Processing job", value: text(metaOf(job).jobId) },
   ];
+  const uploadStep: JourneyStep = (() => {
+    const base = { key: "upload" as const, label: "Recording uploaded", ids: uploadIds };
+    if (!call) return { ...base, at: null, state: "unknown" as const, note: "Not known." };
+    if (stop === "upload") return { ...base, at: call.uploadFailedAt ?? call.unavailableAt ?? call.uploadStartedAt ?? null, state: "stopped" as const, note: `${problem ?? "The recording didn't arrive"}.` };
+    if (isVerified(call)) return { ...base, at: call.verifiedAt ?? call.uploadedAt ?? null, state: "done" as const, note: "The recording reached CallAnchor and was checked." };
+    if (recorded) return { ...base, at: call.uploadedAt ?? call.uploadStartedAt ?? null, state: "waiting" as const, note: call.uploadedAt ? "Uploaded, being checked." : "Waiting for the phone to upload it." };
+    if (call.recordingDetail === "skipped_trial_limit") return { ...base, at: null, state: "skipped" as const, note: "Not recorded: the trial's recording limit was reached." };
+    if (inStage("notConnected", call, ctx, now)) return { ...base, at: null, state: "skipped" as const, note: "The call didn't connect, so there was nothing to record." };
+    return { ...base, at: null, state: "skipped" as const, note: "No recording was made on the phone for this call." };
+  })();
+
+  const sent: JourneyStep = {
+    key: "sent",
+    label: "Sent to the CRM",
+    at: callouts[0]?.at ?? null,
+    state: callouts.length ? "done" : stop === "sent" ? "stopped" : !expected ? "skipped" : "waiting",
+    note: callouts.length
+      ? `Sent to ${platforms.join(", ")}${callouts.length > 1 ? `, ${callouts.length} attempts` : ""}.`
+      : stop === "sent"
+        ? "CallAnchor never sent it to the CRM."
+        : !expected
+          ? "This client has no CRM integration, so nothing is sent."
+          : stop === "upload"
+            ? "Waits for the recording."
+            : "Not sent yet.",
+    ids: [
+      ...requestIds.map((id, i) => ({ label: requestIds.length > 1 ? `CRM request ${i + 1}` : "CRM request", value: id, href: `#request-${id}` })),
+      ...(requestIds.length ? [] : [{ label: "CRM request", value: null }]),
+      { label: "Integration", value: text(metaOf(sync).integrationId) ?? platforms[0] ?? null },
+    ],
+  };
+
+  const recordingSent = call?.deliveredEvents.includes("recording.ready") ?? false;
+  const crm: JourneyStep = {
+    key: "crm",
+    label: "Accepted by the CRM",
+    at: accepted?.at ?? null,
+    state: accepted ? "done" : stop === "crm" ? "stopped" : !expected ? "skipped" : "waiting",
+    note: accepted
+      ? recordingSent
+        ? "The CRM accepted the call with its recording."
+        : recorded
+          ? "The CRM accepted the call details; the recording hasn't reached it yet."
+          : "The CRM accepted the call."
+      : stop === "crm"
+        ? `The CRM refused it${lastCallout?.httpStatus ? ` (HTTP ${lastCallout.httpStatus})` : lastCallout ? " (no response)" : ""}${lastCallout?.label ? `: ${lastCallout.label}` : ""}.`
+        : !expected
+          ? "No CRM to accept it."
+          : "Not accepted yet.",
+    ids: [
+      ...crmRecords.map((id) => ({ label: "CRM record", value: id })),
+      ...(crmRecords.length ? [] : [{ label: "CRM record", value: null, note: requests.length ? "the CRM didn't return one" : "read live when CallAnchor is connected" }]),
+    ],
+  };
+  return [phone, app, uploadStep, sent, crm];
 }
+
+const licensePath = (licenseId: string) => `/dashboard/call_anchor/health/licenses/${encodeURIComponent(licenseId)}`;
 
 // One call's stored history, where it stands, and, with a CallAnchor cookie, each CRM request read
 // live: the payload sent and every reply. Payloads aren't stored.
@@ -965,7 +1141,9 @@ export async function loadCall(callId: string, cookie: string | null) {
     takesRecordings: snapshot?.tenant ? ctx.takesRecordings : null,
     call,
     license,
-    journey: journey(call, callouts, ctx),
+    journey: journey(call, callouts, logs, requests, ctx, now, license ? { licenseId: license.licenseId, last4: license.last4 } : null),
+    complete: call ? isComplete(call, ctx) : false,
+    stop: call ? journeyStop(call, ctx, now) : null,
     hasIntegration: snapshot?.tenant ? ctx.hasIntegration : null,
     callouts,
     logs,

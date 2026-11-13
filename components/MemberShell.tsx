@@ -19,7 +19,7 @@ export async function MemberShell({ children }: { children: React.ReactNode }) {
           ...SUB_APPS.map((app) => ({ href: `/dashboard/${app.slug}`, label: app.name })),
         ]}
       />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <main className="w-full flex-1 px-4 py-8">{children}</main>
       {member.isAuditor && <AuditNoteButton />}
     </>
   );

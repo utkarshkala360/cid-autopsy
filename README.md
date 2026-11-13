@@ -7,10 +7,10 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 | `/admin` | Admin Console: create, disable, reset passwords for, set roles and the auditor permission of, and delete agents/members | Admins (stored in the database) |
 | `/admin/audit-notes` | Notes auditors left on dashboard pages, with the page each was on; mark them done or won't fix | Admins |
 | `/dashboard` | Dashboard: home for sub apps | Agents/members created in the Admin Console |
-| `/dashboard/call_anchor_config` | CallAnchor Config sub app | Agents/members |
-| `/dashboard/call_anchor_config/health` | Client health: recordings, CRM syncs and errors for every client | Agents/members with a CallAnchor login |
-| `/dashboard/call_anchor_config/health/<clientId>` | One client's full health breakdown | Agents/members with a CallAnchor login |
-| `/dashboard/call_anchor_config/apis` | API console: run CallAnchor's APIs live | Members with the Admin role and a CallAnchor login |
+| `/dashboard/call_anchor` | CallAnchor sub app | Agents/members |
+| `/dashboard/call_anchor/health` | Client health: recordings, CRM syncs and errors for every client | Agents/members with a CallAnchor login |
+| `/dashboard/call_anchor/health/clients/<clientId>` | One client: health, licenses (and each phone), seats, calls & logs, calls and issues, each under it | Agents/members with a CallAnchor login |
+| `/dashboard/call_anchor/apis` | API console: run CallAnchor's APIs live | Members with the Admin role and a CallAnchor login |
 | `/customers` | Customers | Agents/members |
 | `/customers/<id>` | A customer and its integrations | Agents/members |
 | `/customers/<id>/integrations/salesforce` | That customer's Salesforce orgs; **+ Connect Salesforce** adds one | Agents/members |
@@ -81,13 +81,13 @@ npm run ca -- list
 
 Every CallAnchor page needs a valid portal session, stored per member and encrypted like Salesforce credentials.
 
-- Each page render, and each route change through [SessionGuard](app/dashboard/(app)/call_anchor_config/SessionGuard.tsx), asks `GET /api/portal/profile` whether the cookie still works. The guard is needed because the router cache can serve a page without reaching the server.
-- A `401` or `403`, or no stored session, sends the member to **Validate OTP** at `/dashboard/call_anchor_config/verify`. After the OTP they return to the page they were on.
+- Each page render, and each route change through [SessionGuard](app/dashboard/(app)/call_anchor/SessionGuard.tsx), asks `GET /api/portal/profile` whether the cookie still works. The guard is needed because the router cache can serve a page without reaching the server.
+- A `401` or `403`, or no stored session, sends the member to **Validate OTP** at `/dashboard/call_anchor/verify`. After the OTP they return to the page they were on.
 - If CallAnchor is down the page stays open, because an OTP couldn't work anyway.
 
-The **API console** at `/dashboard/call_anchor_config/apis` runs any operation from the contract live with the member's own session and marks whether the response matches. Writes need a confirmation. Responses contain customer data, so only members with the Admin role (set in the Admin Console) see it; anyone else gets a 404.
+The **API console** at `/dashboard/call_anchor/apis` runs any operation from the contract live with the member's own session and marks whether the response matches. Writes need a confirmation. Responses contain customer data, so only members with the Admin role (set in the Admin Console) see it; anyone else gets a 404.
 
-**Client health** at `/dashboard/call_anchor_config/health` scores every client from data stored in Postgres, which each visit brings up to date with the member's session, using GET requests only.
+**Client health** at `/dashboard/call_anchor/health` scores every client from data stored in Postgres, which each visit brings up to date with the member's session, using GET requests only.
 
 [lib/callanchor/store.ts](lib/callanchor/store.ts) keeps the `ca_*` tables:
 
