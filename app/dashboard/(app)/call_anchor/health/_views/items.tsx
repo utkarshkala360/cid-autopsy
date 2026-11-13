@@ -77,10 +77,10 @@ const STAGES: Record<CallStage, { label: string; tone: Tone }> = {
   synced: { label: "Recording reached the CRM", tone: "ok" },
   late: { label: "Reached late", tone: "wait" },
   duplicate: { label: "Accepted twice", tone: "wait" },
-  notReached: { label: "Due, didn't reach it", tone: "bad" },
+  notReached: { label: "Didn't reach the CRM", tone: "bad" },
   notAccepted: { label: "Sent, not accepted", tone: "bad" },
   failed: { label: "Sync failed", tone: "bad" },
-  rejected: { label: "Rejected (4xx)", tone: "bad" },
+  rejected: { label: "CRM rejected it (4xx)", tone: "bad" },
   auth: { label: "Sign-in rejected (401/403)", tone: "bad" },
   unreachable: { label: "No response or 5xx", tone: "bad" },
 };
@@ -94,6 +94,14 @@ const STEP_STAGES: Record<JourneyKey, { stop?: CallStage; stages: CallStage[] }>
   sent: { stop: "stopSent", stages: ["due", "sent", "notSent", "notSynced", "missing", "unsynced"] },
   crm: { stop: "stopCrm", stages: ["delivered", "synced", "late", "duplicate", "notReached", "notAccepted", "failed", "rejected", "auth", "unreachable"] },
 };
+// Stages that are a subset of another, shown indented under it: why those calls didn't get through.
+// They aren't added to the step's problem count, so a call is counted once (owner, 2026-11-13).
+const UNDER: Partial<Record<CallStage, CallStage[]>> = { notReached: ["rejected", "auth", "unreachable"] };
+const NESTED = new Set(Object.values(UNDER).flat());
+// Stages that only repeat a neighbour (sent but not accepted, and failed, are the same calls as
+// didn't reach the CRM in the stored data). Kept for links from issues and funnels; listed only
+// when picked.
+const ONLY_WHEN_PICKED = new Set<CallStage>(["notAccepted", "failed"]);
 // A stage left out of the layout would never show in the panel: fail loudly while developing.
 if (process.env.NODE_ENV !== "production") {
   const placed = new Set<CallStage>([...OUTCOME, ...Object.values(STEP_STAGES).flatMap((g) => [...(g.stop ? [g.stop] : []), ...g.stages])]);
@@ -281,7 +289,7 @@ function ItemFilters({ kind, stage, kindHref, stageHref, counts }: FilterProps &
             {JOURNEY_STEPS.map((step, i) => {
               const { stop, stages } = STEP_STAGES[step.key];
               const stopped = stop && counts ? counts[stop] : 0;
-              const problems = counts ? stages.filter((s) => STAGES[s].tone === "bad").reduce((n, s) => n + counts[s], 0) : 0;
+              const problems = counts ? stages.filter((s) => STAGES[s].tone === "bad" && !NESTED.has(s) && !ONLY_WHEN_PICKED.has(s)).reduce((n, s) => n + counts[s], 0) : 0;
               const state: Tone = !counts ? "info" : stopped > 0 ? "bad" : problems > 0 ? "wait" : "ok";
               const open = step.key === openStep;
               const picked = stage && open ? stageLabel(stage) : undefined;
@@ -300,9 +308,19 @@ function ItemFilters({ kind, stage, kindHref, stageHref, counts }: FilterProps &
                       </svg>
                     </summary>
                     <ul className="mb-2 ml-9 mt-1 space-y-0.5">
-                      {(stop ? [stop, ...stages] : stages).map((s) => (
-                        <StageRow key={s} stage={s} active={s === stage} href={stageHref(s)} count={counts?.[s]} />
-                      ))}
+                      {(stop ? [stop, ...stages] : stages)
+                        .filter((s) => !NESTED.has(s) && (!ONLY_WHEN_PICKED.has(s) || s === stage))
+                        .map((s) => (
+                          <StageRow key={s} stage={s} active={s === stage} href={stageHref(s)} count={counts?.[s]}>
+                            {UNDER[s] && (
+                              <ul className="ml-4 border-l border-slate-200 pl-1">
+                                {UNDER[s]!.filter((c) => counts?.[c] !== 0 || c === stage).map((c) => (
+                                  <StageRow key={c} stage={c} active={c === stage} href={stageHref(c)} count={counts?.[c]} />
+                                ))}
+                              </ul>
+                            )}
+                          </StageRow>
+                        ))}
                     </ul>
                   </details>
                 </li>
@@ -341,7 +359,7 @@ function StepNode({ n, state }: { n: number; state: Tone }) {
 
 // One stage: its status dot, name and count. An empty stage is dimmed; a problem with calls in it
 // shows its count in red.
-function StageRow({ stage, active, href, count }: { stage: CallStage; active: boolean; href: string; count?: number }) {
+function StageRow({ stage, active, href, count, children }: { stage: CallStage; active: boolean; href: string; count?: number; children?: React.ReactNode }) {
   const { label, tone } = STAGES[stage];
   const empty = count === 0;
   return (
@@ -360,6 +378,7 @@ function StageRow({ stage, active, href, count }: { stage: CallStage; active: bo
           <span className={`shrink-0 text-xs tabular-nums ${!empty && tone === "bad" ? "font-semibold text-rose-700" : "text-slate-400"}`}>{int(count)}</span>
         )}
       </Link>
+      {children}
     </li>
   );
 }

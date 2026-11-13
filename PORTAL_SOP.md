@@ -272,7 +272,7 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
-| 2026-11-13 | Merge near-duplicate stages on Calls & logs: "Due, didn't reach it", "Sent, not accepted" and "Sync failed" overlap, as do "Not uploaded", "Phone hasn't uploaded" and "Still on the phone" | The panel now follows the journey with counts, but 37 stages is still more than a support person needs | Awaiting owner |
+| 2026-11-13 | Merge the recording near-duplicates on Calls & logs: "Not uploaded", "Phone hasn't uploaded" and "Still on the phone" overlap (the CRM ones are now grouped, see Portal changes) | 37 stages is still more than a support person needs | Awaiting owner |
 | 2026-11-13 | Finish the Supabase Mumbai cutover for local dev too: from here, Neon Singapore returns ~32 KB/s (7 days of calls, 1.2 MB, take 37 s while the query runs in 4 ms), so a cold local read takes over a minute | Production is next to Neon and unaffected; local dev waits on every cold read | Awaiting owner |
 | 2026-11-13 | (Superseded: owner chose to move the database to Mumbai.) Make local dev usable over a slow route to Singapore: either run local against a local Postgres (own store, pulled from CallAnchor), or cut what a page reads (stop loading 8 days of every call, about 6.4 MB, on each fleet visit) and stop the page waiting on CallAnchor pulls | Local took over a minute per page on 13 Nov: the owner's ISP route to Singapore gave Neon 56–230 KB/s (5.8 MB/s elsewhere), over HTTP, WebSocket and curl alike, and transfers over ~4 MB were cut off. Production runs in `sin1` beside Neon and isn't affected | Awaiting owner |
 | 2026-11-13 | Ask CallAnchor to fill `externalCallId` on `mobile.call.create` (the phone's own call-log id) | It's empty on all 8,309 stored ingest logs, so the chain starts at CallAnchor's call id: a call on the phone can't be matched to its row here without it | Awaiting owner |
@@ -294,6 +294,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-13 | Calls & logs, Accepted by the CRM step: one "Didn't reach the CRM" stage with its reasons indented under it (CRM rejected it (4xx), sign-in 401/403, no response or 5xx; empty ones hidden), counted once in the step. "Sent, not accepted" and "Sync failed" were the same calls (15 days: 45 in each, all 4xx), so they show only when a link opens them | Done, not pushed | `UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx` |
 | 2026-11-13 | Licenses tab: each module has its own left-menu filters (Calls & CRM: calls, reach, sync days; Device: model, app, recording, dialer); module change clears filters. Rings in a fixed colour per metric with "of Y" under the number and the share on hover; Purchased column removed; Reached CRM and Recordings as rings; CRM sync, 7 days as one shared cell in both Clients modules and the Licenses tab | Done, pushed 2026-11-13; not yet viewed signed in | `health/_views/licenses.tsx`, `MetricRing` in `health/ui.tsx`, `SyncCell` in `health/parts.tsx`, `health/FleetTable.tsx` |
 | 2026-11-13 | Tabs split: Overview (Needs action, Module as left menu), Clients (Module and per-module Health as left menu, picks kept in the URL), Licenses (Module, Health and Use as left-menu filters, empty options hidden, All shows every license); client pages sit under the Clients tab and breadcrumb; shared `MenuLayout` | Done, pushed 2026-11-13 (`1ab99cb`); not yet viewed signed in | `health/FilterMenu.tsx`, `health/clients/page.tsx`, `health/licenses/page.tsx`, `health/FleetTable.tsx`, `health/HealthNav.tsx` |
 | 2026-11-13 | Overview by module: Trials removed; Needs action split into CRM, Device, Portal and Usage, with CRM errors under CRM and system logs under Portal over a time range (24 hours default, 3, 7, 15 days); Clients table switches between Call journey, Licenses and Issues; Licenses switches between Health & use, Calls & CRM and Device (breakdowns moved into Device); license filters moved inside their section; severity and CRM status codes colour-coded as chips and badges | Done, pushed 2026-11-13 (`1ab99cb`); not yet viewed signed in | `health/page.tsx`, `health/FleetTable.tsx`, `health/_views/licenses.tsx`, `lib/callanchor/modules.ts`, `health/format.ts` |
@@ -327,6 +328,11 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-13: Asked why one call showed under four CRM filters, and to group them from the data.
+  They were nested tests (rejected ⊂ failed ⊂ sent not accepted ⊂ didn't reach); every failure in
+  15 days is a 4xx, mostly Salesforce `OPPORTUNITY_NOT_FOUND` for one client. Grouped under one
+  parent with reasons nested.
 
 - 2026-11-13: Pointed out Health and Use belong to the first Licenses module only; Calls & CRM and
   Device need their own filters. Asked for rings in fixed colours with the share on hover, "X of Y"
