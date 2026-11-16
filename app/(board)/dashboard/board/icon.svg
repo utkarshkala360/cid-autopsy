@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 210">
+<title>360 Cloud Board favicon</title>
+<defs>
+<linearGradient id="favGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#1D4E96"/>
+<stop offset="55%" stop-color="#4C6FE0"/>
+<stop offset="100%" stop-color="#7C5CFC"/>
+</linearGradient>
+</defs>
+<path d="M105 44 A58 58 0 1 1 54.7 73" fill="none" stroke="url(#favGrad)" stroke-width="22" stroke-linecap="round"/>
+<polygon points="63,58 58,90 40,80" fill="#7C5CFC"/>
+<rect x="82" y="125" width="14" height="26" rx="4" fill="#E8622C"/>
+<rect x="100" y="108" width="14" height="43" rx="4" fill="#E8622C"/>
+<rect x="118" y="118" width="14" height="33" rx="4" fill="#E8622C"/>
+</svg>

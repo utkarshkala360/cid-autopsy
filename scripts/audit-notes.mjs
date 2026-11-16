@@ -57,7 +57,7 @@ async function mark(idList) {
   }
   resolution = resolution?.slice(0, 2000) ?? null;
 
-  // Same rules as setAuditNoteStatusAction in app/admin/actions.ts.
+  // Same rules as setAuditNoteStatusAction in app/(portal)/admin/actions.ts.
   const rows = await sql`
     UPDATE audit_notes
     SET status = ${status},

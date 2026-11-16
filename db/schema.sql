@@ -30,6 +30,13 @@ ALTER TABLE members ADD CONSTRAINT members_role_check CHECK (role IN ('agent', '
 -- Auditors get the "Audit note" button on every dashboard page. A permission on top of the role.
 ALTER TABLE members ADD COLUMN IF NOT EXISTS is_auditor BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Which dashboard apps a member can open (slugs from `lib/sub-apps.ts`), set in the Admin Console.
+-- Existing members keep CallAnchor; Board is granted per member.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS apps TEXT[] NOT NULL DEFAULT '{call_anchor}';
+-- Links a member to their Board account. Optional when the member's ID is already an email.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS email TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS members_email_key ON members (lower(email));
+
 -- Notes auditors leave on dashboard pages, with the page they were on. Reviewed weekly to improve
 -- the dashboard; `npm run audit:notes` prints the open ones. `author` keeps the ID if the member goes.
 CREATE TABLE IF NOT EXISTS audit_notes (
@@ -263,7 +270,8 @@ CREATE TABLE IF NOT EXISTS ca_calls (
   uploaded_at        TIMESTAMPTZ,
   verified_at        TIMESTAMPTZ,
   upload_failed_at   TIMESTAMPTZ,
-  -- CRM callouts. A callout reached the CRM when it replied 2xx (CRM_STATUS_SQL in labels.ts).
+  -- CRM callouts. A callout reached the CRM when CallAnchor marked it delivered: a 2xx with a CRM
+  -- record id (CRM_STATUS_SQL in labels.ts).
   attempts           INTEGER     NOT NULL DEFAULT 0,
   first_callout_at   TIMESTAMPTZ,
   last_callout_at    TIMESTAMPTZ,
@@ -364,9 +372,9 @@ CROSS JOIN LATERAL (
 ) l
 CROSS JOIN LATERAL (
   SELECT max(client_id) AS client_id, count(*) AS attempts, min(at) AS first_at, max(at) AS last_at,
-    min(at) FILTER (WHERE http_status BETWEEN 200 AND 299 OR status = 'delivered') AS first_delivered_at,
-    array_agg(DISTINCT event_type) FILTER (WHERE http_status BETWEEN 200 AND 299 OR status = 'delivered') AS delivered_events,
-    (array_agg(CASE WHEN http_status BETWEEN 200 AND 299 THEN 'delivered' ELSE status END ORDER BY at DESC, attempt DESC))[1] AS last_status,
+    min(at) FILTER (WHERE status = 'delivered') AS first_delivered_at,
+    array_agg(DISTINCT event_type) FILTER (WHERE status = 'delivered') AS delivered_events,
+    (array_agg(status ORDER BY at DESC, attempt DESC))[1] AS last_status,
     (array_agg(http_status ORDER BY at DESC, attempt DESC))[1] AS last_http,
     (array_agg(label ORDER BY at DESC, attempt DESC))[1] AS last_label,
     (array_agg(platform_id ORDER BY at DESC, attempt DESC))[1] AS last_platform,
@@ -410,6 +418,11 @@ SELECT ca_refresh_calls(array_agg(DISTINCT l.call_id)) FROM ca_system_logs l
 WHERE l.source = 'mobile.recording.mark-unavailable' AND EXISTS (
   SELECT 1 FROM ca_calls c WHERE c.call_id = l.call_id AND c.unavailable_at IS NULL
 );
+
+-- Calls with a 2xx that CallAnchor marked failed (no CRM record id) are rebuilt, so they stop
+-- counting as reached (owner, 2026-11-13). Rebuilding is idempotent and matches few calls.
+SELECT ca_refresh_calls(array_agg(DISTINCT call_id)) FROM ca_callout_events
+WHERE http_status BETWEEN 200 AND 299 AND status <> 'delivered';
 
 -- Stored calls get their callType once; afterwards this matches nothing.
 SELECT ca_refresh_calls(array_agg(c.call_id)) FROM ca_calls c WHERE c.call_type IS NULL AND EXISTS (
@@ -467,7 +480,7 @@ SELECT l.id, l.occurred_at AS at,
 FROM ca_system_logs l LEFT JOIN ca_calls k ON k.call_id = l.call_id
 UNION ALL
 SELECT e.id, e.at, 'crm', e.event_type, e.client_id, k.license_id, e.call_id, e.platform_id, e.request_id,
-  CASE WHEN e.http_status BETWEEN 200 AND 299 THEN 'delivered' ELSE e.status END, e.label
+  e.status, e.label
 FROM ca_callout_events e LEFT JOIN ca_calls k ON k.call_id = e.call_id
 UNION ALL
 SELECT a.id, a.occurred_at, 'portal', a.action || ' ' || a.resource_type, a.client_id, a.license_id, NULL, a.platform_id, NULL,

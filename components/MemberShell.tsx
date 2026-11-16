@@ -1,7 +1,7 @@
 import { requireMember } from "@/lib/auth";
-import { SUB_APPS } from "@/lib/sub-apps";
+import { appsFor } from "@/lib/sub-apps";
 import { ConsoleHeader } from "@/components/ConsoleHeader";
-import { memberLogoutAction } from "@/app/dashboard/actions";
+import { memberLogoutAction } from "@/app/(portal)/dashboard/actions";
 import { AuditNoteButton } from "@/components/AuditNoteButton";
 
 // Header and page frame for everything members sign in to: the dashboard and its sub apps.
@@ -15,7 +15,7 @@ export async function MemberShell({ children }: { children: React.ReactNode }) {
         userLabel={member.fullName}
         logoutAction={memberLogoutAction}
         nav={[
-          ...SUB_APPS.map((app) => ({ href: `/dashboard/${app.slug}`, label: app.name })),
+          ...appsFor(member).map((app) => ({ href: `/dashboard/${app.slug}`, label: app.name })),
         ]}
       />
       <main className="w-full flex-1 px-4 py-8">{children}</main>

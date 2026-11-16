@@ -1480,14 +1480,14 @@ export async function readDaily(scope: { clientId?: string | null; licenseId?: s
   }));
 }
 
-// The last 2xx, the last call, and the last call that went all the way through: accepted by the CRM,
+// The last delivered callout, the last call, and the last call that went all the way through: accepted by the CRM,
 // with its recording when one was made (`isComplete` in issues.ts).
 export type LastSync = { syncAt: string | null; callAt: string | null; completeAt: string | null; completeCallId: string | null };
 
 export type LastSyncs = {
   clients: Map<string, LastSync>;
   licenses: Map<string, LastSync>;
-  // Keyed `${clientId}|${platformId}`: the last 2xx and the last callout of each integration.
+  // Keyed `${clientId}|${platformId}`: the last delivered callout and the last callout of each integration.
   platforms: Map<string, { syncAt: string | null; calloutAt: string | null }>;
 };
 

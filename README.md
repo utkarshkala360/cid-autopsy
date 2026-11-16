@@ -6,14 +6,16 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 | --- | --- | --- |
 | `/admin` | Admin Console: create, disable, reset passwords for, set roles and the auditor permission of, and delete agents/members | Admins (stored in the database) |
 | `/admin/audit-notes` | Notes auditors left on dashboard pages, with the page each was on; mark them done or won't fix | Admins |
-| `/dashboard` | Dashboard: home for sub apps | Agents/members created in the Admin Console |
-| `/dashboard/call_anchor` | CallAnchor sub app | Agents/members |
+| `/dashboard` | Dashboard: one login, then a card for each app the member may open | Agents/members created in the Admin Console |
+| `/dashboard/call_anchor` | CallAnchor sub app | Agents/members with CallAnchor access |
+| `/dashboard/board` | 360 Cloud Board: work items, boards, initiatives, customers (MongoDB) | Agents/members with Board access and an email |
 | `/dashboard/call_anchor/health` | Client health: recordings, CRM syncs and errors for every client | Agents/members with a CallAnchor login |
 | `/dashboard/call_anchor/health/clients/<clientId>` | One client: health, licenses (and each phone), seats, calls & logs, calls and issues, each under it | Agents/members with a CallAnchor login |
 | `/dashboard/call_anchor/apis` | API console: run CallAnchor's APIs live | Members with the Admin role and a CallAnchor login |
-| `/customers` | Customers | Agents/members |
-| `/customers/<id>` | A customer and its integrations | Agents/members |
-| `/customers/<id>/integrations/salesforce` | That customer's Salesforce orgs; **+ Connect Salesforce** adds one | Agents/members |
+
+**Apps and access.** Members sign in once at `/dashboard/login`. Each member's apps (`members.apps`, slugs from [lib/sub-apps.ts](lib/sub-apps.ts)) are ticked in the Admin Console under **Apps**; the dashboard and header show only those, and any other app's pages return 404 (`requireApp(slug)` in [lib/auth.ts](lib/auth.ts)). New and existing members start with CallAnchor only.
+
+**360 Cloud Board** was merged in from its own repo and Vercel project (2026-11-16). Its code is in [board/](board/) (imported as `@board/...`) and its routes in `app/(board)/dashboard/board/`, with its own root layout and stylesheet so its theme never mixes with the portal's (the portal's routes are in `app/(portal)/`). It keeps its MongoDB data. It has no login of its own: `getCurrentMember()` in [board/src/lib/get-current-member.ts](board/src/lib/get-current-member.ts) takes the portal member, checks Board access, and finds their Board member by email (the member's email field, or their ID when it is an email), creating one on first visit. Board's own docs are in [board/docs/](board/docs/); where they describe next-auth, Google sign-in or `/login`, this replaces them.
 
 **Audit notes.** Members with the auditor permission (set in the Admin Console, on top of their role) see an **Audit note** button on every dashboard and customer page. A note saves the comment and its type with the page's URL, title, heading, query params, any highlighted text, viewport and browser into `audit_notes`. Admins review them at `/admin/audit-notes`; `npm run audit:notes` prints the open ones as Markdown (`-- --days 7` for the last week, any status) for the weekly dashboard review.
 
@@ -31,7 +33,8 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 1. Import this GitHub repo in Vercel.
 2. **Storage → Create → Neon (Postgres)** and connect it to the project. This sets `DATABASE_URL`.
 3. Add `CREDENTIALS_ENCRYPTION_KEY` (generate with `openssl rand -base64 32`): `vercel env add CREDENTIALS_ENCRYPTION_KEY production`. Losing or changing it makes stored Salesforce connections unreadable; they'd need reconnecting.
-4. Deploy. `npm run build` applies `db/schema.sql` before building, so the tables are created automatically.
+4. For Board, add `MONGODB_URI` (its MongoDB Atlas database) and `BLOB_READ_WRITE_TOKEN` (its Vercel Blob store, for work item attachments and avatars). Without them the rest of the portal works and Board pages fail.
+5. Deploy. `npm run build` applies `db/schema.sql` before building, so the tables are created automatically.
 5. Create the first admin (see below).
 
 ## Managing admins
@@ -48,7 +51,7 @@ Running it for an existing ID sets a new password and signs that admin out every
 
 ```bash
 npm install
-vercel env pull .env.local   # DATABASE_URL, CREDENTIALS_ENCRYPTION_KEY
+vercel env pull .env.local   # DATABASE_URL, CREDENTIALS_ENCRYPTION_KEY, MONGODB_URI, BLOB_READ_WRITE_TOKEN
 npm run db:migrate
 npm run admin:create -- '<id>' '<password>'
 npm run dev
@@ -115,5 +118,5 @@ New CallAnchor pages and server actions must call `requireCallAnchorSession()` f
 ## Adding a sub app
 
 1. Register it in [lib/sub-apps.ts](lib/sub-apps.ts). This adds its dashboard card and nav link.
-2. Create `app/dashboard/(app)/<slug>/page.tsx` and call `await requireMember()` at the top. Server actions must call it too.
+2. Create `app/(portal)/dashboard/(app)/<slug>/page.tsx` and call `await requireApp("<slug>")` at the top. Server actions must call it too. Grant it to members in the Admin Console under **Apps**.
 3. To work with a customer's Salesforce, use `withStoredOrg` (see above).

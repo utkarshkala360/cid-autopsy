@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Base Colors */
+    --background: #F4F5FA;
+    --foreground: #1B1F3B;
+    --panel: #FFFFFF;
+    --panel-foreground: #1B1F3B;
+    
+    /* Typography & Muted Colors */
+    --ink: #1B1F3B;
+    --slate: #6B7194;
+    --muted: #EEF0F7;
+    --muted-foreground: #6B7194;
+    --border: #E2E4F0;
+    --input: #E2E4F0;
+    --ring: #5B5FC7;
+
+    /* Primary Accent */
+    --primary: #5B5FC7;
+    --primary-foreground: #FFFFFF;
+    --primary-hover: #484CB0;
+
+    /* Secondary / Subtles */
+    --secondary: #EEF0F7;
+    --secondary-foreground: #1B1F3B;
+
+    /* Semantic Status Tokens */
+    --status-todo: #8B8FA3;
+    --status-todo-bg: #F0F1F5;
+    --status-in-progress: #E08D29;
+    --status-in-progress-bg: #FEF6EC;
+    --status-done: #2DA44E;
+    --status-done-bg: #EAF7ED;
+    --status-blocked: #CF222E;
+    --status-blocked-bg: #FEECEE;
+
+    /* Categorical chart palette (dataviz skill default, 7 of its 8 slots —
+       validated for this panel's white surface: node scripts/validate_palette.js
+       "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#4a3aa7,#e34948" --mode
+       light --surface "#FFFFFF"). Identity color for part-to-whole charts
+       (Donut) only — assigned in this fixed order, never cycled/regenerated;
+       a chart with more groups than slots folds the tail into "Other"
+       (--chart-other, slate — deliberately outside the categorical set). Bar/
+       Lollipop/Stacked/Grouped stay on the existing semantic tokens (primary/
+       status-done) since they encode magnitude or open-vs-closed, not identity.  */
+    --chart-1: #2a78d6;
+    --chart-2: #eb6834;
+    --chart-3: #1baf7a;
+    --chart-4: #eda100;
+    --chart-5: #e87ba4;
+    --chart-6: #008300;
+    --chart-7: #4a3aa7;
+    --chart-other: #8B8FA3;
+
+    /* Radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    /* Elevation (Phase 12) — a small, deliberate scale, re-theming Tailwind's
+       built-in shadow-xs/sm/md/lg utilities already used across components
+       rather than adding a parallel set of names. */
+    --shadow-xs: 0 1px 2px 0 rgb(27 31 59 / 0.04);
+    --shadow-sm: 0 1px 3px 0 rgb(27 31 59 / 0.06), 0 1px 2px -1px rgb(27 31 59 / 0.06);
+    --shadow-md: 0 4px 12px -2px rgb(27 31 59 / 0.10), 0 2px 4px -2px rgb(27 31 59 / 0.06);
+    --shadow-lg: 0 12px 28px -6px rgb(27 31 59 / 0.16), 0 4px 8px -4px rgb(27 31 59 / 0.08);
+
+    /* Motion (Phase 12) — re-themes Tailwind's built-in ease-out utility;
+       durations use Tailwind's own numeric duration-* scale directly. */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@theme {
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), system-ui, sans-serif;
+
+  --color-ink: var(--ink);
+  --color-slate: var(--slate);
+  --color-surface: var(--background);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-status-todo: var(--status-todo);
+  --color-status-todo-bg: var(--status-todo-bg);
+  --color-status-in-progress: var(--status-in-progress);
+  --color-status-in-progress-bg: var(--status-in-progress-bg);
+  --color-status-done: var(--status-done);
+  --color-status-done-bg: var(--status-done-bg);
+  --color-status-blocked: var(--status-blocked);
+  --color-status-blocked-bg: var(--status-blocked-bg);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-other: var(--chart-other);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --ease-out: var(--ease-out);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+}
+
+/* Phase 12 — shared enter/exit motion for Radix content (Dialog, Popover,
+   HoverCard). Plain keyframes instead of the tailwindcss-animate plugin,
+   which isn't a dependency here; driven off Radix's own data-state attr. */
+@keyframes overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes content-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(2px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.radix-overlay {
+  animation: overlay-fade 120ms var(--ease-out) both;
+}
+.radix-content {
+  animation: content-pop 120ms var(--ease-out) both;
+  transform-origin: var(--radix-popper-transform-origin, center);
+}
+.radix-content[data-state="closed"] {
+  animation: none;
+}

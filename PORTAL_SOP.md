@@ -29,6 +29,13 @@ changed anything:
 Rules already established in this repo.
 
 - Commit and push straight to `main`, only when the owner asks. Vercel deploys from `main`.
+- One GitHub repo and one Vercel project for every app (owner, 2026-11-16). 360 Cloud Board was
+  merged in from its own repo and Vercel project; it lives at `/dashboard/board`, code in `board/`.
+- `/dashboard` is the home for every app: members sign in once at `/dashboard/login`, and access to
+  each app is granted separately per member in the Admin Console (**Apps**), stored in
+  `members.apps` (owner, 2026-11-16). The dashboard and header list only a member's apps; others
+  return 404 (`requireApp` in `lib/auth.ts`). Board has no login of its own; it links a portal
+  member to a Board member by email. See README "Apps and access".
 - Data auto-syncs on a visit at most every 5 minutes; the Refresh button (top right of the health
   bar) pulls at once, at most once in 30 seconds per scope, checked in the browser and on the server
   (owner, 2026-11-13).
@@ -59,9 +66,11 @@ Rules already established in this repo.
 - CallAnchor data is stored, not re-pulled from scratch. Visits pull only what's new since each
   stream's saved milestone. The trailing 5 days are refreshed once a day, and every pull saves its new
   milestone (owner, 2026-11-03). See `lib/callanchor/store.ts`.
-- A CRM sync succeeded when the CRM replied 2xx, even if CallAnchor marked the callout failed.
-  `call.completed` and `recording.ready` both count as the call reaching the CRM, so either one syncs
-  its recording (owner, 2026-11-04). See `crmStatus` in `lib/callanchor/labels.ts`.
+- A CRM sync succeeded only when CallAnchor marked the callout delivered: a 2xx with a CRM record id
+  in the reply. A 2xx without a record id is a failure, since the CRM may have skipped the call
+  (owner, 2026-11-13, replacing the 2xx rule of 2026-11-04). A call is synced once any attempt was
+  delivered, whatever failed before. `call.completed` and `recording.ready` both count as the call
+  reaching the CRM, so either one syncs its recording. See `crmStatus` in `lib/callanchor/labels.ts`.
 - `recording.ready` and `call.completed` are both valid syncs: `recording.ready` is sent for a call
   that connected and was recorded (a few seconds or more), `call.completed` for a missed incoming or
   rejected outgoing call. A call that got either one reached the CRM (owner, 2026-11-05).
@@ -328,6 +337,8 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-13 | Leave calls started before the stored log window out of "Data is thin" (use the payload's `startedAt`) | Call `cmv0kcal30wqy8tpxgsm2joak` was made 9 Oct and retried 13 Nov: its ingest log was pruned at 15 days, which is expected, yet it's reported as a gap | Awaiting owner |
+| 2026-11-13 | Raise with CallAnchor: retries send `agentNumber: null` | Attempt 1 of that call sent `+91…0765`; attempts 2–7 sent null, so the client's agent mapping can never match on a retry | Awaiting owner |
 | 2026-11-13 | New phone / new agent checked in 1, 3 and 7-day windows instead of waiting 7 days: after its first full day, "stopped capturing calls" compares with its last 1 day, from day 3 its last 3, from day 7 its last 7; the alert says which ("over its last 3 days"), the phone page says which window and when the next starts, and the hourly chart averages the full days before today it has. Badge "New phone · first day" with the start time on hover | Done, typechecks and lints; not pushed | `RULES.baselineWindows` and `licenseHealth` in `lib/callanchor/issues.ts`, `loadLicense` in `lib/callanchor/health.ts`, `NewPhone` in `health/_views/entities.tsx` |
 | 2026-11-13 | Finish the Supabase Mumbai cutover for local dev too: from here, Neon Singapore returns ~32 KB/s (7 days of calls, 1.2 MB, take 37 s while the query runs in 4 ms), so a cold local read takes over a minute | Production is next to Neon and unaffected; local dev waits on every cold read | Awaiting owner |
 | 2026-11-13 | (Superseded: owner chose to move the database to Mumbai.) Make local dev usable over a slow route to Singapore: either run local against a local Postgres (own store, pulled from CallAnchor), or cut what a page reads (stop loading 8 days of every call, about 6.4 MB, on each fleet visit) and stop the page waiting on CallAnchor pulls | Local took over a minute per page on 13 Nov: the owner's ISP route to Singapore gave Neon 56–230 KB/s (5.8 MB/s elsewhere), over HTTP, WebSocket and curl alike, and transfers over ~4 MB were cut off. Production runs in `sin1` beside Neon and isn't affected | Awaiting owner |
@@ -350,6 +361,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-16 | 360 Cloud Board merged in at `/dashboard/board`: portal login replaces next-auth (Board signup, Google sign-in and `/login` removed), Board member found by email; per-member Apps (CallAnchor, Board) and email in the Admin Console; dashboard and header show only granted apps; portal routes moved to `app/(portal)`, Board to `app/(board)` with its own root layout | Done, builds; signed-out redirects checked; not yet used signed in; not pushed; `MONGODB_URI` and `BLOB_READ_WRITE_TOKEN` still to be added on Vercel | `board/`, `app/(board)/`, `requireApp` in `lib/auth.ts`, `board/src/lib/get-current-member.ts`, `lib/sub-apps.ts` |
 | 2026-11-13 | Refresh button at the right of the health tab bar: pulls now (streams older than 30 s) instead of waiting for the 5-minute auto-sync, then shows "Refresh in Ns" for 30 s; the server refuses a manual pull for the same scope started under 30 s ago | Done, typechecks and lints; pushed 2026-11-13; not yet clicked signed in | `RefreshButton` in `health/Progress.tsx`, `force` in `planPull` (`store.ts`) and `startPullJob` (`pull-job.ts`), `health/pull/route.ts` |
 | 2026-11-13 | Needs action cell: under "1 critical 4 warning", the distinct calls not in the CRM across the row's open issues, each counted once, with a red (i) whose hover adds the worst issue ("50 calls not in the CRM · Recordings stuck on the phone"); column info tip says it counts issues, not calls | Done; Manish Minerals checked read-only (49 + 1 = 50); pushed 2026-11-13 | `notInCrm` on `Issue` in `lib/callanchor/issues.ts`, `needsOf` in `lib/callanchor/health.ts`, `NeedsCell` in `health/_views/entities.tsx` |
 | 2026-11-13 | Calls & logs, Recording uploaded step: one "Stopped here" count with its non-overlapping reasons under it (Phone hasn't uploaded, Stuck after upload began, new Phone couldn't save it). Still on the phone, Not uploaded, Upload failed, Uploaded not verified and Still open 15 days repeat those calls, so they show only when a link opens them | Done; pushed 2026-11-13 | `UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx`, `unsaved` stage in `lib/callanchor/issues.ts` |
@@ -389,6 +401,28 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-16: Asked to merge the 360 Cloud Board repo (its own GitHub and Vercel) into this one, then
+  for a single GitHub and Vercel, with `/dashboard` showing CallAnchor and Board behind the same
+  login and independent access per app. Subdomains (`board.cid-autopsy.vercel.app`) were dropped:
+  `vercel.app` serves only one level of subdomain. Board moved to `/dashboard/board` on the portal
+  login; per-member app access added to the Admin Console.
+
+- 2026-11-16: The home screen didn't sign in automatically when a session was already active. `/`
+  now sends a signed-in member to `/dashboard` (`app/page.tsx`); admins still choose Admin Console,
+  since their cookie is scoped to `/admin` and `/admin/login` redirects them on its own.
+- 2026-11-13: Asked what "Data is thin: 1 of 1,073 calls with CRM callouts … have no stored ingest
+  log" means. Explained: one call reached the CRM but we never stored the phone's
+  `mobile.call.create` log for it (`CoverageNote` in `health/parts.tsx`), so it's missing from the
+  first journey step and recording counts; a gap in our copy, not a client fault. No change. Then
+  asked for its call id: looked it up read-only (`ca_calls`, callouts but null `ingested_at`). Then
+  shared `anchor-logs/{requestId}` for it and asked to show retry history on the call. It's already
+  in the contract (`getAnchorLog`) and the call page reads it live, one row per attempt. The call was
+  made 9 Oct and retried on 13 Nov, so its ingest log was long pruned (not a pull gap, as first said).
+  Its 2xx retries count as delivered, but Salesforce skipped them (agent number missing). Three
+  recommendations added. Then said the call showing "went all the way through" is wrong: no record
+  id, no success. Replaced the 2xx rule: only CallAnchor's delivered (2xx with a record id) counts;
+  the call now shows failed and falls under "Other calls that didn't reach the CRM".
 
 - 2026-11-13: Asked why a client stopping 20 calls at upload (24h) shows only "1 critical 3 warning".
   Explained: Needs action counts open issues, not calls; one issue (per phone, or per client)

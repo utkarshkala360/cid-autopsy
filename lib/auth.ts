@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
@@ -19,6 +19,9 @@ export type Member = {
   fullName: string;
   role: "agent" | "member" | "admin";
   isAuditor: boolean;
+  // Dashboard apps this member may open: slugs from `lib/sub-apps.ts`.
+  apps: string[];
+  email: string | null;
 };
 
 // Compared against when the username doesn't exist, so response timing doesn't reveal valid usernames.
@@ -147,7 +150,7 @@ export const getMember = cache(async (): Promise<Member | null> => {
   if (!session) return null;
 
   const [row] = await db()`
-    SELECT id, username, full_name, role, is_auditor
+    SELECT id, username, full_name, role, is_auditor, apps, email
     FROM members
     WHERE id = ${session.sub} AND is_active = TRUE AND session_version = ${session.sv}
   `;
@@ -158,6 +161,8 @@ export const getMember = cache(async (): Promise<Member | null> => {
     fullName: row.full_name,
     role: row.role,
     isAuditor: row.is_auditor,
+    apps: row.apps ?? [],
+    email: row.email ?? null,
   };
 });
 
@@ -165,6 +170,21 @@ export async function requireMember() {
   const member = await getMember();
   if (!member) redirect(SESSION_COOKIES.member.loginPath);
   return member;
+}
+
+// Each dashboard app is granted per member in the Admin Console. Others get a 404, as for other
+// gated pages, and don't see the app on the dashboard.
+export async function requireApp(slug: string) {
+  const member = await requireMember();
+  if (!member.apps.includes(slug)) notFound();
+  return member;
+}
+
+// The email that links a member to apps keyed by email (Board): the email field, else an ID that
+// is itself an email.
+export function memberEmail(member: Pick<Member, "email" | "username">) {
+  const email = member.email ?? (member.username.includes("@") ? member.username : null);
+  return email?.toLowerCase() ?? null;
 }
 
 export function hashPassword(password: string) {

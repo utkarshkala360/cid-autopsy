@@ -54,12 +54,13 @@ function replyLabel(event: Delivery) {
 // Failures by their error, everything else by the shape of the reply.
 export const deliveryLabel = (event: Delivery) => (event.status === "failed" ? errorLabel(event) : replyLabel(event));
 
-// A 2xx reply from the CRM is a success, even when CallAnchor marks the callout failed: it does
-// that when a reply lacks a record id, and retries (owner, 2026-11-04). CRM_STATUS_SQL, and
-// ca_refresh_calls in db/schema.sql, must agree.
-export const crmStatus = (status: string, httpStatus: number | null) =>
-  httpStatus !== null && httpStatus >= 200 && httpStatus < 300 ? "delivered" : status;
-export const CRM_STATUS_SQL = "(CASE WHEN http_status BETWEEN 200 AND 299 THEN 'delivered' ELSE status END)";
+// A callout reached the CRM only when CallAnchor marked it delivered, which needs a CRM record id in
+// the reply. A 2xx without one is a failure: the CRM may have skipped the call (owner, 2026-11-13,
+// replacing the 2xx rule of 2026-11-04). CRM_STATUS_SQL, and ca_refresh_calls and ca_events in
+// db/schema.sql, must agree.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const crmStatus = (status: string, _httpStatus: number | null) => status;
+export const CRM_STATUS_SQL = "status";
 
 // Only the HTTP code identifies a sign-in failure. Reply text is each client's own code, so words like
 // "unauthorized" in it aren't reliable (finding F, owner 2026-11-04).

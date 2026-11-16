@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 870 210">
+<title>360 Cloud Board logo</title>
+<defs>
+<linearGradient id="ringGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#1D4E96"/>
+<stop offset="55%" stop-color="#4C6FE0"/>
+<stop offset="100%" stop-color="#7C5CFC"/>
+</linearGradient>
+</defs>
+<g transform="translate(10,8)">
+<path d="M77.4,40.16 C74.68,26.36 62.56,16 48,16 C36.44,16 26.4,22.56 21.4,32.16 C9.36,33.44 0,43.64 0,56 A24,24 0 0,0 24,80 H76 A20,20 0 0,0 96,60 C96,49.44 87.8,40.88 77.4,40.16 Z" fill="none" stroke="#90A4B8" stroke-width="5" stroke-linejoin="round"/>
+</g>
+<path d="M105 52 A58 58 0 1 1 54.7 81" fill="none" stroke="url(#ringGrad2)" stroke-width="15" stroke-linecap="round"/>
+<polygon points="61.2,69.7 57.4,88.3 47,82.3" fill="#7C5CFC"/>
+<rect x="84" y="137" width="11" height="18" rx="3" fill="#E8622C"/>
+<rect x="100" y="125" width="11" height="30" rx="3" fill="#E8622C"/>
+<rect x="116" y="133" width="11" height="22" rx="3" fill="#E8622C"/>
+<text x="245" y="132" xml:space="preserve" font-family="'Poppins','Century Gothic','Segoe UI',sans-serif" font-weight="800">
+<tspan fill="#E8622C" font-size="64">360</tspan><tspan fill="#1F2937" font-size="64"> Cloud </tspan><tspan fill="#1D4E96" font-size="64">Board</tspan>
+</text>
+</svg>

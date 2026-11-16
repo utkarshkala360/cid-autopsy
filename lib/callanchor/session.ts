@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { requireMember } from "@/lib/auth";
+import { requireApp } from "@/lib/auth";
 import { checkSession, type SessionCheck } from "@/lib/callanchor/portal";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -47,7 +47,7 @@ export const verifyUrl = (next: string) => `${VERIFY_PATH}?${new URLSearchParams
 
 // For every CallAnchor page and server action. `profile` is null when CallAnchor couldn't be reached.
 export async function requireCallAnchorSession(next = CALLANCHOR_PATH) {
-  const member = await requireMember();
+  const member = await requireApp("call_anchor");
   const session = await getCallAnchorSession(member.id);
   if (session.status === "invalid" || session.status === "missing") redirect(verifyUrl(next));
   return { member, profile: session.status === "valid" ? session.profile : null };

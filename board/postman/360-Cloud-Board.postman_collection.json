@@ -1,0 +1,2406 @@
+{
+  "info": {
+    "name": "360 Cloud Board",
+    "description": "Full REST API coverage for 360 Cloud Board — every route under src/app/api/**. Start with the Auth folder: run \"Get CSRF Token\" then \"Login\" (fill in testEmail/testPassword first — the account must already exist, created via the app's /signup page, since there is no REST signup endpoint). Postman's cookie jar then carries the session into every other request automatically. Fill in the resource-id collection variables (teamId, workItemId, etc.) by creating records through this same collection and copying the returned _id.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Get CSRF Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/csrf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "csrf"
+              ]
+            },
+            "description": "Fetches a CSRF token required by NextAuth's Credentials sign-in callback. Run this first. The Tests script below stores the token in the {{csrfToken}} collection variable for the next request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"csrfToken\", data.csrfToken);",
+                  "pm.test(\"CSRF token received\", function () {",
+                  "    pm.expect(data.csrfToken).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/callback/credentials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "callback",
+                "credentials"
+              ]
+            },
+            "description": "Logs in with the Credentials provider (email/password, bcrypt-checked against Member.passwordHash). Run \"Get CSRF Token\" first. On success, Postman's cookie jar (on by default in the desktop app, per-domain) automatically carries the resulting session cookie into every subsequent request against the same {{baseUrl}} domain — no manual cookie copying needed. Requires an account that already exists (created via the app's /signup page).",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "email",
+                  "value": "{{testEmail}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{testPassword}}",
+                  "type": "text"
+                },
+                {
+                  "key": "csrfToken",
+                  "value": "{{csrfToken}}",
+                  "type": "text"
+                },
+                {
+                  "key": "json",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "callbackUrl",
+                  "value": "{{baseUrl}}/dashboard",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "session"
+              ]
+            },
+            "description": "Quick \"am I logged in\" sanity check — returns the current session JSON (or an empty object if not authenticated)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Members & Profile",
+      "item": [
+        {
+          "name": "Update Member Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/members/{{memberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "members",
+                "{{memberId}}"
+              ]
+            },
+            "description": "Update a Member's display name. Requires self or Org Admin (requireSelfOrOrgAdmin) — a Member may always edit their own profile; an Org Admin may edit anyone's.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/members/{{memberId}}/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "members",
+                "{{memberId}}",
+                "password"
+              ]
+            },
+            "description": "Change a Member's password (bcrypt-hashed). Requires self or Org Admin (requireSelfOrOrgAdmin). currentPassword is required when changing your own password if you already have one set (omit it for an OAuth-only Member setting a password for the first time, or when an Org Admin is changing someone ELSE's password).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"OldPassword123\",\n  \"newPassword\": \"NewPassword456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/members/{{memberId}}/avatar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "members",
+                "{{memberId}}",
+                "avatar"
+              ]
+            },
+            "description": "Upload a new avatar image to Vercel Blob (PNG/JPEG/WebP/GIF, max 4 MB). Requires self or Org Admin (requireSelfOrOrgAdmin). Body: multipart/form-data with a 'file' field.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file (PNG/JPEG/WebP/GIF, max 4MB)."
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Teams",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams"
+              ]
+            },
+            "description": "List every Team in the Organization. Any authenticated Member."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams"
+              ]
+            },
+            "description": "Create a new Team. Requires Org Admin (requireOrgAdmin). primaryWorkItemType is optional (defaults to \"task\") and must match an existing Work Item Template key (see Work Item Templates folder).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Success\",\n  \"primaryWorkItemType\": \"task\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Team",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}"
+              ]
+            },
+            "description": "Update a Team's name, active flag, and/or primary Work Item template (all fields optional; at least one required). Requires Org Admin (requireOrgAdmin).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Success\",\n  \"active\": true,\n  \"primaryWorkItemType\": \"task\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Team Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "members"
+              ]
+            },
+            "description": "List every TeamMembership row for a Team. Requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Team Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "members"
+              ]
+            },
+            "description": "Invite/assign a Member to a Team with a role (upserts the TeamMembership row). Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited). role allowed values: viewer | member | admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"member@example.com\",\n  \"role\": \"member\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Team Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/members/{{memberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "members",
+                "{{memberId}}"
+              ]
+            },
+            "description": "Remove a Member's TeamMembership row from a Team. Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Team Configuration",
+      "item": [
+        {
+          "name": "Get Workflow",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/workflow?type=task",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "workflow"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "task",
+                  "description": "Work Item type (defaults to \"task\").",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Get the effective Workflow (statuses + transitions) for a Work Item type on this Team. Requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        },
+        {
+          "name": "Replace Workflow",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/workflow",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "workflow"
+              ]
+            },
+            "description": "Replace the entire Workflow (statuses + transitions) for a Work Item type on this Team (upsert). Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited). status.category allowed values: todo | in_progress | done | blocked. stageNudge.entity allowed values: journeyStage | lifecycleStage (nullable — an optional Team-Admin-configured suggestion). transitions[].requiredFields is filtered to a fixed set: assignee | dueDate | description | labels.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"task\",\n  \"statuses\": [\n    {\n      \"key\": \"todo\",\n      \"label\": \"To Do\",\n      \"category\": \"todo\",\n      \"stageNudge\": null,\n      \"wipLimit\": null\n    },\n    {\n      \"key\": \"in_progress\",\n      \"label\": \"In Progress\",\n      \"category\": \"in_progress\",\n      \"stageNudge\": null,\n      \"wipLimit\": 5\n    },\n    {\n      \"key\": \"done\",\n      \"label\": \"Done\",\n      \"category\": \"done\",\n      \"stageNudge\": null,\n      \"wipLimit\": null\n    }\n  ],\n  \"transitions\": [\n    {\n      \"from\": \"todo\",\n      \"to\": \"in_progress\",\n      \"requiredFields\": [\n        \"assignee\"\n      ]\n    },\n    {\n      \"from\": \"in_progress\",\n      \"to\": \"done\",\n      \"requiredFields\": []\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Custom Fields",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/fields?type=task",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "fields"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "task",
+                  "description": "Work Item type (defaults to \"task\").",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List Custom Field definitions for a Work Item type on this Team. Requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Custom Field",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/fields",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "fields"
+              ]
+            },
+            "description": "Create a Custom Field definition for a Work Item type on this Team. Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited). fieldType allowed values: text | number | dropdown | date | user_picker. options is required (non-empty) when fieldType is \"dropdown\".",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"task\",\n  \"key\": \"severity\",\n  \"label\": \"Severity\",\n  \"fieldType\": \"dropdown\",\n  \"options\": [\n    \"Low\",\n    \"Medium\",\n    \"High\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Custom Field",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/fields/{{fieldId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "fields",
+                "{{fieldId}}"
+              ]
+            },
+            "description": "Delete a Custom Field definition. Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Display Label",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/display-label",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "display-label"
+              ]
+            },
+            "description": "Override the display label this Team uses for its Work Item type (e.g. \"Ticket\" instead of the template default). Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited). Pass null to clear the override and fall back to the template default.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayLabel\": \"Ticket\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Sprint Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/sprint-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "sprint-settings"
+              ]
+            },
+            "description": "Toggle whether Sprints/Team-run Initiatives are enabled for this Team (opt-in, off by default). Requires Team Admin (requireTeamRole 'admin'), or Org Admin (inherited).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sprintsEnabled\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Team Macro Stage",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/macro-stage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "macro-stage"
+              ]
+            },
+            "description": "Set this Team's macro stage on the \"team\" Stage Track. Requires Org Admin (requireOrgAdmin) — stricter than Team's other config fields. macroStage must be a valid stage key on the enabled \"team\" Stage Track (see Stage Tracks folder), or null to clear.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"macroStage\": \"lead\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Work Items",
+      "item": [
+        {
+          "name": "List Work Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items?type=task",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "work-items"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "task",
+                  "description": "Optional Work Item type filter.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List Work Items for a Team. Requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Work Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "work-items"
+              ]
+            },
+            "description": "Create a Work Item on this Team. Requires Team Member+ (requireTeamRole 'member'). priority allowed values: low | medium | high | urgent (default medium). status defaults to the Team's first configured status if omitted. customerId is only used when the type's template has requiresCustomer, but is always optional. type defaults to \"task\".",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Fix login redirect bug\",\n  \"description\": \"Steps to reproduce: ...\",\n  \"type\": \"task\",\n  \"status\": \"todo\",\n  \"priority\": \"medium\",\n  \"assignee\": null,\n  \"labels\": [\n    \"bug\"\n  ],\n  \"dueDate\": null,\n  \"customFields\": {},\n  \"customerId\": null,\n  \"initiativeId\": null,\n  \"teamInitiativeId\": null,\n  \"parentId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "work-items",
+                "{{workItemId}}"
+              ]
+            },
+            "description": "Get a single Work Item. Requires Team Viewer+, OR a Guest with an explicit grant on this exact item or its Initiative (requireWorkItemAccess — the one place that bypass is allowed)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Work Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "work-items",
+                "{{workItemId}}"
+              ]
+            },
+            "description": "Update a Work Item (any subset of fields). Requires Team Member+ (requireTeamRole 'member'). Every field change is diffed and logged to the append-only ChangeHistory feed. priority allowed values: low | medium | high | urgent. originatedFromKind allowed values: customer | work_item (must be set/cleared together with originatedFromId). Status transitions are validated against the Team's Workflow and may require additional fields (WF-4) before they're accepted.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Fix login redirect bug\",\n  \"description\": \"Updated repro steps.\",\n  \"status\": \"in_progress\",\n  \"priority\": \"high\",\n  \"assignee\": \"{{memberId}}\",\n  \"labels\": [\n    \"bug\",\n    \"urgent\"\n  ],\n  \"dueDate\": \"2026-09-01\",\n  \"customFields\": {},\n  \"customerId\": null,\n  \"initiativeId\": null,\n  \"teamInitiativeId\": null,\n  \"order\": 1000,\n  \"parentId\": null,\n  \"originatedFromKind\": null,\n  \"originatedFromId\": null,\n  \"isEpic\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Work Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "work-items",
+                "{{workItemId}}"
+              ]
+            },
+            "description": "Delete a Work Item. Requires Team Member+ (requireTeamRole 'member'). Its ChangeHistory rows are NOT cascade-deleted (Non-Negotiable #5); its sub-tasks are orphaned to top-level rather than deleted."
+          },
+          "response": []
+        },
+        {
+          "name": "Nested Resources",
+          "item": [
+            {
+              "name": "Add Comment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/comments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "comments"
+                  ]
+                },
+                "description": "Add a comment to a Work Item (joins the append-only ChangeHistory feed; comments are never edited or deleted). Requires Team Member+, OR a Guest with an explicit grant on this item (requireWorkItemAccess + canCommentWithAccess).",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"text\": \"This looks good to me, ready for QA.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Attachments",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/attachments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "attachments"
+                  ],
+                  "query": [
+                    {
+                      "key": "groupId",
+                      "value": "",
+                      "description": "Optional — pass an attachment's groupId to list every version of it instead of just the latest of each.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "List the latest version of every attachment on a Work Item (or, with ?groupId=, every version of one attachment group). Requires Team Viewer+, OR a Guest with a grant on this item (requireWorkItemAccess) — Viewer/Guest can download but not delete."
+              },
+              "response": []
+            },
+            {
+              "name": "Upload Attachment",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/attachments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "attachments"
+                  ]
+                },
+                "description": "Upload a file attachment to a Work Item (to Vercel Blob, max 10 MB). Requires Team Member+ (requireTeamRole 'member'). Body: multipart/form-data with a 'file' field, and an optional 'replacesAttachmentId' text field to upload a new version of an existing attachment.",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "",
+                      "description": "File to upload (max 10MB)."
+                    },
+                    {
+                      "key": "replacesAttachmentId",
+                      "type": "text",
+                      "value": "",
+                      "description": "Optional — {{attachmentId}} of the attachment this uploads a new version of."
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Attachment",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/attachments/{{attachmentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "attachments",
+                    "{{attachmentId}}"
+                  ]
+                },
+                "description": "Delete an attachment group (every version). Requires Team Member+ (requireTeamRole 'member') — excludes Team Viewer and Guest (\"can download but not delete\")."
+              },
+              "response": []
+            },
+            {
+              "name": "List Collaborators",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/collaborators",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "collaborators"
+                  ]
+                },
+                "description": "List a Work Item's Collaborators (get notifications, no extra access). Requires Team Member+ (requireTeamRole 'member')."
+              },
+              "response": []
+            },
+            {
+              "name": "Add Collaborator",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/collaborators",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "collaborators"
+                  ]
+                },
+                "description": "Add a Member as a Collaborator on a Work Item. Requires Team Member+ (requireTeamRole 'member').",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"collaborator@example.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Remove Collaborator",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/collaborators/{{memberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "collaborators",
+                    "{{memberId}}"
+                  ]
+                },
+                "description": "Remove a Collaborator from a Work Item. Requires Team Member+ (requireTeamRole 'member')."
+              },
+              "response": []
+            },
+            {
+              "name": "List Guest Grants (Work Item)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/guests",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "guests"
+                  ]
+                },
+                "description": "List Guest access grants on a Work Item. Requires Team Admin, OR a Team Member who is this item's reporter (requireTeamRole 'member' + reporter check)."
+              },
+              "response": []
+            },
+            {
+              "name": "Grant Guest Access (Work Item)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/guests",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "guests"
+                  ]
+                },
+                "description": "Grant a Member Guest access to a single Work Item (upserts by email). Requires Team Admin, OR a Team Member who is this item's reporter (requireTeamRole 'member' + reporter check).",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"guest@example.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Revoke Guest Access (Work Item)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/guests/{{grantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "guests",
+                    "{{grantId}}"
+                  ]
+                },
+                "description": "Revoke a Guest access grant on a Work Item. Requires Team Admin, OR a Team Member who is this item's reporter (requireTeamRole 'member' + reporter check)."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Work Item History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "history"
+                  ]
+                },
+                "description": "Get the append-only field-change/comment history for a Work Item (GET only — no route anywhere updates or deletes a ChangeHistory record, Non-Negotiable #5). Requires Team Viewer+, OR a Guest with a grant on this item (requireWorkItemAccess)."
+              },
+              "response": []
+            },
+            {
+              "name": "List Links",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/links",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "links"
+                  ]
+                },
+                "description": "List every cross-Team link touching this Work Item, from either direction. Requires Team Viewer+ (requireTeamRole 'viewer')."
+              },
+              "response": []
+            },
+            {
+              "name": "Create Link",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/links",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "links"
+                  ]
+                },
+                "description": "Link this Work Item to another (possibly on a different Team). Requires Team Member+ on this item's Team (requireTeamRole 'member'), AND at least Viewer on the target item's Team. relation allowed values: blocks | is_blocked_by | relates_to | duplicates.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"targetItemId\": \"{{workItemId}}\",\n  \"relation\": \"blocks\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Link",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/links/{{linkId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "links",
+                    "{{linkId}}"
+                  ]
+                },
+                "description": "Remove a link from either side. Requires Team Member+ (requireTeamRole 'member')."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Work Item Macro Stage",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/teams/{{teamId}}/work-items/{{workItemId}}/macro-stage",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "teams",
+                    "{{teamId}}",
+                    "work-items",
+                    "{{workItemId}}",
+                    "macro-stage"
+                  ]
+                },
+                "description": "Set a Work Item's macro stage on the \"work_item\" Stage Track. Requires Org Admin (requireOrgAdmin) — stricter than the general Work Item PATCH route. macroStage must be a valid stage key on the enabled \"work_item\" Stage Track, or null to clear.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"macroStage\": \"idea\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Initiatives",
+      "item": [
+        {
+          "name": "List Initiatives",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives"
+              ],
+              "query": [
+                {
+                  "key": "teamId",
+                  "value": "{{teamId}}",
+                  "description": "Optional — narrow to one Team's Team-run Initiatives (Sprints).",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List Initiatives in the Organization. Any authenticated Member."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Initiative",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives"
+              ]
+            },
+            "description": "Create an Initiative. If teamId is omitted/null, this is an ordinary cross-Team tag and requires Org Admin or any Team Admin (requireAnyTeamAdmin). If teamId is set, this is a Team-run Initiative (Sprint) and requires Team Admin on THAT Team (requireTeamRole teamId 'admin') — startDate and endDate are then required.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Q3 Platform Roadmap\",\n  \"description\": \"Cross-team initiative for Q3 platform work.\",\n  \"teamId\": null,\n  \"sprintGoal\": \"\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2026-09-14\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Initiative",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}"
+              ]
+            },
+            "description": "Get a single Initiative. Any authenticated Member."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Initiative",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}"
+              ]
+            },
+            "description": "Update an Initiative's name/description (requireAnyTeamAdmin). sprintGoal/startDate/endDate are only valid on a Team-run Initiative while sprintStatus is still \"planned\", and require Team Admin on ITS OWN Team (requireTeamRole 'admin') — a stricter gate than name/description. originatedFromKind allowed values: customer | work_item (must be set/cleared together with originatedFromId).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Q3 Platform Roadmap\",\n  \"description\": \"Updated scope.\",\n  \"sprintGoal\": \"Ship the new onboarding flow.\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2026-09-14\",\n  \"originatedFromKind\": null,\n  \"originatedFromId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Lifecycle Stage",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/lifecycle-stage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "lifecycle-stage"
+              ]
+            },
+            "description": "Set an Initiative's macro stage on the \"initiative\" (Product Lifecycle) Stage Track. Requires Org Admin (requireOrgAdmin). lifecycleStage must be a valid stage key on the enabled \"initiative\" Stage Track, or null to clear.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lifecycleStage\": \"idea\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Guest Grants (Initiative)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/guests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "guests"
+              ]
+            },
+            "description": "List Guest access grants on an Initiative. Requires Org Admin, or any Team Admin (requireAnyTeamAdmin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Grant Guest Access (Initiative)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/guests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "guests"
+              ]
+            },
+            "description": "Grant a Member Guest access to an Initiative (upserts by email). Requires Org Admin, or any Team Admin (requireAnyTeamAdmin).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"guest@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke Guest Access (Initiative)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/guests/{{grantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "guests",
+                "{{grantId}}"
+              ]
+            },
+            "description": "Revoke a Guest access grant on an Initiative. Requires Org Admin, or any Team Admin (requireAnyTeamAdmin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Sprint",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "start"
+              ]
+            },
+            "description": "Start a Team-run Initiative (Sprint) — moves sprintStatus from \"planned\" to \"active\". Requires Team Member+ on the Initiative's own Team (requireTeamRole 'member'). Only valid on an Initiative with a teamId."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Sprint",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "complete"
+              ]
+            },
+            "description": "Complete a Team-run Initiative (Sprint) — moves sprintStatus to \"completed\". Requires Team Member+ on the Initiative's own Team (requireTeamRole 'member'). Only valid on an Initiative with a teamId."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Sprint Burndown (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/{{initiativeId}}/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "{{initiativeId}}",
+                "export"
+              ]
+            },
+            "description": "CSV export of a Team-run Initiative's (Sprint's) burndown report. Requires Team Viewer+ on the Initiative's own Team (requireTeamRole 'viewer'). Only valid on an Initiative with a teamId."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Velocity (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/initiatives/velocity-export?teamId={{teamId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "initiatives",
+                "velocity-export"
+              ],
+              "query": [
+                {
+                  "key": "teamId",
+                  "value": "{{teamId}}",
+                  "description": "Required — velocity is computed per-Team.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "CSV export of a Team's Sprint velocity history. Requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
+            },
+            "description": "List every Customer in the Organization. Any authenticated Member (every non-Guest role gets at least View)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
+            },
+            "description": "Create a Customer record. Requires Org Admin, or any Team Admin (requireAnyTeamAdmin).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"contacts\": [\n    {\n      \"name\": \"John Smith\",\n      \"email\": \"john@acme.com\",\n      \"phone\": \"555-0100\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "Get a single Customer. Any authenticated Member."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "Update a Customer's name/contacts. Requires Org Admin, or any Team Admin (requireAnyTeamAdmin).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corporation\",\n  \"contacts\": [\n    {\n      \"name\": \"John Smith\",\n      \"email\": \"john@acme.com\",\n      \"phone\": \"555-0100\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Journey Stage",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerId}}/journey-stage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerId}}",
+                "journey-stage"
+              ]
+            },
+            "description": "Set a Customer's macro stage on the \"customer\" (Customer Journey) Stage Track. Requires Org Admin (requireOrgAdmin) — stricter than name/contacts. journeyStage must be a valid stage key on the enabled \"customer\" Stage Track, or null to clear.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"journeyStage\": \"lead\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stage Tracks",
+      "item": [
+        {
+          "name": "List Stage Tracks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stage-tracks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "stage-tracks"
+              ]
+            },
+            "description": "List the 4 Stage Tracks (customer, initiative, team, work_item) — the generalized Modules system. Any authenticated Member."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Stage Track",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/stage-tracks/{{trackId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "stage-tracks",
+                "{{trackId}}"
+              ]
+            },
+            "description": "Update a Stage Track's name, enabled flag, and/or full stage list (all optional; at least one required). Requires Org Admin (requireOrgAdmin). There is no POST/DELETE — the 4 rows are fixed by entityType and self-seeded. Removing a stage key still in live use returns 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Journey\",\n  \"enabled\": true,\n  \"stages\": [\n    {\n      \"key\": \"lead\",\n      \"label\": \"Lead\"\n    },\n    {\n      \"key\": \"onboarding\",\n      \"label\": \"Onboarding\"\n    },\n    {\n      \"key\": \"active\",\n      \"label\": \"Active\"\n    },\n    {\n      \"key\": \"renewal_expansion\",\n      \"label\": \"Renewal/Expansion\"\n    },\n    {\n      \"key\": \"offboarding\",\n      \"label\": \"Offboarding\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Work Item Templates",
+      "item": [
+        {
+          "name": "List Work Item Templates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-item-templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-item-templates"
+              ]
+            },
+            "description": "List the Work Item Template registry (Task/Ticket, or any Org-Admin-added template). Any authenticated Member."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Work Item Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-item-templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-item-templates"
+              ]
+            },
+            "description": "Add a new Work Item Template to the registry. Requires Org Admin (requireOrgAdmin).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"bug\",\n  \"label\": \"Bug\",\n  \"requiresCustomer\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Work Item Template",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-item-templates/{{templateId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-item-templates",
+                "{{templateId}}"
+              ]
+            },
+            "description": "Update a Work Item Template's label and/or requiresCustomer flag (key is not editable). Requires Org Admin (requireOrgAdmin).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Bug Report\",\n  \"requiresCustomer\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Work Item Template",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-item-templates/{{templateId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-item-templates",
+                "{{templateId}}"
+              ]
+            },
+            "description": "Delete a Work Item Template. Requires Org Admin (requireOrgAdmin). Blocked with 409 if any Team still uses it as its primaryWorkItemType."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Saved Views",
+      "item": [
+        {
+          "name": "List Saved Views",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/saved-views?type=task",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "saved-views"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "task",
+                  "description": "Required — the Work Item type these Views are for.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List Saved Views for a Work Item type on this Team (this Member's own \"self\" Views plus every \"team\" View). Requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Saved View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/saved-views",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "saved-views"
+              ]
+            },
+            "description": "Save a filter/sort/group-by configuration as a View. Requires Team Viewer+ for visibility \"self\"; visibility \"team\" (shared with everyone) requires Team Member+. visibility allowed values: self | team.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"task\",\n  \"name\": \"My Open Items\",\n  \"visibility\": \"self\",\n  \"config\": {\n    \"filters\": {\n      \"groups\": []\n    },\n    \"sort\": [],\n    \"groupBy\": null\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Saved View",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/saved-views/{{viewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "saved-views",
+                "{{viewId}}"
+              ]
+            },
+            "description": "Update a Saved View's name/visibility/config (all optional). Requires the View's creator, or Team Admin (requireTeamRole 'admin').",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Open Items\",\n  \"visibility\": \"team\",\n  \"config\": {\n    \"filters\": {\n      \"groups\": []\n    },\n    \"sort\": [],\n    \"groupBy\": \"priority\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Saved View",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/saved-views/{{viewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "teams",
+                "{{teamId}}",
+                "saved-views",
+                "{{viewId}}"
+              ]
+            },
+            "description": "Delete a Saved View. Requires the View's creator, or Team Admin (requireTeamRole 'admin')."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "List Dashboard Views",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard-views",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard-views"
+              ],
+              "query": [
+                {
+                  "key": "teamId",
+                  "value": "{{teamId}}",
+                  "description": "Optional — omit for Org-level Views, set for Team-level Views.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List Dashboard Views. Without ?teamId=, lists Org-level Views (any authenticated Member). With ?teamId=, lists that Team's Views and requires Team Viewer+ (requireTeamRole 'viewer')."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Dashboard View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard-views",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard-views"
+              ]
+            },
+            "description": "Create a Dashboard View made of configurable widgets. teamId: null creates an Org-level View — any authenticated Member may publish a \"shared\" Org-level View (a deliberate override of the original spec, see ARCHITECTURE.md). teamId set creates a Team-level View — visibility \"shared\" then requires Team Member+ (requireTeamRole 'member'), \"self\" only requires Viewer. visibility allowed values: self | shared. widgets[].kind allowed values: summary | breakdown | cycle_time | burndown | velocity.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamId\": null,\n  \"name\": \"Executive Summary\",\n  \"visibility\": \"self\",\n  \"config\": {\n    \"widgets\": [\n      {\n        \"id\": \"w1\",\n        \"kind\": \"summary\",\n        \"title\": \"Open Items\",\n        \"filters\": {\n          \"groups\": []\n        }\n      },\n      {\n        \"id\": \"w2\",\n        \"kind\": \"breakdown\",\n        \"title\": \"By Priority\",\n        \"filters\": {\n          \"groups\": []\n        },\n        \"groupBy\": \"priority\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Dashboard View",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard-views/{{dashboardViewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard-views",
+                "{{dashboardViewId}}"
+              ]
+            },
+            "description": "Update a Dashboard View's name/visibility/config (all optional). Requires the View's creator; otherwise a Team-level View requires Team Admin on its Team (requireTeamRole 'admin'), and an Org-level View requires Org Admin or any Team Admin (requireAnyTeamAdmin). Sharing a Team-level View still requires Team Member+ (requireTeamRole 'member').",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Executive Summary\",\n  \"visibility\": \"shared\",\n  \"config\": {\n    \"widgets\": [\n      {\n        \"id\": \"w1\",\n        \"kind\": \"summary\",\n        \"title\": \"Open Items\",\n        \"filters\": {\n          \"groups\": []\n        }\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Dashboard View",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard-views/{{dashboardViewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard-views",
+                "{{dashboardViewId}}"
+              ]
+            },
+            "description": "Delete a Dashboard View. Requires the View's creator; otherwise a Team-level View requires Team Admin on its Team, and an Org-level View requires Org Admin or any Team Admin (requireAnyTeamAdmin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Dashboard (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/export?team=all&initiative=all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "team",
+                  "value": "all",
+                  "description": "Team id, or \"all\" (scope limited to Teams the Member can access).",
+                  "disabled": false
+                },
+                {
+                  "key": "initiative",
+                  "value": "all",
+                  "description": "Initiative id, or \"all\".",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "CSV export of the Org/Team dashboard report (summary, by-priority, by-team, by-assignee, cycle/lead time). Any authenticated Member — scope is automatically limited to Teams they have a role on."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Search Work Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=login bug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "login bug",
+                  "description": "Search text, minimum 2 characters.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Team-scoped search across Work Item title/key, limited to Teams the current Member has a role on. Any authenticated Member."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ]
+            },
+            "description": "List the current Member's own notifications plus unread count. Any authenticated Member (self-scoped, no Team role needed)."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notificationId}}"
+              ]
+            },
+            "description": "Mark one of the current Member's own notifications as read. Any authenticated Member (self-scoped)."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications Read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/mark-all-read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "mark-all-read"
+              ]
+            },
+            "description": "Mark every unread notification for the current Member as read. Any authenticated Member (self-scoped)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Pings the actual MongoDB connection and returns 200 if reachable, 503 if not. Public — no authentication required."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL of the running app."
+    },
+    {
+      "key": "testEmail",
+      "value": "",
+      "type": "string",
+      "description": "Email of an existing account (created via the app's /signup page) to log in as."
+    },
+    {
+      "key": "testPassword",
+      "value": "",
+      "type": "string",
+      "description": "Password for testEmail."
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string",
+      "description": "Auto-set by the \"Get CSRF Token\" request's Tests script — leave blank."
+    },
+    {
+      "key": "teamId",
+      "value": "",
+      "type": "string",
+      "description": "A Team's _id. Create one via POST {{baseUrl}}/api/teams (Org Admin) and paste its _id here."
+    },
+    {
+      "key": "workItemId",
+      "value": "",
+      "type": "string",
+      "description": "A Work Item's _id. Create one via POST .../teams/{{teamId}}/work-items."
+    },
+    {
+      "key": "initiativeId",
+      "value": "",
+      "type": "string",
+      "description": "An Initiative's _id. Create one via POST {{baseUrl}}/api/initiatives."
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string",
+      "description": "A Customer's _id. Create one via POST {{baseUrl}}/api/customers."
+    },
+    {
+      "key": "memberId",
+      "value": "",
+      "type": "string",
+      "description": "A Member's _id — e.g. the logged-in user's own id from GET {{baseUrl}}/api/auth/session."
+    },
+    {
+      "key": "fieldId",
+      "value": "",
+      "type": "string",
+      "description": "A Custom Field definition's _id, from POST .../teams/{{teamId}}/fields."
+    },
+    {
+      "key": "viewId",
+      "value": "",
+      "type": "string",
+      "description": "A Saved View's _id, from POST .../teams/{{teamId}}/saved-views."
+    },
+    {
+      "key": "dashboardViewId",
+      "value": "",
+      "type": "string",
+      "description": "A Dashboard View's _id, from POST {{baseUrl}}/api/dashboard-views."
+    },
+    {
+      "key": "trackId",
+      "value": "",
+      "type": "string",
+      "description": "A Stage Track's _id, from GET {{baseUrl}}/api/stage-tracks."
+    },
+    {
+      "key": "templateId",
+      "value": "",
+      "type": "string",
+      "description": "A Work Item Template's _id, from POST {{baseUrl}}/api/work-item-templates."
+    },
+    {
+      "key": "grantId",
+      "value": "",
+      "type": "string",
+      "description": "A Guest grant's id, from a POST .../guests response (reused across Work Item and Initiative guest grants)."
+    },
+    {
+      "key": "attachmentId",
+      "value": "",
+      "type": "string",
+      "description": "An Attachment's _id, from POST .../work-items/{{workItemId}}/attachments."
+    },
+    {
+      "key": "linkId",
+      "value": "",
+      "type": "string",
+      "description": "A WorkItemLink's _id, from POST .../work-items/{{workItemId}}/links."
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string",
+      "description": "A Notification's _id, from GET {{baseUrl}}/api/notifications."
+    }
+  ]
+}

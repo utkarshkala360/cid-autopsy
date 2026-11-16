@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveAuditNoteAction } from "@/app/dashboard/audit-actions";
+import { saveAuditNoteAction } from "@/app/(portal)/dashboard/audit-actions";
 import { MAX_COMMENT_LENGTH, NOTE_KINDS, type NoteKind } from "@/lib/audit-notes";
 import { inputClass, labelClass, primaryButtonClass, secondaryButtonClass } from "@/components/ui";
 

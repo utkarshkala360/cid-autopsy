@@ -187,7 +187,8 @@ export const callTime = (call: StoredCall) => call.ingestedAt ?? call.firstCallo
 const ageOf = (call: StoredCall, now: number) => now - Date.parse(callTime(call)!);
 const older = (at: string | null, now: number, ms: number) => at !== null && now - Date.parse(at) > ms;
 
-// A 2xx from the CRM, for any event, is a call that reached it (owner, 2026-11-04). recording.ready is
+// A delivered callout (CallAnchor got a CRM record id back), for any event, is a call that reached it;
+// a 2xx without a record id isn't (owner, 2026-11-13). recording.ready is
 // sent for a call that connected and was recorded; call.completed for a missed incoming or rejected
 // outgoing call. Either one is the call's sync (owner, 2026-11-05).
 export const isDelivered = (call: StoredCall) => call.firstDeliveredAt !== null;
