@@ -43,6 +43,9 @@ Rules already established in this repo.
   daily counts per client and phone (`ca_daily`, saved before calls are pruned, so 30-day strips keep
   working), phone and integration change history, and portal events (owner, 2026-11-13). Lists of
   individual calls therefore reach back 15 days at most. See `SYNC` and `prune()` in `store.ts`.
+- Board's data is in MongoDB Atlas `board-mongo` (Free, Mumbai), provisioned and billed through the
+  Vercel Marketplace, which sets `MONGODB_URI`; the database is `board` (`board/src/lib/mongodb.ts`)
+  (owner, 2026-11-16).
 - The database lives near India because this is an internal app used from India: Supabase Postgres
   in Mumbai (`bom1`, Free plan), with Vercel functions in Mumbai too. Neon has no India region
   (owner, 2026-11-13). The app reaches it through `lib/db.ts` (postgres.js, transaction pooler) and
@@ -361,7 +364,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
-| 2026-11-16 | 360 Cloud Board merged in at `/dashboard/board`: portal login replaces next-auth (Board signup, Google sign-in and `/login` removed), Board member found by email; per-member Apps (CallAnchor, Board) and email in the Admin Console; dashboard and header show only granted apps; portal routes moved to `app/(portal)`, Board to `app/(board)` with its own root layout | Done, builds; signed-out redirects checked; not yet used signed in; not pushed; `MONGODB_URI` and `BLOB_READ_WRITE_TOKEN` still to be added on Vercel | `board/`, `app/(board)/`, `requireApp` in `lib/auth.ts`, `board/src/lib/get-current-member.ts`, `lib/sub-apps.ts` |
+| 2026-11-16 | 360 Cloud Board merged in at `/dashboard/board`: portal login replaces next-auth (Board signup, Google sign-in and `/login` removed), Board member found by email; per-member Apps (CallAnchor, Board) and email in the Admin Console; dashboard and header show only granted apps; portal routes moved to `app/(portal)`, Board to `app/(board)` with its own root layout | Done, deployed 2026-11-16 (`f911499`), env vars on Vercel; Board on the new Vercel-provisioned Atlas cluster `board-mongo` (empty) | `board/`, `app/(board)/`, `requireApp` in `lib/auth.ts`, `board/src/lib/get-current-member.ts`, `lib/sub-apps.ts` |
 | 2026-11-13 | Refresh button at the right of the health tab bar: pulls now (streams older than 30 s) instead of waiting for the 5-minute auto-sync, then shows "Refresh in Ns" for 30 s; the server refuses a manual pull for the same scope started under 30 s ago | Done, typechecks and lints; pushed 2026-11-13; not yet clicked signed in | `RefreshButton` in `health/Progress.tsx`, `force` in `planPull` (`store.ts`) and `startPullJob` (`pull-job.ts`), `health/pull/route.ts` |
 | 2026-11-13 | Needs action cell: under "1 critical 4 warning", the distinct calls not in the CRM across the row's open issues, each counted once, with a red (i) whose hover adds the worst issue ("50 calls not in the CRM · Recordings stuck on the phone"); column info tip says it counts issues, not calls | Done; Manish Minerals checked read-only (49 + 1 = 50); pushed 2026-11-13 | `notInCrm` on `Issue` in `lib/callanchor/issues.ts`, `needsOf` in `lib/callanchor/health.ts`, `NeedsCell` in `health/_views/entities.tsx` |
 | 2026-11-13 | Calls & logs, Recording uploaded step: one "Stopped here" count with its non-overlapping reasons under it (Phone hasn't uploaded, Stuck after upload began, new Phone couldn't save it). Still on the phone, Not uploaded, Upload failed, Uploaded not verified and Still open 15 days repeat those calls, so they show only when a link opens them | Done; pushed 2026-11-13 | `UNDER`, `ONLY_WHEN_PICKED` in `health/_views/items.tsx`, `unsaved` stage in `lib/callanchor/issues.ts` |
@@ -401,6 +404,16 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-16: `/dashboard/board/dashboard` showed "Something went wrong", and asked why not
+  `board.cid-autopsy.vercel.app`. Cause: Board's MongoDB Atlas cluster (`360degreeboard.0neiqyz`) no
+  longer resolves in DNS (NXDOMAIN), in the old Board project too, so it was deleted or renamed; a new
+  `MONGODB_URI` is needed. Nested `vercel.app` subdomains aren't possible; `board-cid-autopsy.vercel.app`
+  or a custom domain are the options.
+- 2026-11-16: Asked for a new free cluster through Vercel. Provisioned MongoDB Atlas `board-mongo`
+  (Free, `bom1` Mumbai) from the Vercel Marketplace, connected to this project; it sets
+  `MONGODB_URI` and Board keeps its data in database `board`. Board starts empty; the old data went
+  with the old cluster.
 
 - 2026-11-16: Asked to merge the 360 Cloud Board repo (its own GitHub and Vercel) into this one, then
   for a single GitHub and Vercel, with `/dashboard` showing CallAnchor and Board behind the same

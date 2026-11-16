@@ -33,7 +33,7 @@ Internal console built with Next.js 16 (App Router), deployed on Vercel from thi
 1. Import this GitHub repo in Vercel.
 2. **Storage → Create → Neon (Postgres)** and connect it to the project. This sets `DATABASE_URL`.
 3. Add `CREDENTIALS_ENCRYPTION_KEY` (generate with `openssl rand -base64 32`): `vercel env add CREDENTIALS_ENCRYPTION_KEY production`. Losing or changing it makes stored Salesforce connections unreadable; they'd need reconnecting.
-4. For Board, add `MONGODB_URI` (its MongoDB Atlas database) and `BLOB_READ_WRITE_TOKEN` (its Vercel Blob store, for work item attachments and avatars). Without them the rest of the portal works and Board pages fail.
+4. For Board, connect MongoDB Atlas from the Vercel Marketplace (`vercel integration add mongodbatlas`; this project uses `board-mongo`, Free, `bom1`), which sets `MONGODB_URI`, and add and `BLOB_READ_WRITE_TOKEN` (its Vercel Blob store, for work item attachments and avatars). Without them the rest of the portal works and Board pages fail.
 5. Deploy. `npm run build` applies `db/schema.sql` before building, so the tables are created automatically.
 5. Create the first admin (see below).
 

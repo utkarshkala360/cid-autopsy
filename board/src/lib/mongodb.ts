@@ -52,8 +52,11 @@ export async function connectDB(): Promise<typeof mongoose> {
 
   // If no connection promise exists yet, create one
   if (!cached.promise) {
+    // The Vercel-provisioned URI names no database, which would mean "test"; Board keeps its data
+    // in "board" unless MONGODB_DB says otherwise.
     cached.promise = mongoose.connect(uri, {
       bufferCommands: false,
+      dbName: process.env.MONGODB_DB || "board",
     });
   }
 
