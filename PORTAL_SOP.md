@@ -405,6 +405,12 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-16: Asked whether the old `360-cloud-board` Vercel project can be deleted. Yes: nothing
+  runs from it. Its Blob store `360-cloud-board-blob` (Board attachments) is connected only to it,
+  so connect the store to `cid-autopsy` first so it stays visible there. Then asked to connect it
+  and delete only if nothing depended on it: the store now connects to `cid-autopsy` (Vercel-managed
+  `BLOB_READ_WRITE_TOKEN`), no domains or other stores used the old project, and it was deleted.
+
 - 2026-11-16: `/dashboard/board/dashboard` showed "Something went wrong", and asked why not
   `board.cid-autopsy.vercel.app`. Cause: Board's MongoDB Atlas cluster (`360degreeboard.0neiqyz`) no
   longer resolves in DNS (NXDOMAIN), in the old Board project too, so it was deleted or renamed; a new
