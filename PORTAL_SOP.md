@@ -364,6 +364,9 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-18 | Public `/utilities` page: one card per stand-alone tool (`/sf-connect`, `/sf-auth`); add a tool by adding a row to `TOOLS` | Done, typechecks and lints; renders locally; not pushed | `app/(portal)/utilities/page.tsx` |
+| 2026-11-18 | Public `/sf-connect`: same flow as `/sf-auth` but with our packaged Connected App, so the client only picks the environment and Org URL. Consumer Key and Secret are in Vercel env (`SF_PACKAGE_CLIENT_ID`, `SF_PACKAGE_CLIENT_SECRET`, Production, secret marked sensitive) and `.env.local`; the secret never reaches the browser. `/sf-connect/token` only redeems codes whose redirect URI is this site's `/sf-connect` | Done, typechecks and lints; checked locally (Salesforce recognises the key); not pushed. The packaged app's Callback URL must include `https://cid-autopsy-six.vercel.app/sf-connect` | `app/(portal)/sf-connect/`, shared code in `app/(portal)/sf-auth/` |
+| 2026-11-18 | Public Salesforce auth page `/sf-auth` (no portal login): client picks Production / Developer Edition / Sandbox, optional Org URL, Consumer Key and Secret; PKCE pair, state and redirect URI (`<origin>/sf-auth`) are automatic; one button opens the Salesforce approval page, which returns to `/sf-auth`, and the page swaps the code for tokens through `/sf-auth/token` and shows the refresh token. Nothing is stored: the form details sit in the tab's sessionStorage only for the round trip and are deleted on return; the token route only forwards to Salesforce domains | Done, typechecks and lints; route checked locally against login.salesforce.com; not pushed; full round trip needs a real Connected App | `app/(portal)/sf-auth/` |
 | 2026-11-16 | 360 Cloud Board merged in at `/dashboard/board`: portal login replaces next-auth (Board signup, Google sign-in and `/login` removed), Board member found by email; per-member Apps (CallAnchor, Board) and email in the Admin Console; dashboard and header show only granted apps; portal routes moved to `app/(portal)`, Board to `app/(board)` with its own root layout | Done, deployed 2026-11-16 (`f911499`), env vars on Vercel; Board on the new Vercel-provisioned Atlas cluster `board-mongo` (empty) | `board/`, `app/(board)/`, `requireApp` in `lib/auth.ts`, `board/src/lib/get-current-member.ts`, `lib/sub-apps.ts` |
 | 2026-11-13 | Refresh button at the right of the health tab bar: pulls now (streams older than 30 s) instead of waiting for the 5-minute auto-sync, then shows "Refresh in Ns" for 30 s; the server refuses a manual pull for the same scope started under 30 s ago | Done, typechecks and lints; pushed 2026-11-13; not yet clicked signed in | `RefreshButton` in `health/Progress.tsx`, `force` in `planPull` (`store.ts`) and `startPullJob` (`pull-job.ts`), `health/pull/route.ts` |
 | 2026-11-13 | Needs action cell: under "1 critical 4 warning", the distinct calls not in the CRM across the row's open issues, each counted once, with a red (i) whose hover adds the worst issue ("50 calls not in the CRM · Recordings stuck on the phone"); column info tip says it counts issues, not calls | Done; Manish Minerals checked read-only (49 + 1 = 50); pushed 2026-11-13 | `notInCrm` on `Issue` in `lib/callanchor/issues.ts`, `needsOf` in `lib/callanchor/health.ts`, `NeedsCell` in `health/_views/entities.tsx` |
@@ -404,6 +407,23 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-18: Asked for a `/utilities` page linking the new Salesforce pages. Built it.
+
+- 2026-11-18: Asked for a second page that uses our packaged app's Consumer Key and Secret from
+  Vercel env so clients don't enter them. Built `/sf-connect` and set the env vars. Also asked
+  whether a new refresh token stops the old one: no, they live side by side until revoked, expired
+  by the app's refresh token policy, or pushed out by Salesforce's 5-per-user-per-app limit.
+
+- 2026-11-18: Shared an Apps Script Salesforce OAuth URL generator and asked for a cleaner version
+  in the portal at `/sf-auth`, with redirect URI and PKCE hidden, one button to the approval page,
+  and the refresh token shown on return, storing nothing. Built `app/(portal)/sf-auth/`.
+
+- 2026-11-17: Asked which settings differ between two clients (Giftedson's Trial and an Anuj
+  client). The stored snapshot holds only a summary (plan, integrations, OneAPI, recording flags),
+  not full settings, and the second id wasn't among the 54 synced clients. The local CLI session had
+  expired and decrypting a member's stored session was blocked, so a full comparison needs a fresh
+  `npm run login` in `callanchor-apis/`. Nothing changed.
 
 - 2026-11-16: Asked whether the old `360-cloud-board` Vercel project can be deleted. Yes: nothing
   runs from it. Its Blob store `360-cloud-board-blob` (Board attachments) is connected only to it,
