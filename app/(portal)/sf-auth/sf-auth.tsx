@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ENVS, orgHost, type Env } from "./hosts";
+import { ENVS, orgHost, prefillLink, type Env, type Prefill } from "./hosts";
 
 // The details needed after Salesforce redirects back. Kept in this tab's sessionStorage only
 // for the round trip, and deleted the moment the page comes back.
@@ -65,6 +65,50 @@ function takePending(): Pending | null {
   }
 }
 
+/** Saves the round-trip details and sends the browser to Salesforce. Returns a problem to show, if any. */
+async function beginAuth(o: {
+  page: Page;
+  env: Env;
+  orgUrl: string;
+  clientId: string;
+  clientSecret: string;
+  packagedClientId?: string;
+}): Promise<string | null> {
+  let host: string = ENVS[o.env].loginHost;
+  if (o.orgUrl.trim()) {
+    const parsed = orgHost(o.orgUrl);
+    if (!parsed) return "Org URL must be a Salesforce address, like https://yourcompany.my.salesforce.com";
+    host = parsed;
+  }
+  const { verifier, challenge } = await pkcePair();
+  const pending: Pending = {
+    page: o.page,
+    host,
+    clientId: o.packagedClientId ? "" : o.clientId.trim(),
+    clientSecret: o.packagedClientId ? "" : o.clientSecret.trim(),
+    codeVerifier: verifier,
+    redirectUri: redirectUri(),
+    state: randomString(32),
+  };
+  try {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    return "This browser blocked session storage, which the round trip needs. Try a normal window.";
+  }
+  const url = new URL(`https://${host}/services/oauth2/authorize`);
+  url.search = new URLSearchParams({
+    response_type: "code",
+    client_id: o.packagedClientId || pending.clientId,
+    redirect_uri: pending.redirectUri,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    state: pending.state,
+    prompt: "login consent",
+  }).toString();
+  window.location.assign(url.toString());
+  return null;
+}
+
 /** Runs once when Salesforce redirects back here with ?code= or ?error=. */
 function completeReturn(page: Page, started: { current: boolean }, show: (v: View) => void) {
   const params = new URLSearchParams(window.location.search);
@@ -125,7 +169,15 @@ function completeReturn(page: Page, started: { current: boolean }, show: (v: Vie
     .catch(() => show({ step: "error", code: code!, message: "Couldn't reach the token service." }));
 }
 
-export function SfAuth({ page, packagedClientId }: { page: Page; packagedClientId?: string }) {
+export function SfAuth({
+  page,
+  packagedClientId,
+  prefill = {},
+}: {
+  page: Page;
+  packagedClientId?: string;
+  prefill?: Prefill;
+}) {
   const [view, setView] = useState<View>({ step: "form" });
   const callback = useSyncExternalStore(noSubscribe, redirectUri, () => "");
   const started = useRef(false);
@@ -146,7 +198,7 @@ export function SfAuth({ page, packagedClientId }: { page: Page; packagedClientI
           {view.code && <CopyField label="Authorization code" value={view.code} />}
         </div>
       )}
-      <AuthForm page={page} packagedClientId={packagedClientId} callback={callback} />
+      <AuthForm page={page} packagedClientId={packagedClientId} prefill={prefill} callback={callback} />
     </>
   );
 }
@@ -154,60 +206,63 @@ export function SfAuth({ page, packagedClientId }: { page: Page; packagedClientI
 function AuthForm({
   page,
   packagedClientId,
+  prefill,
   callback,
 }: {
   page: Page;
   packagedClientId?: string;
+  prefill: Prefill;
   callback: string;
 }) {
-  const [env, setEnv] = useState<Env>("production");
-  const [orgUrl, setOrgUrl] = useState("");
-  const [clientId, setClientId] = useState("");
+  const [env, setEnv] = useState<Env>(prefill.env ?? "production");
+  const [orgUrl, setOrgUrl] = useState(prefill.org ?? "");
+  const [clientId, setClientId] = useState(prefill.clientId ?? "");
+  const [linkNote, setLinkNote] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function authorize(e: React.FormEvent) {
-    e.preventDefault();
+  async function authorize(e?: React.FormEvent) {
+    e?.preventDefault();
     setError("");
-    let host: string = ENVS[env].loginHost;
-    if (orgUrl.trim()) {
-      const parsed = orgHost(orgUrl);
-      if (!parsed) {
-        setError("Org URL must be a Salesforce address, like https://yourcompany.my.salesforce.com");
-        return;
-      }
-      host = parsed;
-    }
     setBusy(true);
-    const { verifier, challenge } = await pkcePair();
-    const pending: Pending = {
-      page,
-      host,
-      clientId: packagedClientId ? "" : clientId.trim(),
-      clientSecret: packagedClientId ? "" : clientSecret.trim(),
-      codeVerifier: verifier,
-      redirectUri: redirectUri(),
-      state: randomString(32),
-    };
-    try {
-      sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-    } catch {
+    const problem = await beginAuth({ page, env, orgUrl, clientId, clientSecret, packagedClientId });
+    if (problem) {
       setBusy(false);
-      setError("This browser blocked session storage, which the round trip needs. Try a normal window.");
-      return;
+      setError(problem);
     }
-    const url = new URL(`https://${host}/services/oauth2/authorize`);
-    url.search = new URLSearchParams({
-      response_type: "code",
-      client_id: packagedClientId || pending.clientId,
-      redirect_uri: pending.redirectUri,
-      code_challenge: challenge,
-      code_challenge_method: "S256",
-      state: pending.state,
-      prompt: "login consent",
-    }).toString();
-    window.location.assign(url.toString());
+  }
+
+  // A link with ?start=1 goes straight to Salesforce once the details it carries are complete.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!prefill.start || autoStarted.current) return;
+    // /sf-auth needs the client's secret, which never goes in a link, so it can't auto-start.
+    if (!packagedClientId) return;
+    autoStarted.current = true;
+    const problem = beginAuth({
+      page,
+      env: prefill.env ?? "production",
+      orgUrl: prefill.org ?? "",
+      clientId: prefill.clientId ?? "",
+      clientSecret: "",
+      packagedClientId,
+    });
+    void problem.then((msg) => msg && setError(msg));
+  }, [page, prefill, packagedClientId]);
+
+  async function copyLink() {
+    const link = prefillLink(window.location.origin, page, {
+      env,
+      org: orgUrl.trim() || undefined,
+      clientId: packagedClientId ? undefined : clientId.trim() || undefined,
+    });
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkNote("Link copied. It opens this page filled in and goes straight to Salesforce.");
+    } catch {
+      setLinkNote(link);
+    }
   }
 
   const input =
@@ -286,6 +341,11 @@ function AuthForm({
       >
         {busy ? "Opening Salesforce…" : "Authorize with Salesforce"}
       </button>
+
+      <button type="button" onClick={copyLink} className="text-xs font-medium text-sky-700 hover:underline">
+        Copy link for client
+      </button>
+      {linkNote && <p className="break-all text-xs text-slate-500">{linkNote}</p>}
 
       {callback && !packagedClientId && (
         <p className="text-xs text-slate-500">

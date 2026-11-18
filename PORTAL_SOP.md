@@ -364,6 +364,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-18 | Pre-fill links for `/sf-connect` and `/sf-auth`: `?env=production|developer|sandbox` (also prod, dev, test, sb), `&org=<org URL or host>`, `&start=1` to go straight to Salesforce; `&client_id=` on `/sf-auth` only (the secret never goes in a link, so `/sf-auth` never auto-starts). "Copy link for client" on the form builds the link. Non-Salesforce org values and return trips (`code`/`error`) are ignored | Done, typechecks and lints; pre-fill checked locally; auto-start not clicked through; not pushed | `readPrefill` and `prefillLink` in `app/(portal)/sf-auth/hosts.ts`, `beginAuth` in `sf-auth.tsx` |
 | 2026-11-18 | Public `/utilities` page: one card per stand-alone tool (`/sf-connect`, `/sf-auth`); add a tool by adding a row to `TOOLS` | Done, typechecks and lints; renders locally; not pushed | `app/(portal)/utilities/page.tsx` |
 | 2026-11-18 | Public `/sf-connect`: same flow as `/sf-auth` but with our packaged Connected App, so the client only picks the environment and Org URL. Consumer Key and Secret are in Vercel env (`SF_PACKAGE_CLIENT_ID`, `SF_PACKAGE_CLIENT_SECRET`, Production, secret marked sensitive) and `.env.local`; the secret never reaches the browser. `/sf-connect/token` only redeems codes whose redirect URI is this site's `/sf-connect` | Done, typechecks and lints; checked locally (Salesforce recognises the key); not pushed. The packaged app's Callback URL must include `https://cid-autopsy.vercel.app/sf-connect` (`cid-autopsy-six.vercel.app` redirects there, and the page uses the address it is served from) | `app/(portal)/sf-connect/`, shared code in `app/(portal)/sf-auth/` |
 | 2026-11-18 | Public Salesforce auth page `/sf-auth` (no portal login): client picks Production / Developer Edition / Sandbox, optional Org URL, Consumer Key and Secret; PKCE pair, state and redirect URI (`<origin>/sf-auth`) are automatic; one button opens the Salesforce approval page, which returns to `/sf-auth`, and the page swaps the code for tokens through `/sf-auth/token` and shows the refresh token. Nothing is stored: the form details sit in the tab's sessionStorage only for the round trip and are deleted on return; the token route only forwards to Salesforce domains | Done, typechecks and lints; route checked locally against login.salesforce.com; not pushed; full round trip needs a real Connected App | `app/(portal)/sf-auth/` |
@@ -407,6 +408,13 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-18: Asked for URL parameters that pre-fill `/sf-connect` (env and org URL) so a link takes
+  the client straight to getting the refresh token. Added `env`, `org`, `start`, and a Copy link button.
+
+- 2026-11-18: First `/sf-connect` try on a Developer Edition org returned `redirect_uri_mismatch`: the
+  packaged app's Callback URL list didn't have `https://cid-autopsy.vercel.app/sf-connect` exactly.
+  Fixed in Salesforce, not the portal. Nothing changed in code.
 
 - 2026-11-18: Asked for a `/utilities` page linking the new Salesforce pages. Built it.
 

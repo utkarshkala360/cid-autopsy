@@ -27,3 +27,45 @@ export function orgHost(input: string): string | null {
     return null;
   }
 }
+
+/** Details a link can pre-fill: ?env=sandbox&org=acme.my.salesforce.com&start=1 (client_id on /sf-auth only). */
+export type Prefill = { env?: Env; org?: string; clientId?: string; start?: boolean };
+
+const ENV_ALIASES: Record<string, Env> = {
+  production: "production",
+  prod: "production",
+  developer: "developer",
+  dev: "developer",
+  sandbox: "sandbox",
+  test: "sandbox",
+  sb: "sandbox",
+};
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export function readPrefill(sp: SearchParams, allowClientId: boolean): Prefill {
+  const one = (k: string) => {
+    const v = sp[k];
+    return (Array.isArray(v) ? v[0] : v)?.trim() || undefined;
+  };
+  // A return trip from Salesforce carries code/error, never prefill or auto-start.
+  if (one("code") || one("error")) return {};
+  const env = ENV_ALIASES[one("env")?.toLowerCase() ?? ""];
+  const org = one("org");
+  return {
+    env,
+    org: org && orgHost(org) ? org : undefined,
+    clientId: allowClientId ? one("client_id") : undefined,
+    start: ["1", "true", "yes"].includes(one("start")?.toLowerCase() ?? ""),
+  };
+}
+
+/** The link to send a client: opens the page with these details filled in and goes straight to Salesforce. */
+export function prefillLink(origin: string, page: string, p: Prefill): string {
+  const q = new URLSearchParams();
+  if (p.env) q.set("env", p.env);
+  if (p.org) q.set("org", orgHost(p.org) ?? p.org);
+  if (p.clientId) q.set("client_id", p.clientId);
+  q.set("start", "1");
+  return `${origin}${page}?${q}`;
+}
