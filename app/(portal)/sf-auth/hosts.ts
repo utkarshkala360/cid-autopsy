@@ -28,8 +28,25 @@ export function orgHost(input: string): string | null {
   }
 }
 
-/** Details a link can pre-fill: ?env=sandbox&org=acme.my.salesforce.com&start=1 (client_id on /sf-auth only). */
-export type Prefill = { env?: Env; org?: string; clientId?: string; start?: boolean };
+/**
+ * Details a link can pre-fill: ?env=sandbox&org=acme.my.salesforce.com&start=1 (client_id on /sf-auth only).
+ * When the CallAnchor package opens the page as a popup it adds &state=…&origin=<its Lightning origin>,
+ * and the refresh token goes back to it by postMessage instead of being shown.
+ */
+export type Prefill = {
+  env?: Env;
+  org?: string;
+  clientId?: string;
+  start?: boolean;
+  handback?: Handback;
+};
+export type Handback = { state: string; origin: string };
+
+/** "acme.my.salesforce.com" -> "https://acme.lightning.force.com"; null for hosts without a My Domain. */
+export function lightningOrigin(host: string | null): string | null {
+  if (!host || !host.endsWith(".my.salesforce.com")) return null;
+  return `https://${host.replace(/\.my\.salesforce\.com$/, ".lightning.force.com")}`;
+}
 
 const ENV_ALIASES: Record<string, Env> = {
   production: "production",
@@ -51,13 +68,22 @@ export function readPrefill(sp: SearchParams, allowClientId: boolean): Prefill {
   // A return trip from Salesforce carries code/error, never prefill or auto-start.
   if (one("code") || one("error")) return {};
   const env = ENV_ALIASES[one("env")?.toLowerCase() ?? ""];
+  const yes = (k: string) => ["1", "true", "yes"].includes(one(k)?.toLowerCase() ?? "");
   const org = one("org");
   return {
     env,
     org: org && orgHost(org) ? org : undefined,
     clientId: allowClientId ? one("client_id") : undefined,
-    start: ["1", "true", "yes"].includes(one("start")?.toLowerCase() ?? ""),
+    start: yes("start"),
+    handback: readHandback(org, one("state"), one("origin")),
   };
+}
+
+// Only ever hand the token to the org's own Lightning tab, never to whatever origin a link names.
+function readHandback(org?: string, state?: string, origin?: string): Handback | undefined {
+  if (!org || !state || !origin) return undefined;
+  const expected = lightningOrigin(orgHost(org));
+  return expected && origin === expected ? { state, origin } : undefined;
 }
 
 /** The link to send a client: opens the page with these details filled in and goes straight to Salesforce. */

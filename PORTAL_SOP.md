@@ -364,6 +364,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-18 | Popup hand-back on `/sf-connect`: the CallAnchor package opens it with `&org=…&state=…&origin=<its Lightning origin>`; after the exchange the page posts `{type: "callanchor:refresh-token", state, refreshToken}` to `window.opener` (target origin = that origin), waits for `callanchor:refresh-token-saved` with the same state, then closes. Hands back only when `origin` is the org's own `*.lightning.force.com` and the token's `instance_url` is that same org; otherwise, or with no confirmation in 15 s, it shows the token to copy. Replaced the `package=true` URL redirect (owner: token must not go in a URL) | Done, typechecks and lints; origin checks tested; popup round trip not run; not pushed | `readHandback` / `lightningOrigin` in `app/(portal)/sf-auth/hosts.ts`, `handBack` in `sf-auth.tsx` |
 | 2026-11-18 | Pre-fill links for `/sf-connect` and `/sf-auth`: `?env=production|developer|sandbox` (also prod, dev, test, sb), `&org=<org URL or host>`, `&start=1` to go straight to Salesforce; `&client_id=` on `/sf-auth` only (the secret never goes in a link, so `/sf-auth` never auto-starts). "Copy link for client" on the form builds the link. Non-Salesforce org values and return trips (`code`/`error`) are ignored | Done, typechecks and lints; pre-fill checked locally; auto-start not clicked through; not pushed | `readPrefill` and `prefillLink` in `app/(portal)/sf-auth/hosts.ts`, `beginAuth` in `sf-auth.tsx` |
 | 2026-11-18 | Public `/utilities` page: one card per stand-alone tool (`/sf-connect`, `/sf-auth`); add a tool by adding a row to `TOOLS` | Done, typechecks and lints; renders locally; not pushed | `app/(portal)/utilities/page.tsx` |
 | 2026-11-18 | Public `/sf-connect`: same flow as `/sf-auth` but with our packaged Connected App, so the client only picks the environment and Org URL. Consumer Key and Secret are in Vercel env (`SF_PACKAGE_CLIENT_ID`, `SF_PACKAGE_CLIENT_SECRET`, Production, secret marked sensitive) and `.env.local`; the secret never reaches the browser. `/sf-connect/token` only redeems codes whose redirect URI is this site's `/sf-connect` | Done, typechecks and lints; checked locally (Salesforce recognises the key); not pushed. The packaged app's Callback URL must include `https://cid-autopsy.vercel.app/sf-connect` (`cid-autopsy-six.vercel.app` redirects there, and the page uses the address it is served from) | `app/(portal)/sf-connect/`, shared code in `app/(portal)/sf-auth/` |
@@ -408,6 +409,14 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-18: Dropped the `package=true` redirect: the refresh token must not go in a URL. Instead the
+  package opens `/sf-connect` as a popup and gets the token by `postMessage`, only to the org's own
+  Lightning origin. Built it. The 5-approval check can't happen on this page before login (it doesn't
+  know the user yet); it belongs in the package before it opens the popup.
+
+- 2026-11-18: Asked for a `package=true` link flag that sends the new refresh token back to the
+  package's Setup tab as `c__refresh_token`. Built it.
 
 - 2026-11-18: Asked for URL parameters that pre-fill `/sf-connect` (env and org URL) so a link takes
   the client straight to getting the refresh token. Added `env`, `org`, `start`, and a Copy link button.

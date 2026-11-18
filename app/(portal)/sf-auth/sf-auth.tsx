@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ENVS, orgHost, prefillLink, type Env, type Prefill } from "./hosts";
+import { ENVS, lightningOrigin, orgHost, prefillLink, type Env, type Handback, type Prefill } from "./hosts";
 
 // The details needed after Salesforce redirects back. Kept in this tab's sessionStorage only
 // for the round trip, and deleted the moment the page comes back.
@@ -16,6 +16,8 @@ type Pending = {
   codeVerifier: string;
   redirectUri: string;
   state: string;
+  /** Opened as a popup by the CallAnchor package: post the refresh token back to it. */
+  handback?: Handback;
 };
 
 type Tokens = {
@@ -28,7 +30,9 @@ type Tokens = {
 type View =
   | { step: "form" }
   | { step: "exchanging" }
-  | { step: "done"; code: string; tokens: Tokens }
+  | { step: "handing" }
+  | { step: "saved" }
+  | { step: "done"; code: string; tokens: Tokens; note?: string }
   | { step: "error"; message: string; code?: string };
 
 function base64Url(bytes: Uint8Array) {
@@ -73,6 +77,7 @@ async function beginAuth(o: {
   clientId: string;
   clientSecret: string;
   packagedClientId?: string;
+  handback?: Handback;
 }): Promise<string | null> {
   let host: string = ENVS[o.env].loginHost;
   if (o.orgUrl.trim()) {
@@ -89,6 +94,7 @@ async function beginAuth(o: {
     codeVerifier: verifier,
     redirectUri: redirectUri(),
     state: randomString(32),
+    handback: o.handback,
   };
   try {
     sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
@@ -163,10 +169,46 @@ function completeReturn(page: Page, started: { current: boolean }, show: (v: Vie
           message: `${data.error ?? "Error"}: ${data.error_description ?? `token call failed (${res.status})`}`,
         });
       } else {
-        show({ step: "done", code: code!, tokens: data });
+        if (!handBack(pending.handback, data, code!, show)) show({ step: "done", code: code!, tokens: data });
       }
     })
     .catch(() => show({ step: "error", code: code!, message: "Couldn't reach the token service." }));
+}
+
+const HANDBACK_TIMEOUT_MS = 15_000;
+
+/**
+ * Popup opened by the CallAnchor package: post the refresh token to the opener and close once it
+ * confirms the save. Only when the token's own org is the opener's org. Returns false to show the
+ * token instead (opened directly, opener gone, or a different org signed in).
+ */
+function handBack(hb: Handback | undefined, data: Tokens, code: string, show: (v: View) => void): boolean {
+  const opener = window.opener as Window | null;
+  if (!hb || !opener || !data.refresh_token || !data.instance_url) return false;
+  if (lightningOrigin(orgHost(data.instance_url)) !== hb.origin) return false;
+
+  show({ step: "handing" });
+  const timer = setTimeout(() => {
+    window.removeEventListener("message", onMessage);
+    show({
+      step: "done",
+      code,
+      tokens: data,
+      note: "CallAnchor Setup didn't confirm it saved the token. Copy it below and paste it there.",
+    });
+  }, HANDBACK_TIMEOUT_MS);
+  function onMessage(e: MessageEvent) {
+    if (e.origin !== hb!.origin || e.data?.type !== "callanchor:refresh-token-saved" || e.data.state !== hb!.state) {
+      return;
+    }
+    clearTimeout(timer);
+    window.removeEventListener("message", onMessage);
+    show({ step: "saved" });
+    window.close();
+  }
+  window.addEventListener("message", onMessage);
+  opener.postMessage({ type: "callanchor:refresh-token", state: hb.state, refreshToken: data.refresh_token }, hb.origin);
+  return true;
 }
 
 export function SfAuth({
@@ -187,7 +229,13 @@ export function SfAuth({
   if (view.step === "exchanging") {
     return <p className="mt-8 text-sm text-slate-600">Exchanging the code for tokens…</p>;
   }
-  if (view.step === "done") return <Result page={page} code={view.code} tokens={view.tokens} />;
+  if (view.step === "handing") {
+    return <p className="mt-8 text-sm text-slate-600">Got the refresh token. Saving it in CallAnchor Setup…</p>;
+  }
+  if (view.step === "saved") {
+    return <p className="mt-8 text-sm text-slate-700">Saved in Salesforce. You can close this tab.</p>;
+  }
+  if (view.step === "done") return <Result page={page} code={view.code} tokens={view.tokens} note={view.note} />;
 
   return (
     <>
@@ -226,7 +274,15 @@ function AuthForm({
     e?.preventDefault();
     setError("");
     setBusy(true);
-    const problem = await beginAuth({ page, env, orgUrl, clientId, clientSecret, packagedClientId });
+    const problem = await beginAuth({
+      page,
+      env,
+      orgUrl,
+      clientId,
+      clientSecret,
+      packagedClientId,
+      handback: prefill.handback,
+    });
     if (problem) {
       setBusy(false);
       setError(problem);
@@ -247,6 +303,7 @@ function AuthForm({
       clientId: prefill.clientId ?? "",
       clientSecret: "",
       packagedClientId,
+      handback: prefill.handback,
     });
     void problem.then((msg) => msg && setError(msg));
   }, [page, prefill, packagedClientId]);
@@ -345,6 +402,11 @@ function AuthForm({
       <button type="button" onClick={copyLink} className="text-xs font-medium text-sky-700 hover:underline">
         Copy link for client
       </button>
+      {prefill.handback && (
+        <p className="text-xs text-slate-500">
+          After you approve, the token is saved straight into CallAnchor Setup in Salesforce.
+        </p>
+      )}
       {linkNote && <p className="break-all text-xs text-slate-500">{linkNote}</p>}
 
       {callback && !packagedClientId && (
@@ -358,9 +420,10 @@ function AuthForm({
   );
 }
 
-function Result({ page, code, tokens }: { page: Page; code: string; tokens: Tokens }) {
+function Result({ page, code, tokens, note }: { page: Page; code: string; tokens: Tokens; note?: string }) {
   return (
     <div className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      {note && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{note}</p>}
       {tokens.refresh_token ? (
         <CopyField label="Refresh token" value={tokens.refresh_token} big />
       ) : (
