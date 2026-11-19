@@ -415,9 +415,26 @@ async function saveAudit(entries: AuditEntry[]) {
   }
 }
 
-// Bump when saveLicenses reads a license differently: every row saved by older code is then re-read
-// on the next pull (planPull), not only new licenses. 1: device from lastLoginDevice (2026-11-19).
-export const LICENSE_READ_VERSION = 1;
+// ---- Re-reading stored data (owner, 2026-11-19) ----
+// How each kind of stored data is read from what CallAnchor sends. Whenever the code reading one
+// changes, bump its number here: the next pull then re-reads everything already stored of that kind,
+// not only what arrives later. ca_read_versions holds the version the store was last re-read at.
+//   licenses  re-saved from ca_licenses.raw; rows without it come again with the client list
+//   logs      detail, call, license and actor re-read from ca_system_logs.raw
+//   audit     links re-read from ca_audit_logs.raw
+//   callouts  payloads aren't stored: every client's CRM syncs are pulled again over retention
+//   clients   client list, tenant summaries and integrations pulled again
+//   calls     every call rebuilt from its stored logs and callouts (also after logs or callouts)
+export const READ_VERSIONS = {
+  licenses: 1, // 1: device from lastLoginDevice (2026-11-19)
+  logs: 1,
+  audit: 1,
+  callouts: 1,
+  clients: 1,
+  calls: 1,
+} as const;
+type ReadKind = keyof typeof READ_VERSIONS;
+export const LICENSE_READ_VERSION = READ_VERSIONS.licenses;
 
 // A license's device brand and model: the separate fields when sent, else split from lastLoginDevice.
 function deviceParts(l: License): { brand: string | null; model: string | null } {
@@ -446,13 +463,15 @@ const asText = (value: unknown) => (value === null || value === undefined ? null
 
 // Saves a client's licenses from its tenant, with a dated row for each field that changed since the
 // last save. Licenses no longer in the tenant are marked removed.
-export async function saveLicenses(clientId: string, licenses: License[]) {
+// `reread`: the licenses are stored ones read again, so nothing changed at CallAnchor: no change rows,
+// and licenses missing from the list aren't marked removed.
+export async function saveLicenses(clientId: string, licenses: License[], reread = false) {
   const stored = await db()`SELECT * FROM ca_licenses WHERE client_id = ${clientId}`;
   const before = new Map(stored.map((r) => [r.license_id as string, r]));
   const changes: { licenseId: string; field: string; old: string | null; value: string | null }[] = [];
   for (const license of licenses) {
     const old = before.get(license.id);
-    if (!old) continue;
+    if (!old || reread) continue;
     for (const [field, read] of Object.entries(LICENSE_FIELDS)) {
       const value = read(license);
       // A device first becoming known (e.g. read from lastLoginDevice) isn't a device change.
@@ -506,6 +525,7 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         calls_grew_at = CASE WHEN EXCLUDED.lifetime_calls > ca_licenses.lifetime_calls THEN now() ELSE ca_licenses.calls_grew_at END
     `;
   }
+  if (reread) return;
   await db()`
     UPDATE ca_licenses SET removed_at = now()
     WHERE client_id = ${clientId} AND removed_at IS NULL AND NOT (license_id = ANY(${licenses.map((l) => l.id)}::text[]))
@@ -771,6 +791,119 @@ async function pullSnapshots(cookie: string) {
   }
 }
 
+async function staleReads(): Promise<ReadKind[]> {
+  const rows = await db()`SELECT kind, version FROM ca_read_versions`;
+  const have = new Map(rows.map((r) => [r.kind as string, r.version as number]));
+  return (Object.keys(READ_VERSIONS) as ReadKind[]).filter((k) => (have.get(k) ?? 0) < READ_VERSIONS[k]);
+}
+
+const markRead = (kind: ReadKind) => db()`
+  INSERT INTO ca_read_versions (kind, version, read_at) VALUES (${kind}, ${READ_VERSIONS[kind]}, now())
+  ON CONFLICT (kind) DO UPDATE SET version = EXCLUDED.version, read_at = now()`;
+
+// Walks a table by id in pages, so a large one never sits in memory at once.
+async function eachPage(table: "ca_system_logs" | "ca_audit_logs", run: (rows: Row[]) => Promise<void>) {
+  let after = "";
+  for (;;) {
+    const rows =
+      table === "ca_system_logs"
+        ? await db()`SELECT id, raw FROM ca_system_logs WHERE raw IS NOT NULL AND id > ${after} ORDER BY id LIMIT ${ROWS_PER_INSERT}`
+        : await db()`SELECT id, raw FROM ca_audit_logs WHERE raw IS NOT NULL AND id > ${after} ORDER BY id LIMIT ${ROWS_PER_INSERT}`;
+    if (rows.length === 0) return;
+    await run(rows);
+    after = rows[rows.length - 1].id;
+  }
+}
+
+const parsed = <T>(raw: unknown) => (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
+
+async function rereadLicenses() {
+  const rows = await db()`SELECT client_id, raw FROM ca_licenses WHERE removed_at IS NULL AND raw IS NOT NULL`;
+  const byClient = new Map<string, License[]>();
+  for (const r of rows) byClient.set(r.client_id, [...(byClient.get(r.client_id) ?? []), parsed<License>(r.raw)]);
+  for (const [clientId, licenses] of byClient) await saveLicenses(clientId, licenses, true);
+}
+
+async function rereadLogs() {
+  await eachPage("ca_system_logs", async (rows) => {
+    const logs = rows.map((r) => parsed<SystemLog>(r.raw));
+    await db()`
+      UPDATE ca_system_logs t SET message = x.message, detail = x.detail, call_id = x.call_id, license_id = x.license_id,
+        actor_type = x.actor_type, actor_id = x.actor_id
+      FROM unnest(
+        ${logs.map((l) => l.id)}::text[],
+        ${logs.map((l) => mask(l.message ?? "").slice(0, 300))}::text[],
+        ${logs.map((l) => logDetail(l.metadata))}::text[],
+        ${logs.map((l) => logCallId(l))}::text[],
+        ${logs.map((l) => logLicenseId(l))}::text[],
+        ${logs.map((l) => l.actorType ?? null)}::text[],
+        ${logs.map((l) => l.actorId ?? null)}::text[]
+      ) AS x(id, message, detail, call_id, license_id, actor_type, actor_id)
+      WHERE t.id = x.id`;
+  });
+}
+
+async function rereadAudit() {
+  await eachPage("ca_audit_logs", async (rows) => {
+    const entries = rows.map((r) => parsed<AuditEntry>(r.raw));
+    const links = entries.map(auditLinks);
+    await db()`
+      UPDATE ca_audit_logs t SET license_id = x.license_id, platform_id = x.platform_id, callout_log_id = x.callout_log_id,
+        actor_type = x.actor_type, correlation_id = x.correlation_id
+      FROM unnest(
+        ${entries.map((a) => a.id)}::text[],
+        ${links.map((l) => l.licenseId)}::text[],
+        ${links.map((l) => l.platformId)}::text[],
+        ${links.map((l) => l.calloutLogId)}::text[],
+        ${entries.map((a) => a.actorType ?? null)}::text[],
+        ${entries.map((a) => a.correlationId ?? null)}::text[]
+      ) AS x(id, license_id, platform_id, callout_log_id, actor_type, correlation_id)
+      WHERE t.id = x.id`;
+  });
+}
+
+// Every call there's anything stored about, rebuilt by ca_refresh_calls.
+async function rebuildCalls() {
+  const rows = await db()`
+    SELECT call_id FROM ca_calls
+    UNION SELECT call_id FROM ca_system_logs WHERE call_id IS NOT NULL
+    UNION SELECT call_id FROM ca_callout_events`;
+  await refreshCalls(rows.map((r) => r.call_id as string));
+}
+
+// The pull step that brings stored data up to READ_VERSIONS. Each kind is marked read only once it
+// has been, so a failure or the time limit leaves it for the next pull.
+async function rereadStored(cookie: string) {
+  const stale = await staleReads();
+  if (stale.length === 0) return;
+  const lease = await claim("reread");
+  if (!lease) return;
+  try {
+    if (stale.includes("licenses")) await rereadLicenses().then(() => markRead("licenses"));
+    if (stale.includes("logs")) await rereadLogs().then(() => markRead("logs"));
+    if (stale.includes("audit")) await rereadAudit().then(() => markRead("audit"));
+    if (stale.includes("clients")) {
+      const started = Date.now();
+      await pullSnapshots(cookie);
+      const [s] = await db()`SELECT refreshed_at FROM ca_sync_state WHERE stream = 'snapshots'`;
+      // Another pull held the client list: left for the next pull.
+      if (s?.refreshed_at && new Date(s.refreshed_at).getTime() >= started) await markRead("clients");
+    }
+    if (stale.includes("callouts")) {
+      // Each client's next CRM sync refresh reads back over retention and saves every row again.
+      await db()`
+        UPDATE ca_sync_state SET backfill_from = now() - ${`${SYNC.retainDays} days`}::interval
+        WHERE stream LIKE 'callouts:%'`;
+      await markRead("callouts");
+    }
+    if (stale.includes("calls") || stale.includes("logs")) await rebuildCalls().then(() => markRead("calls"));
+    await release("reread", { refreshed: true });
+  } catch (error) {
+    await release("reread", { error: describe(error) });
+    throw error;
+  }
+}
+
 // ---- What a page calls ----
 
 export type PullReport = { errors: string[] };
@@ -839,7 +972,7 @@ export async function pullFleet(cookie: string): Promise<PullReport> {
 // one long pull hidden inside the page render.
 
 export type PullStep = { key: string; label: string };
-const STEP_KEY = /^(snapshots|logs|audit|logs:[\w-]{1,100}|callouts:[\w-]{1,100})$/;
+const STEP_KEY = /^(reread|snapshots|logs|audit|logs:[\w-]{1,100}|callouts:[\w-]{1,100})$/;
 export const isPullStep = (key: string) => STEP_KEY.test(key);
 
 // A stream a page should pull: never pulled, or last pulled longer ago than pageEveryMs. The manual
@@ -866,6 +999,8 @@ export async function planPull(clientId: string | null, force = false): Promise<
   );
   const snapshotsDue = Date.now() - snapshots.refreshedAt >= (force ? SYNC.pullEveryMs : SYNC.snapshotEveryMs);
   if (namesMissing || (!clientId && snapshotsDue)) steps.push({ key: "snapshots", label: "Client list" });
+  // Stored data read by older code is read again (READ_VERSIONS), whichever page asks.
+  if ((await staleReads().catch(() => [])).length) steps.push({ key: "reread", label: "Re-reading stored data" });
   if (pageDue(states.get("logs"), force)) steps.push({ key: "logs", label: "System logs" });
   if (pageDue(states.get("audit"), force)) steps.push({ key: "audit", label: "Portal events" });
   const rows = await db()`SELECT client_id, company_name FROM ca_client_snapshots WHERE data IS NOT NULL`;
@@ -885,13 +1020,14 @@ export async function runPullStep(cookie: string, key: string): Promise<string |
   const report: PullReport = { errors: [] };
   const states = await readStates();
   await attempt(report, key, async () => {
-    if (key === "snapshots") await pullSnapshots(cookie);
+    if (key === "reread") await rereadStored(cookie);
+    else if (key === "snapshots") await pullSnapshots(cookie);
     else if (key === "logs") await pullLogs(cookie, "latest");
     else if (key === "audit") await pullAudit(cookie, "latest");
     else if (key.startsWith("logs:")) await pullLogs(cookie, "latest", key.slice("logs:".length));
     else await pullCallouts(cookie, key.slice("callouts:".length), "latest");
   });
-  if (key !== "snapshots") refreshLater(cookie, [key], states);
+  if (key !== "snapshots" && key !== "reread") refreshLater(cookie, [key], states);
   return report.errors[0] ?? null;
 }
 
@@ -1154,7 +1290,7 @@ export async function readStoreStatus(clientId: string | null): Promise<StoreSta
                  min(refreshed_at) FILTER (WHERE stream <> 'snapshots') AS refreshed_at,
                  count(last_error) AS errors,
                  max(refreshed_at) FILTER (WHERE stream = 'snapshots') AS snapshot_at
-          FROM ca_sync_state WHERE stream NOT LIKE 'logs:%' OR stream = ANY(${busyLogs}::text[])`,
+          FROM ca_sync_state WHERE (stream NOT LIKE 'logs:%' OR stream = ANY(${busyLogs}::text[])) AND stream <> 'reread'`,
     clientId
       ? db()`SELECT min(at) AS since FROM ca_callout_events WHERE client_id = ${clientId}`
       : db()`SELECT min(at) AS since FROM ca_callout_events`,

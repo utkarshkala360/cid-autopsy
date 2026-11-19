@@ -246,8 +246,11 @@ Rules already established in this repo.
   the dropdown (`RangeSelect`); Suspense boundaries are keyed by page, never by range. Each page
   view computes the preset ranges not yet in memory after the response (`warmEntities`) (owner,
   2026-11-13).
-- When the way a license is read changes, bump `LICENSE_READ_VERSION` in `lib/callanchor/store.ts`
-  so licenses already saved are re-read, not only new ones (owner, 2026-11-19).
+- When the code reading any stored data changes (licenses, system logs, portal events, CRM callouts,
+  clients, calls), bump that kind's entry in `READ_VERSIONS` in `lib/callanchor/store.ts`, so data
+  already stored is re-read too, not only what arrives later (owner, 2026-11-19). The next pull adds a
+  "Re-reading stored data" step: logs, portal events and licenses from their stored raw JSON, calls
+  rebuilt, CRM callouts pulled again over retention, the client list pulled again.
 - Users never wait on data they've already seen (owner, 2026-11-13). The fleet, licenses and client
   summary loaders keep their last result in server memory and serve it at once, recomputing in the
   background when it's over 5 seconds old, one run per key (`cached` in `lib/callanchor/health.ts`);
@@ -392,6 +395,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-19 | Re-read of all stored data on a version bump: `READ_VERSIONS` per kind (licenses, logs, audit, callouts, clients, calls) against `ca_read_versions`; a stale kind adds a leased "Re-reading stored data" pull step; dry-run in a rolled-back transaction: 1,000 logs in 0.5 s, 8,325 calls rebuilt in 1.7 s | Done, typechecks and lints; pushed 2026-11-19 | `READ_VERSIONS`, `rereadStored` and `planPull` in `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-19 | Audit notes 8 and 9. Time ranges: a dropdown on every health page (Today default, Yesterday, This week, Last week, Last 7 days, Last 15 days, Custom date / time inside the 15 stored days), calendar ranges in IST with Monday weeks, each compared with the whole dates before it from the daily totals (Overview hero, client and license pages' comparison strip, every row's "vs … yesterday"); license page journey and chart follow the range. Synced calls: a CRM callout counts as "Picked up by the app" (7,324 → 8,289 of 8,289 calls); "No stored ingest log" is info; missed or rejected calls never "not recorded" (390 → 40, the 350 moved all reached the CRM); "Data is thin" judges a call by when it was made (27 false gaps → 0); S3 purge-after-sync flag raised to warning with its cause | Done, builds, typechecks and lints; counts checked read-only against the store; not yet viewed signed in | `lib/callanchor/range.ts`, `health/range-ui.tsx`, `health/RangeSelect.tsx`, `lib/callanchor/health.ts`, `isUnconnected` and `PLATFORM_FAULTS` in `lib/callanchor/issues.ts` |
 | 2026-11-19 | Licenses saved by older code are re-read: `ca_licenses.read_version` below `LICENSE_READ_VERSION` triggers an immediate client list pull on any page, re-saving every license; `ca_licenses.raw` keeps each license as CallAnchor sent it | Done, typechecks and lints; pushed 2026-11-19 | `LICENSE_READ_VERSION`, `saveLicenses` and `planPull` in `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-19 | Device read from `lastLoginDevice` when the tenant sends no brand/model fields (licenses showed unknown device, e.g. a OnePlus at Manish Minerals); filled on the next tenant pull; empty-to-known isn't a device change | Done, typechecks and lints; pushed 2026-11-19 | `deviceParts` and `saveLicenses` in `lib/callanchor/store.ts` |
@@ -441,6 +445,10 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-19: Asked that re-reading cover every module (clients, calls, logs and the rest), not only
+  licenses, so older stored data reflects fixes. Added `READ_VERSIONS` with `ca_read_versions` and a
+  "Re-reading stored data" pull step; the first deploy re-reads everything once.
 
 - 2026-11-19: The device still showed unknown after the fix, and the owner asked that licenses saved
   earlier get re-read too, not only new ones. The client list (which saves licenses) wasn't pulled from

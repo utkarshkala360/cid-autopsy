@@ -638,3 +638,11 @@ CREATE TABLE IF NOT EXISTS ca_pull_jobs (
 -- RLS doesn't apply to. Harmless on any other Postgres. Kept last so it covers every table.
 DO $$ DECLARE t record; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.tablename); END LOOP; END $$;
 
+
+-- The version each kind of stored data was last re-read at (READ_VERSIONS in lib/callanchor/store.ts).
+-- Below the code's version, the next pull re-reads everything stored of that kind (owner, 2026-11-19).
+CREATE TABLE IF NOT EXISTS ca_read_versions (
+  kind    TEXT        PRIMARY KEY,
+  version INTEGER     NOT NULL,
+  read_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
