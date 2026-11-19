@@ -368,6 +368,10 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-19 | Salesforce sign-in failures that come back with no HTTP code (CallAnchor's "OAuth token request failed … invalid_grant / app_not_found") count as "CRM is rejecting the sign-in", not "CRM isn't responding". The text is CallAnchor's own prefix, not the client's reply | 9 callouts at 1 client (16–17 Nov) shown as an outage, with "check the webhook URL is reachable" as the advice, when the token or connected app is broken | Awaiting owner |
+| 2026-11-19 | Name the phone's own reason when a recording is unavailable: `GOOGLE_DIALER_NO_RECORDING` → "Google Phone app didn't record the call: turn on call recording in it", `RECORDING_FILE_NOT_FOUND` → "No recording file on the phone" | CallAnchor logs these at info, and we show its vaguer text ("No recording file found after call"), so the Google dialer cause behind 35 calls at 2 clients is hidden | Awaiting owner |
+| 2026-11-19 | Show the 36 "Data retention purge errors" as info: each says the call record to delete was already gone | Harmless double delete, but CallAnchor logs it as an error and it reads like data loss | Awaiting owner |
+| 2026-11-19 | Two agent sessions in this checkout: stage files only in the same command as the commit, never ahead of it | Another session's commit swept up a staged `git rm` of `RangeLink.tsx` without the matching edit, and its production deploy failed (`b8fbf8a`); the next commit fixed it | Awaiting owner |
 | 2026-11-19 | Raise with CallAnchor: the delete-recording-from-S3-after-CRM-sync step fails on every call (IAM user lacks `s3:DeleteObject`), logged at info only, so recordings are never removed after sync. Also: 36 retention purges fail because the call record is already gone (harmless, but shown as errors) | 1,954 logs, 1,925 of the 1,926 calls synced with a recording | Health flag built (warning, owner 2026-11-19); raising with CallAnchor awaits owner |
 | 2026-11-19 | Raise with CallAnchor: a call left at `pending_upload` with no `upload-init` stays that way forever and never gets a CRM callout; ask for a timeout that marks it unavailable with a reason, so the CRM still gets the call | 328 such calls 8-19 Nov, none ever reached the CRM; 77 had a successful upload from the same phone within 15 minutes, so the app was alive | Awaiting owner |
 | 2026-11-19 | Raise with CallAnchor: the `normalize-cleanup` step's S3 role can't delete the original file (AccessDenied), on every LAVA LZG412 upload | 215 logs; uploads still succeed, but originals pile up in the bucket | Awaiting owner |
@@ -395,6 +399,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-19 | Next.js 16.4.3 → 16.4.6 (security advisory), `next` and `eslint-config-next` | Done on branch `security-upgrade` (`250f5fe`, worktree `../cid-autopsy-security`): typecheck and build pass, lint unchanged. Not merged into main | `package.json` |
 | 2026-11-19 | Re-read of all stored data on a version bump: `READ_VERSIONS` per kind (licenses, logs, audit, callouts, clients, calls) against `ca_read_versions`; a stale kind adds a leased "Re-reading stored data" pull step; dry-run in a rolled-back transaction: 1,000 logs in 0.5 s, 8,325 calls rebuilt in 1.7 s | Done, typechecks and lints; pushed 2026-11-19 | `READ_VERSIONS`, `rereadStored` and `planPull` in `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-19 | Audit notes 8 and 9. Time ranges: a dropdown on every health page (Today default, Yesterday, This week, Last week, Last 7 days, Last 15 days, Custom date / time inside the 15 stored days), calendar ranges in IST with Monday weeks, each compared with the whole dates before it from the daily totals (Overview hero, client and license pages' comparison strip, every row's "vs … yesterday"); license page journey and chart follow the range. Synced calls: a CRM callout counts as "Picked up by the app" (7,324 → 8,289 of 8,289 calls); "No stored ingest log" is info; missed or rejected calls never "not recorded" (390 → 40, the 350 moved all reached the CRM); "Data is thin" judges a call by when it was made (27 false gaps → 0); S3 purge-after-sync flag raised to warning with its cause | Done, builds, typechecks and lints; counts checked read-only against the store; not yet viewed signed in | `lib/callanchor/range.ts`, `health/range-ui.tsx`, `health/RangeSelect.tsx`, `lib/callanchor/health.ts`, `isUnconnected` and `PLATFORM_FAULTS` in `lib/callanchor/issues.ts` |
 | 2026-11-19 | Licenses saved by older code are re-read: `ca_licenses.read_version` below `LICENSE_READ_VERSION` triggers an immediate client list pull on any page, re-saving every license; `ca_licenses.raw` keeps each license as CallAnchor sent it | Done, typechecks and lints; pushed 2026-11-19 | `LICENSE_READ_VERSION`, `saveLicenses` and `planPull` in `lib/callanchor/store.ts`, `db/schema.sql` |
@@ -446,6 +451,12 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-19: Asked to find other hidden or unclear errors like the S3 one, then to run the security
+  upgrade, then reported a failed deployment. Checked every stored log source and callout: three
+  hidden ones (Salesforce sign-in shown as an outage, the Google dialer reason, retention purge
+  noise) are in Recommendations; the scheduled sync, uploads and duplicates are covered. Upgrade done
+  on its own branch. The failed deploy was another session's commit taking a staged delete; the next
+  deploy was ready.
 - 2026-11-19: Asked that re-reading cover every module (clients, calls, logs and the rest), not only
   licenses, so older stored data reflects fixes. Added `READ_VERSIONS` with `ca_read_versions` and a
   "Re-reading stored data" pull step; the first deploy re-reads everything once.
