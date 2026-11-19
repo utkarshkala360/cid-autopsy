@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { phoneText } from "@/lib/callanchor/labels";
+import { agentText, phoneText } from "@/lib/callanchor/labels";
 import { notFound, redirect } from "next/navigation";
 import { ISSUE_ID, loadIssue } from "@/lib/callanchor/health";
 import { durationText, RULES } from "@/lib/callanchor/issues";
@@ -48,6 +48,7 @@ export async function IssueView({ issueId: raw, clientId }: { issueId: string; c
           <>
             {" · phone "}
             <Link href={licenseHref(HEALTH_PATH, data.license.licenseId, data.clientId)} className={`${rowLinkClass} font-mono`}>{phoneText(data.license)}</Link>
+            {agentText(data.license) && <span className="text-slate-500"> ({agentText(data.license)})</span>}
           </>
         )}
       </p>

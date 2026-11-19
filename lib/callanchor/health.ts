@@ -1,5 +1,5 @@
 import "server-only";
-import { httpClass, phoneText } from "@/lib/callanchor/labels";
+import { agentText, httpClass, phoneText } from "@/lib/callanchor/labels";
 import {
   applySettings,
   byIssue,
@@ -1300,6 +1300,7 @@ export async function loadCallItems(
   ]);
   const contexts = new Map(snapshots.map((s) => [s.clientId, clientContext(s.tenant)]));
   const phoneOf = new Map(licenses.map((l) => [l.licenseId, phoneText(l)]));
+  const agentOf = new Map(licenses.map((l) => [l.licenseId, agentText(l)]));
   const none = clientContext(null);
   const phones = scope.licenseIds?.length ? new Set(scope.licenseIds) : null;
   const scoped = calls.filter((c) => !internal.hidden.has(c.clientId ?? "") && (!phones || phones.has(c.licenseId ?? "")));
@@ -1314,6 +1315,7 @@ export async function loadCallItems(
     ...c,
     problem: callProblem(c, contexts.get(c.clientId ?? "") ?? none, now),
     phone: c.licenseId ? (phoneOf.get(c.licenseId) ?? null) : null,
+    agent: c.licenseId ? (agentOf.get(c.licenseId) ?? null) : null,
   }));
   return { items, total: matching.length, counts, title: stageTitle(stage), phones: Object.fromEntries(phoneOf), loadedAt: new Date(now).toISOString() };
 }

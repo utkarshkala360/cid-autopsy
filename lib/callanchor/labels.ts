@@ -80,3 +80,8 @@ export function httpClass(httpStatus: number | null): HttpClass {
 // a row saved before full numbers were kept, until the next client list pull fills it in.
 export const phoneText = (l: { number?: string | null; last4: string | null } | null | undefined) =>
   l?.number || (l?.last4 ? `…${l.last4}` : "Unknown phone");
+
+// The agent shown with a phone wherever its number shows (owner, 2026-11-13, restated 2026-11-19):
+// the assigned agent's name, "Unassigned" when the seat has no agent, or null when not yet pulled.
+export const agentText = (l: { agentName?: string | null; memberId?: string | null } | null | undefined) =>
+  l?.agentName || (l && l.memberId === null ? "Unassigned" : null);

@@ -197,7 +197,9 @@ Rules already established in this repo.
   shows where its calls stop, and when a call last went all the way through; each call shows the
   step it stopped at and the ids that tie every step to the next (owner, 2026-11-13).
 - A phone (license) always shows as its full number, with its agent's name in a grey line under it
-  (owner, 2026-11-13). Use `phoneText()` in `lib/callanchor/labels.ts` (full number from
+  (owner, 2026-11-13; restated 2026-11-19: everywhere a number shows, no exceptions, including call
+  tables, call and issue pages, the breadcrumb and filter chips, where it reads "number · agent" or
+  "number (agent)" inline). Use `phoneText()` and `agentText()` in `lib/callanchor/labels.ts` (full number from
   `ca_licenses.number`, or …1234 on a row saved before numbers were kept); names from
   `ca_licenses.agent_name`. Both are saved by each client list pull, which runs at once while any
   license lacks them. "Unassigned" only when the seat has no agent. Call ids show whole, never cut.
@@ -340,6 +342,8 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-19 | Raise with CallAnchor: a call left at `pending_upload` with no `upload-init` stays that way forever and never gets a CRM callout; ask for a timeout that marks it unavailable with a reason, so the CRM still gets the call | 328 such calls 8-19 Nov, none ever reached the CRM; 77 had a successful upload from the same phone within 15 minutes, so the app was alive | Awaiting owner |
+| 2026-11-19 | Raise with CallAnchor: the `normalize-cleanup` step's S3 role can't delete the original file (AccessDenied), on every LAVA LZG412 upload | 215 logs; uploads still succeed, but originals pile up in the bucket | Awaiting owner |
 | 2026-11-13 | Leave calls started before the stored log window out of "Data is thin" (use the payload's `startedAt`) | Call `cmv0kcal30wqy8tpxgsm2joak` was made 9 Oct and retried 13 Nov: its ingest log was pruned at 15 days, which is expected, yet it's reported as a gap | Awaiting owner |
 | 2026-11-13 | Raise with CallAnchor: retries send `agentNumber: null` | Attempt 1 of that call sent `+91…0765`; attempts 2–7 sent null, so the client's agent mapping can never match on a retry | Awaiting owner |
 | 2026-11-13 | New phone / new agent checked in 1, 3 and 7-day windows instead of waiting 7 days: after its first full day, "stopped capturing calls" compares with its last 1 day, from day 3 its last 3, from day 7 its last 7; the alert says which ("over its last 3 days"), the phone page says which window and when the next starts, and the hourly chart averages the full days before today it has. Badge "New phone · first day" with the start time on hover | Done, typechecks and lints; not pushed | `RULES.baselineWindows` and `licenseHealth` in `lib/callanchor/issues.ts`, `loadLicense` in `lib/callanchor/health.ts`, `NewPhone` in `health/_views/entities.tsx` |
@@ -364,6 +368,8 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-19 | Device read from `lastLoginDevice` when the tenant sends no brand/model fields (licenses showed unknown device, e.g. a OnePlus at Manish Minerals); filled on the next tenant pull; empty-to-known isn't a device change | Done, typechecks and lints; pushed 2026-11-19 | `deviceParts` and `saveLicenses` in `lib/callanchor/store.ts` |
+| 2026-11-19 | Agent name shown with every phone number: under the number in the Calls & logs table, beside it on the call and issue pages, and in the breadcrumb and phone filter chip | Done, typechecks and lints; pushed 2026-11-19 | `agentText` in `lib/callanchor/labels.ts`, `callItems` in `lib/callanchor/health.ts`, `health/_views/items.tsx`, `call.tsx`, `issue.tsx`, `health/layout.tsx` |
 | 2026-11-18 | Popup hand-back on `/sf-connect`: the CallAnchor package opens it with `&org=…&state=…&origin=<its Lightning origin>`; after the exchange the page posts `{type: "callanchor:refresh-token", state, refreshToken}` to `window.opener` (target origin = that origin), waits for `callanchor:refresh-token-saved` with the same state, then closes. Hands back only when `origin` is the org's own `*.lightning.force.com` and the token's `instance_url` is that same org; otherwise, or with no confirmation in 15 s, it shows the token to copy. Replaced the `package=true` URL redirect (owner: token must not go in a URL) | Done, typechecks and lints; origin checks tested; popup round trip not run; not pushed | `readHandback` / `lightningOrigin` in `app/(portal)/sf-auth/hosts.ts`, `handBack` in `sf-auth.tsx` |
 | 2026-11-18 | Pre-fill links for `/sf-connect` and `/sf-auth`: `?env=production|developer|sandbox` (also prod, dev, test, sb), `&org=<org URL or host>`, `&start=1` to go straight to Salesforce; `&client_id=` on `/sf-auth` only (the secret never goes in a link, so `/sf-auth` never auto-starts). "Copy link for client" on the form builds the link. Non-Salesforce org values and return trips (`code`/`error`) are ignored | Done, typechecks and lints; pre-fill checked locally; auto-start not clicked through; not pushed | `readPrefill` and `prefillLink` in `app/(portal)/sf-auth/hosts.ts`, `beginAuth` in `sf-auth.tsx` |
 | 2026-11-18 | Public `/utilities` page: one card per stand-alone tool (`/sf-connect`, `/sf-auth`); add a tool by adding a row to `TOOLS` | Done, typechecks and lints; renders locally; not pushed | `app/(portal)/utilities/page.tsx` |
@@ -409,6 +415,22 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 ## Feedback log
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
+
+- 2026-11-19: Pointed out that the tenant API gives Vaishnavi's (Manish Minerals) device as OnePlus
+  while the portal showed it unknown. Cause: some licenses carry only `lastLoginDevice` ("Brand
+  Model") without `lastLoginAndroidBrand`/`Model`, and we read only the latter. Now split from
+  `lastLoginDevice` as a fallback; a device first becoming known isn't logged as "Device changed".
+
+- 2026-11-19: Asked why recordings don't get uploaded, comparing successful journeys with failed ones.
+  Answered from the store (8-19 Nov) read-only: 0-second outgoing calls are recorded as not_recorded
+  (expected); the real losses are calls left at pending_upload with no upload-init (328, 131 from one
+  phone, Manish Minerals +918291936833, which uploads nothing) and mark-unavailable (92, file not found, mostly certain
+  devices with Google Dialer). No portal change.
+
+- 2026-11-19: Pointed out that the Calls table ("Calls stopped at the recording upload") showed the
+  phone number with no agent name, against the standing rule. Added the agent under every phone number
+  that lacked it (calls table, call page, issue page, breadcrumb, filter chip) and made the rule say
+  "everywhere, no exceptions".
 
 - 2026-11-18: Dropped the `package=true` redirect: the refresh token must not go in a URL. Instead the
   package opens `/sf-connect` as a popup and gets the token by `postMessage`, only to the org's own

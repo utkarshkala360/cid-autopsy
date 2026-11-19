@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { phoneText } from "@/lib/callanchor/labels";
+import { agentText, phoneText } from "@/lib/callanchor/labels";
 import { cache, Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, WINDOW_DAYS, type WindowDays } from "@/lib/callanchor/health";
@@ -174,9 +174,9 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
   // Across all clients, internal ones are left out unless "Show internal" is ticked.
   const hideInternal = !client && !internal;
   const clientName = client ? (names.get(client) ?? client) : null;
-  // How a chip names a filter: a phone by its last four digits, never its raw id (QA U7).
+  // How a chip names a filter: a phone by its number and agent, never its raw id (QA U7).
   const chipValue = (key: string, value: string) =>
-    key === "auth" || key === "problems" ? "yes" : key === "license" ? phoneText(phone) : key === "licenses" ? `${phones.length} phones` : value;
+    key === "auth" || key === "problems" ? "yes" : key === "license" ? [phoneText(phone), agentText(phone)].filter(Boolean).join(" · ") : key === "licenses" ? `${phones.length} phones` : value;
   const title =
     kind === "calls"
       ? "Calls"
@@ -598,9 +598,12 @@ async function CallItems({ client, license, licenses, showInternal, days, stage,
                 {!c.ingestedAt && <p className="text-amber-700">no ingest log</p>}
               </td>
               {!client && <td className={td}><ClientCell id={c.clientId} names={names} /></td>}
-              <td className={`${td} font-mono text-xs`}>
+              <td className={`${td} text-xs`}>
                 {c.licenseId ? (
-                  <Link href={licenseHref(HEALTH_PATH, c.licenseId, c.clientId)} className={rowLinkClass}>{c.phone ?? "Unknown phone"}</Link>
+                  <>
+                    <Link href={licenseHref(HEALTH_PATH, c.licenseId, c.clientId)} className={`${rowLinkClass} font-mono`}>{c.phone ?? "Unknown phone"}</Link>
+                    {c.agent && <p className="text-slate-500">{c.agent}</p>}
+                  </>
                 ) : (
                   <span className="text-slate-400">—</span>
                 )}

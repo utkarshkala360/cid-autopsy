@@ -102,6 +102,9 @@ export type License = {
   lastLoginAppVersionCode?: number | null;
   lastLoginAndroidBrand?: string | null;
   lastLoginAndroidModel?: string | null;
+  // "Samsung SM-A076B": the device as one string. Some licenses carry only this, without the brand and
+  // model fields (owner, 2026-11-19: a OnePlus showed as unknown), so it's the fallback for both.
+  lastLoginDevice?: string | null;
   lastLoginFirmwareVersion?: string | null;
   lastLoginGoogleDialerPresent?: boolean | null;
   recordingEnabled?: boolean | null;
@@ -412,6 +415,15 @@ async function saveAudit(entries: AuditEntry[]) {
   }
 }
 
+// A license's device brand and model: the separate fields when sent, else split from lastLoginDevice.
+function deviceParts(l: License): { brand: string | null; model: string | null } {
+  const brand = l.lastLoginAndroidBrand?.trim() || null;
+  const model = l.lastLoginAndroidModel?.trim() || null;
+  if (brand || model) return { brand, model };
+  const [first, ...rest] = (l.lastLoginDevice ?? "").trim().split(/\s+/).filter(Boolean);
+  return { brand: first ?? null, model: rest.join(" ") || null };
+}
+
 // The fields of a license whose changes are kept, as text. Agent names and full numbers aren't stored.
 const LICENSE_FIELDS = {
   member_id: (l: License) => l.assignedTo?.id ?? null,
@@ -419,8 +431,8 @@ const LICENSE_FIELDS = {
   is_active: (l: License) => String(l.isActive),
   is_logged_in: (l: License) => String(l.isLoggedIn),
   last_login_label: (l: License) => l.lastLoginLabel ?? null,
-  device_brand: (l: License) => l.lastLoginAndroidBrand ?? null,
-  device_model: (l: License) => l.lastLoginAndroidModel ?? null,
+  device_brand: (l: License) => deviceParts(l).brand,
+  device_model: (l: License) => deviceParts(l).model,
   firmware: (l: License) => l.lastLoginFirmwareVersion ?? null,
   app_version: (l: License) => l.lastLoginAppVersion ?? null,
   recording_enabled: (l: License) => (l.recordingEnabled === null || l.recordingEnabled === undefined ? null : String(l.recordingEnabled)),
@@ -439,6 +451,8 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
     if (!old) continue;
     for (const [field, read] of Object.entries(LICENSE_FIELDS)) {
       const value = read(license);
+      // A device first becoming known (e.g. read from lastLoginDevice) isn't a device change.
+      if ((field === "device_brand" || field === "device_model") && old[field] === null) continue;
       if (asText(old[field]) !== value) changes.push({ licenseId: license.id, field, old: asText(old[field]), value });
     }
   }
@@ -464,8 +478,8 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         ${boolText(licenses.map((l) => l.isActive))}::text[]::boolean[],
         ${boolText(licenses.map((l) => l.isLoggedIn))}::text[]::boolean[],
         ${licenses.map((l) => l.lastLoginLabel ?? null)}::text[],
-        ${licenses.map((l) => l.lastLoginAndroidBrand ?? null)}::text[],
-        ${licenses.map((l) => l.lastLoginAndroidModel ?? null)}::text[],
+        ${licenses.map((l) => deviceParts(l).brand)}::text[],
+        ${licenses.map((l) => deviceParts(l).model)}::text[],
         ${licenses.map((l) => l.lastLoginFirmwareVersion ?? null)}::text[],
         ${boolText(licenses.map((l) => l.lastLoginGoogleDialerPresent ?? null))}::text[]::boolean[],
         ${licenses.map((l) => l.lastLoginAppVersion ?? null)}::text[],
