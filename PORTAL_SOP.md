@@ -433,6 +433,8 @@ One line per piece of feedback, newest first: date, what the owner said, and wha
   earlier get re-read too, not only new ones. The client list (which saves licenses) wasn't pulled from
   a client's pages unless a name or number was missing. Licenses now carry `read_version`; any row
   below `LICENSE_READ_VERSION` makes the next pull re-save every license. Each license's raw JSON is kept.
+  Verified: all 138 licenses re-read; Vaishnavi's shows OnePlus NE2211. Her raw license shows its last
+  login was 1 Sept 2026 on an app too old to report its version, the likely cause of her uploads.
 
 - 2026-11-19: Asked to read the audit notes and ask questions before fixing, and that every "run
   audit" should start with questions even when the answer is written in the note. Ran
