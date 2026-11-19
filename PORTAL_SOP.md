@@ -215,13 +215,13 @@ Rules already established in this repo.
   green at 80% or more, amber from 50%, red below; Unused the other way round (green at 20% or less).
   Each opens those licenses (`PctRing`). The CRM syncs ring (`MetricRing`, reached of due) is green at
   the CRM warning line in Settings (95%), amber down to the critical line (80%), red below.
-- A row's calls in the range sit under its name, "39 calls in 24 hours · last 1 h ago", not in a
-  column (owner, 2026-11-13).
+- A row's calls in the range sit under its name, "39 calls today · last 1 h ago", not in a
+  column (owner, 2026-11-13), with the dates before under it, "vs 31 yesterday (+26%)".
 - CRM syncs is one cell everywhere (owner, 2026-11-13): the ring (due calls in the range that
-  reached the CRM, of due), a strip over the range (an hour per cell for 24 hours, 6 hours for 3
-  days, a day for 7 and 15; synced at the synced-day rate), synced cells out of cells with due calls,
-  and the last call through. The range rolls back from now like the items page's window, so a count
-  and the calls it opens agree. Computed in one pass over the range's calls (`loadEntities` in
+  reached the CRM, of due), a strip over the range (an hour per cell for ranges up to two days,
+  else a day, from the range's start; synced at the synced-day rate), synced cells out of cells with
+  due calls, and the last call through. The items page reads the same range, so a count and the calls
+  it opens agree. Computed in one pass over the range's calls (`loadEntities` in
   `lib/callanchor/health.ts`); device rows add calls across clients with each call's own client
   context (`addToJourney`).
 - Pages never pull CallAnchor while rendering, and changing pages never waits on a pull (owner,
@@ -242,9 +242,10 @@ Rules already established in this repo.
 - Hover text on the health pages shows at once (owner, 2026-11-13): give an element a `title` and
   `InstantTips` (`health/Tips.tsx`, in the health layout) shows it in its own bubble, never the
   browser's delayed tooltip.
-- Changing the range keeps the current table on screen until the new one is ready, with a spinner on
-  the picked option (`RangeLink`); Suspense boundaries are keyed by page, never by range. Each page
-  view computes the ranges not yet in memory after the response (`warmEntities`) (owner, 2026-11-13).
+- Changing the range keeps the current table on screen until the new one is ready, with a spinner by
+  the dropdown (`RangeSelect`); Suspense boundaries are keyed by page, never by range. Each page
+  view computes the preset ranges not yet in memory after the response (`warmEntities`) (owner,
+  2026-11-13).
 - When the way a license is read changes, bump `LICENSE_READ_VERSION` in `lib/callanchor/store.ts`
   so licenses already saved are re-read, not only new ones (owner, 2026-11-19).
 - Users never wait on data they've already seen (owner, 2026-11-13). The fleet, licenses and client
@@ -267,11 +268,23 @@ Rules already established in this repo.
   `npm run audit:notes`, and mark each note done or won't fix with what changed (owner, 2026-11-12):
   `npm run audit:notes -- --mark <ids> done "what changed" --commit <hash>`, after the fix is
   committed. Notes are never deleted; `--days 7` shows closed ones too.
-- Time ranges are calendar ranges in IST (a day starts at midnight IST), picked from a dropdown
-  instead of chips, on every window picker: Today (default), Yesterday, This week, Last week and so
-  on. Each range shows a comparison with the same range one step earlier: Today with the day before,
-  a week with the week before. The license page's fixed "last 24 hours" sections follow the picked
-  range too (owner, 2026-11-19; replaces the rolling 24 hours, 3, 7 and 15 days).
+- Time ranges are calendar ranges in IST, a day from midnight IST and a week Monday to Monday,
+  picked from a dropdown on every health page (Overview, entity tabs, client, license, Calls & logs):
+  Today (default), Yesterday, This week, Last week, Last 7 days, Last 15 days, and a custom date and
+  time range held inside the days calls are stored. Each range is compared with the same number of
+  whole dates just before it (dates only, not time: Today against all of yesterday, This week
+  against all of last week), as numbers only from the daily totals, with no drill-down: calls, share
+  reached the CRM, recordings uploaded and synced. The license page's journey and chart follow the
+  range too (owner, 2026-11-19; replaces the rolling 24 hours, 3, 7 and 15 days). `parseRange` in
+  `lib/callanchor/range.ts`; issue and pulse links that count over a rolling window keep `?window=N`,
+  read as a custom range.
+- A call the CRM accepted, by `recording.ready` or `call.completed`, is a success at every step it
+  implies (owner, 2026-11-19): a callout proves the app took the call in (the journey's "Picked up"
+  step), and an accepted `recording.ready` proves recorded, uploaded and checked. A call with no
+  stored ingest log is information, not a problem. A missed or rejected call never counts as "not
+  recorded", whatever its length. But a 0-second call isn't fine by itself: a CRM rejection stays a
+  failure and an answered call whose recording didn't arrive stays a problem. `isUnconnected` and
+  `addToJourney` in `lib/callanchor/issues.ts`.
 - When the owner says "run audit", run `npm run audit:notes`, then ask the owner questions about the
   notes before building anything, even when the note, the SOP or the code seems to answer them.
   Build only after the owner answers and says to go ahead (owner, 2026-11-19).
@@ -352,8 +365,7 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
-| 2026-11-19 | Count a call the CRM accepted as a success at every step it implies (`recording.ready` accepted ⇒ recorded, uploaded and checked, marked "known from the CRM sync"); a call with no ingest log because it was made before our stored logs (or is a retry of one) is labelled "before our logs", not red. 0-second calls aren't treated as fine across the board: a CRM rejection stays a failure | All 965 "no stored ingest log" calls are ours: 938 came before logs were first stored (10 Nov), 27 are retries of such calls; 199 calls synced with `recording.ready` show as "not uploaded" for the same reason | Awaiting owner |
-| 2026-11-19 | Raise with CallAnchor: the delete-recording-from-S3-after-CRM-sync step fails on every call (IAM user lacks `s3:DeleteObject`), logged at info only, so recordings are never removed after sync | 1,954 logs, 1,925 of the 1,926 calls synced with a recording; also 36 retention purges fail because the call record is already gone (harmless, but flagged as errors) | Awaiting owner |
+| 2026-11-19 | Raise with CallAnchor: the delete-recording-from-S3-after-CRM-sync step fails on every call (IAM user lacks `s3:DeleteObject`), logged at info only, so recordings are never removed after sync. Also: 36 retention purges fail because the call record is already gone (harmless, but shown as errors) | 1,954 logs, 1,925 of the 1,926 calls synced with a recording | Health flag built (warning, owner 2026-11-19); raising with CallAnchor awaits owner |
 | 2026-11-19 | Raise with CallAnchor: a call left at `pending_upload` with no `upload-init` stays that way forever and never gets a CRM callout; ask for a timeout that marks it unavailable with a reason, so the CRM still gets the call | 328 such calls 8-19 Nov, none ever reached the CRM; 77 had a successful upload from the same phone within 15 minutes, so the app was alive | Awaiting owner |
 | 2026-11-19 | Raise with CallAnchor: the `normalize-cleanup` step's S3 role can't delete the original file (AccessDenied), on every LAVA LZG412 upload | 215 logs; uploads still succeed, but originals pile up in the bucket | Awaiting owner |
 | 2026-11-13 | Leave calls started before the stored log window out of "Data is thin" (use the payload's `startedAt`) | Call `cmv0kcal30wqy8tpxgsm2joak` was made 9 Oct and retried 13 Nov: its ingest log was pruned at 15 days, which is expected, yet it's reported as a gap | Awaiting owner |
@@ -380,6 +392,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-19 | Audit notes 8 and 9. Time ranges: a dropdown on every health page (Today default, Yesterday, This week, Last week, Last 7 days, Last 15 days, Custom date / time inside the 15 stored days), calendar ranges in IST with Monday weeks, each compared with the whole dates before it from the daily totals (Overview hero, client and license pages' comparison strip, every row's "vs … yesterday"); license page journey and chart follow the range. Synced calls: a CRM callout counts as "Picked up by the app" (7,324 → 8,289 of 8,289 calls); "No stored ingest log" is info; missed or rejected calls never "not recorded" (390 → 40, the 350 moved all reached the CRM); "Data is thin" judges a call by when it was made (27 false gaps → 0); S3 purge-after-sync flag raised to warning with its cause | Done, builds, typechecks and lints; counts checked read-only against the store; not yet viewed signed in | `lib/callanchor/range.ts`, `health/range-ui.tsx`, `health/RangeSelect.tsx`, `lib/callanchor/health.ts`, `isUnconnected` and `PLATFORM_FAULTS` in `lib/callanchor/issues.ts` |
 | 2026-11-19 | Licenses saved by older code are re-read: `ca_licenses.read_version` below `LICENSE_READ_VERSION` triggers an immediate client list pull on any page, re-saving every license; `ca_licenses.raw` keeps each license as CallAnchor sent it | Done, typechecks and lints; pushed 2026-11-19 | `LICENSE_READ_VERSION`, `saveLicenses` and `planPull` in `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-19 | Device read from `lastLoginDevice` when the tenant sends no brand/model fields (licenses showed unknown device, e.g. a OnePlus at Manish Minerals); filled on the next tenant pull; empty-to-known isn't a device change | Done, typechecks and lints; pushed 2026-11-19 | `deviceParts` and `saveLicenses` in `lib/callanchor/store.ts` |
 | 2026-11-19 | Agent name shown with every phone number: under the number in the Calls & logs table, beside it on the call and issue pages, and in the breadcrumb and phone filter chip | Done, typechecks and lints; pushed 2026-11-19 | `agentText` in `lib/callanchor/labels.ts`, `callItems` in `lib/callanchor/health.ts`, `health/_views/items.tsx`, `call.tsx`, `issue.tsx`, `health/layout.tsx` |
@@ -445,6 +458,13 @@ One line per piece of feedback, newest first: date, what the owner said, and wha
   success, and to look for similar cases, but to be careful because not every 0-second call is fine.
   Checked: no-ingest-log calls all predate our logs; CallAnchor's post-sync recording purge actually
   fails every time. Both are listed under Recommendations, with follow-up questions to the owner.
+- 2026-11-19: Answered: count accepted `recording.ready` and `call.completed` syncs as success;
+  ranges Today, Yesterday, This week, Last week, Last 7 days, Last 15 days and a custom date / time
+  inside the stored days; weeks Monday to Monday; compare by dates only, numbers only, no drill-down;
+  headline numbers and journey; add a health flag for the S3 purge. Built all of it and the rules in
+  the SOP. Correction from the check: accepted `recording.ready` already counted as uploaded; the
+  real gaps were the "Picked up" step, missed calls with ring time counted "not recorded", and
+  retries counted as missing logs.
 - 2026-11-19: Pointed out that the tenant API gives Vaishnavi's (Manish Minerals) device as OnePlus
   while the portal showed it unknown. Cause: some licenses carry only `lastLoginDevice` ("Brand
   Model") without `lastLoginAndroidBrand`/`Model`, and we read only the latter. Now split from

@@ -4,12 +4,14 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { cardClass, secondaryButtonClass } from "@/components/ui";
 import { InternalMark } from "@/components/InternalMark";
-import { loadClientHealth, WINDOW_DAYS, type Drill, type WindowDays } from "@/lib/callanchor/health";
+import { customBounds, loadClientHealth, rangeFrom, type Drill } from "@/lib/callanchor/health";
+import type { TimeRange } from "@/lib/callanchor/range";
 import type { CallStage } from "@/lib/callanchor/issues";
 import { PortalError } from "@/lib/callanchor/portal";
 import { HEALTH_PATH, requireCallAnchorSession, storedCookie, verifyUrl } from "@/lib/callanchor/session";
 import { setClientInternalAction } from "../../actions";
 import { ago, clientHref, formatTime, httpTone, int, itemsHref, pct, rateClass, severityTone, toneBadge } from "../../format";
+import { CompareStrip, RangePicker } from "../../range-ui";
 import { Collapsed, CoverageNote, Funnel, JourneyRollup, ItemLink, LoadingNote, PulsePanel, Section, SyncTrend, Table, Tile, td } from "../../parts";
 
 export const metadata: Metadata = { title: "Client health" };
@@ -24,13 +26,13 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   const path = clientHref(HEALTH_PATH, clientId);
   const { profile } = await requireCallAnchorSession(path);
   // The range is shared with the entity tabs (owner, 2026-11-13); older links used ?window=.
-  const days = (WINDOW_DAYS.find((d) => String(d) === (query.range ?? query.window)) ?? 1) as WindowDays;
+  const range = rangeFrom(query);
 
   return (
     <div>
       {profile ? (
         <Suspense fallback={<LoadingNote text="Reading this client's calls, recordings and CRM syncs from CallAnchor…" />}>
-          <ClientHealth clientId={clientId} days={days} path={path} />
+          <ClientHealth clientId={clientId} range={range} path={path} query={query} />
         </Suspense>
       ) : (
         <p className="mt-6 text-sm text-slate-500">CallAnchor can&apos;t be reached right now.</p>
@@ -39,35 +41,14 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
   );
 }
 
-function WindowPicker({ path, days }: { path: string; days: WindowDays }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Range</span>
-      {WINDOW_DAYS.map((d) => (
-        <Link
-          key={d}
-          scroll={false}
-          href={d === 1 ? path : `${path}?range=${d}`}
-          aria-current={d === days ? "page" : undefined}
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${
-            d === days ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          {d === 1 ? "24 hours" : `${d} days`}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-async function ClientHealth({ clientId, days, path }: { clientId: string; days: WindowDays; path: string }) {
+async function ClientHealth({ clientId, range, path, query }: { clientId: string; range: TimeRange; path: string; query: Record<string, string | string[] | undefined> }) {
   const { member } = await requireCallAnchorSession(path);
   const cookie = await storedCookie(member.id);
   if (!cookie) redirect(verifyUrl(path));
 
   let data;
   try {
-    data = await loadClientHealth(cookie, clientId, days);
+    data = await loadClientHealth(cookie, clientId, range);
   } catch (error) {
     if (error instanceof PortalError && error.rejected) redirect(verifyUrl(path));
     if (error instanceof PortalError && error.status === 404) notFound();
@@ -85,10 +66,10 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
 
   const now = Date.parse(data.loadedAt);
   const { client, tenant, funnel, licenseTotals, seats } = data;
-  const items = (drill: Drill) => itemsHref(HEALTH_PATH, drill, { client: clientId, window: days });
+  const items = (drill: Drill) => itemsHref(HEALTH_PATH, drill, { client: clientId, range });
   const stageHref = (stage: CallStage) => items({ kind: "calls", stage });
   // The pulse covers fixed spans (24 hours, 7 and 30 days), whatever the window picker says.
-  const pulseHref = (stage: CallStage, window = 1) => itemsHref(HEALTH_PATH, { kind: "calls", stage }, { client: clientId, window });
+  const pulseHref = (stage: CallStage, window = 1) => itemsHref(HEALTH_PATH, { kind: "calls", stage, window: String(window) }, { client: clientId });
   const top = data.issues.find((i) => i.level !== "info");
   const problemPhones = licenseTotals.critical + licenseTotals.warning;
   const failedReplies = data.replies.filter((r) => r.status === "failed");
@@ -116,23 +97,23 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
         {top
           ? `${top.title}${top.impactText ? `: ${top.impactText}` : ""}${top.firstAt ? `, since ${formatTime(top.firstAt)} IST` : ""}.`
           : data.callCount
-            ? `No problems found. ${funnel.due ? `${pct(funnel.reachedShare)} of due calls reached the CRM in ${data.windowLabel}.` : `No call was due at a CRM in ${data.windowLabel}.`}`
-            : `No calls in ${data.windowLabel}, and nothing needs action.`}
+            ? `No problems found. ${funnel.due ? `${pct(funnel.reachedShare)} of due calls reached the CRM ${data.range.inText}.` : `No call was due at a CRM ${data.range.inText}.`}`
+            : `No calls ${data.range.inText}, and nothing needs action.`}
         {problemPhones > 0 && ` ${problemPhones} of ${licenseTotals.total} phones need attention.`}
       </p>
       <CoverageNote store={data.store} coverage={data.coverage} pullErrors={data.pullErrors} now={now} tookMs={data.tookMs} />
 
       <section id="s-call-journey" data-section="Call journey" className="mt-6 scroll-mt-32">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-slate-900">Call journey, {data.windowLabel}</h2>
-          <WindowPicker path={path} days={days} />
+          <h2 className="text-base font-semibold text-slate-900">Call journey, {data.range.label}</h2>
+          <RangePicker range={range} path={path} query={query} bounds={customBounds()} />
         </div>
       <p className="mt-1 text-sm text-slate-500">
         Where this client&apos;s calls stop between the phone and the CRM. Every number opens its calls.
         {funnel.noLog > 0 && (
           <>
             {" "}
-            <ItemLink href={stageHref("noLog")}>{int(funnel.noLog)} calls</ItemLink> have CRM callouts but no stored ingest log, so they&apos;re missing from the first step.
+            <ItemLink href={stageHref("noLog")}>{int(funnel.noLog)} calls</ItemLink> have no stored ingest log; their CRM callouts show the app took them in.
           </>
         )}
         {funnel.skipped > 0 && (
@@ -142,6 +123,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
           </>
         )}
       </p>
+        <CompareStrip totals={data.totals} comparison={data.comparison} recordings={tenant.takesRecordings} />
         <div className="mt-3">
           <JourneyRollup journey={data.journey} href={stageHref} lastComplete={data.pulse.lastComplete} now={now} recordings={tenant.takesRecordings} />
         </div>
@@ -183,7 +165,7 @@ async function ClientHealth({ clientId, days, path }: { clientId: string; days: 
       />
 
       <Section
-        title={`CRM replies, ${data.windowLabel}`}
+        title={`CRM replies, ${data.range.label}`}
         note="Grouped by what we know. What the CRM said is each client's own code, so it's shown as samples and never decides severity."
       >
         <Table head={["What we know", "Calls", "What the CRM said", "Latest"]} empty={data.replies.length ? undefined : "No CRM syncs in this window."}>

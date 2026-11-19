@@ -34,7 +34,7 @@ export function trailFor(pathname: string, back: string | null, clients: Record<
     else if (view === "devices") crumbs.push({ label: "Devices" });
     else if (view === "items") crumbs.push({ label: "Calls & logs" });
     else if (view === "calls") {
-      crumbs.push({ label: "Calls & logs", href: backTo ?? `${root}/items?kind=calls&stage=all&window=1` });
+      crumbs.push({ label: "Calls & logs", href: backTo ?? `${root}/items?kind=calls&stage=all` });
       if (id) crumbs.push({ label: `Call ${id}` });
     } else if (view === "issues") {
       crumbs.push({ label: "Issues", href: `${root}/issues` });
@@ -42,7 +42,7 @@ export function trailFor(pathname: string, back: string | null, clients: Record<
     } else crumbs.push({ label: "Overview" });
   } else {
     const [view, id] = segs;
-    crumbs.push({ label: FLEET_LABELS[view ?? ""] ?? "Overview", href: view && id ? `${BASE}/${view === "calls" ? "items?kind=calls&stage=all&window=1" : view}` : undefined });
+    crumbs.push({ label: FLEET_LABELS[view ?? ""] ?? "Overview", href: view && id ? `${BASE}/${view === "calls" ? "items?kind=calls&stage=all" : view}` : undefined });
     if (id) crumbs.push({ label: view === "calls" ? `Call ${id}` : view === "issues" ? "Issue" : id });
   }
   const last = crumbs.length - 1;

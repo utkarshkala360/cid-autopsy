@@ -579,7 +579,7 @@ function PlainStat({ label, value, detail, href, tone }: { label: string; value:
 // A client's views, all under /health/clients/<client> (owner, 2026-11-13).
 export const clientViews = (basePath: string, clientId: string) => {
   const root = `${basePath}/clients/${encodeURIComponent(clientId)}`;
-  return { health: root, licenses: `${root}/licenses`, seats: `${root}/licenses?use=unused`, items: `${root}/items?kind=calls&stage=all&window=1` };
+  return { health: root, licenses: `${root}/licenses`, seats: `${root}/licenses?use=unused`, items: `${root}/items?kind=calls&stage=all` };
 };
 
 // A section's anchor and its name in the left menu's "On this page": the title up to any count.

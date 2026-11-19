@@ -948,19 +948,22 @@ const toLog = (r: Row): StoredLog => ({
 // Summaries read every log in a window, so they leave out `raw`.
 const LOG_COLUMNS = "id, client_id, occurred_at, category, severity, source, resource_id, call_id, message, detail";
 
-export async function readCallouts(clientId: string | null, since: number): Promise<StoredCallout[]> {
+// `until` (exclusive) bounds a range in the past, such as yesterday.
+export async function readCallouts(clientId: string | null, since: number, until = Date.now() + DAY): Promise<StoredCallout[]> {
   const from = new Date(since).toISOString();
+  const to = new Date(until).toISOString();
   const rows = clientId
-    ? await db()`SELECT * FROM ca_callout_events WHERE client_id = ${clientId} AND at >= ${from} ORDER BY at DESC`
-    : await db()`SELECT * FROM ca_callout_events WHERE at >= ${from} ORDER BY at DESC`;
+    ? await db()`SELECT * FROM ca_callout_events WHERE client_id = ${clientId} AND at >= ${from} AND at < ${to} ORDER BY at DESC`
+    : await db()`SELECT * FROM ca_callout_events WHERE at >= ${from} AND at < ${to} ORDER BY at DESC`;
   return rows.map(toCallout);
 }
 
-export async function readLogs(clientId: string | null, since: number): Promise<StoredLog[]> {
+export async function readLogs(clientId: string | null, since: number, until = Date.now() + DAY): Promise<StoredLog[]> {
   const from = new Date(since).toISOString();
+  const to = new Date(until).toISOString();
   const rows = clientId
-    ? await db().query(`SELECT ${LOG_COLUMNS} FROM ca_system_logs WHERE client_id = $1 AND occurred_at >= $2 ORDER BY occurred_at DESC`, [clientId, from])
-    : await db().query(`SELECT ${LOG_COLUMNS} FROM ca_system_logs WHERE occurred_at >= $1 ORDER BY occurred_at DESC`, [from]);
+    ? await db().query(`SELECT ${LOG_COLUMNS} FROM ca_system_logs WHERE client_id = $1 AND occurred_at >= $2 AND occurred_at < $3 ORDER BY occurred_at DESC`, [clientId, from, to])
+    : await db().query(`SELECT ${LOG_COLUMNS} FROM ca_system_logs WHERE occurred_at >= $1 AND occurred_at < $2 ORDER BY occurred_at DESC`, [from, to]);
   return rows.map(toLog);
 }
 
@@ -1013,10 +1016,11 @@ function conditions() {
 
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
 
-export async function readCalloutPage(filter: CalloutFilter, days: number, page: number) {
+export async function readCalloutPage(filter: CalloutFilter, range: { from: number; to: number }, page: number) {
   const now = Date.now();
   const c = conditions();
-  c.add("at >= ?", new Date(now - days * DAY).toISOString());
+  c.add("at >= ?", new Date(range.from).toISOString());
+  c.add("at < ?", new Date(range.to).toISOString());
   if (filter.clientId) c.add("client_id = ?", filter.clientId);
   if (filter.status) c.add(`${CRM_STATUS_SQL} = ?`, filter.status);
   if (filter.platform) c.add("platform_id = ?", filter.platform);
@@ -1033,10 +1037,11 @@ export async function readCalloutPage(filter: CalloutFilter, days: number, page:
   return { items: rows.map(toCallout), total: Number(rows[0]?.total ?? 0), now };
 }
 
-export async function readLogPage(filter: LogFilter, days: number, page: number) {
+export async function readLogPage(filter: LogFilter, range: { from: number; to: number }, page: number) {
   const now = Date.now();
   const c = conditions();
-  c.add("occurred_at >= ?", new Date(now - days * DAY).toISOString());
+  c.add("occurred_at >= ?", new Date(range.from).toISOString());
+  c.add("occurred_at < ?", new Date(range.to).toISOString());
   if (filter.clientId) c.add("client_id = ?", filter.clientId);
   if (filter.source) c.add("(source = ? OR source LIKE ?)", filter.source, `${escapeLike(filter.source)}.%`);
   if (filter.severity) c.add("severity = ?", filter.severity);
@@ -1238,9 +1243,10 @@ const toCall = (r: Row): StoredCall => ({
 });
 
 // A call's time is when it was ingested, or its first callout when its ingest log wasn't stored.
-export async function readCalls(scope: { clientId?: string | null; licenseId?: string | null }, since: number): Promise<StoredCall[]> {
+export async function readCalls(scope: { clientId?: string | null; licenseId?: string | null }, since: number, until?: number): Promise<StoredCall[]> {
   const c = conditions();
   c.add("coalesce(ingested_at, first_callout_at) >= ?", new Date(since).toISOString());
+  if (until !== undefined) c.add("coalesce(ingested_at, first_callout_at) < ?", new Date(until).toISOString());
   if (scope.clientId) c.add("client_id = ?", scope.clientId);
   if (scope.licenseId) c.add("license_id = ?", scope.licenseId);
   const rows = await db().query(`SELECT * FROM ca_calls ${c.where} ORDER BY coalesce(ingested_at, first_callout_at) DESC`, c.params);
@@ -1469,6 +1475,21 @@ export async function saveDaily() {
        verified_unsent = EXCLUDED.verified_unsent, recorded = EXCLUDED.recorded, uploaded = EXCLUDED.uploaded,
        verified = EXCLUDED.verified, synced = EXCLUDED.synced, saved_at = now()`,
   );
+}
+
+// When the oldest stored system log was written: calls made before it can't have a stored ingest log.
+export async function readLogsSince(): Promise<string | null> {
+  const [row] = await db()`SELECT min(occurred_at) AS since FROM ca_system_logs`;
+  return row?.since ? iso(row.since) : null;
+}
+
+// The first IST day the store holds any call of, from the daily totals or the calls themselves.
+export async function readFirstDay(): Promise<string | null> {
+  const [row] = await db().query(
+    `SELECT least((SELECT min(day) FROM ca_daily),
+       (SELECT to_char(min(coalesce(ingested_at, first_callout_at)) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') FROM ca_calls)) AS day`,
+  );
+  return row?.day ?? null;
 }
 
 export async function readDaily(scope: { clientId?: string | null; licenseId?: string | null }, since: number, serverGraceMs: number): Promise<DayRow[]> {

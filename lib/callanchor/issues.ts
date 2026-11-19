@@ -204,15 +204,18 @@ export const isVerified = (c: StoredCall) => c.verifiedAt !== null || sentRecord
 export const isUploaded = (c: StoredCall) => c.uploadedAt !== null || isVerified(c);
 export const isRecorded = (c: StoredCall) =>
   c.recordingDetail === "pending_upload" || c.uploadStartedAt !== null || c.uploadFailedAt !== null || isUploaded(c);
-// A call that never connected, so had nothing to record: its payload says 0 seconds (owner,
-// 2026-11-05), or it was missed or rejected. Without a payload length, a call synced only as
-// call.completed, which CallAnchor sends for a missed incoming or rejected outgoing call, counts too.
-// Not a recording failure.
+// A call that never connected, so had nothing to record: missed or rejected, whatever its length (a
+// missed call's seconds are ring time: 382 such calls with call.completed accepted were flagged "not
+// recorded" before 2026-11-19), or its payload says 0 seconds (owner, 2026-11-05). Without a payload
+// length, a call synced only as call.completed, which CallAnchor sends for a missed incoming or
+// rejected outgoing call, counts too. A recorded call never does, so an answered call whose recording
+// didn't arrive stays a problem (owner, 2026-11-19: not every 0-second call is fine). Not a recording
+// failure.
 export const isUnconnected = (c: StoredCall) =>
   !isRecorded(c) &&
-  (c.callSeconds !== null
-    ? c.callSeconds === 0
-    : c.callType === "missed" || c.callType === "rejected" || c.deliveredEvents.includes("call.completed"));
+  (c.callType === "missed" ||
+    c.callType === "rejected" ||
+    (c.callSeconds !== null ? c.callSeconds === 0 : c.deliveredEvents.includes("call.completed")));
 // When the call was ready to go to the CRM: after verification for a recording, else on ingest.
 const readyAt = (c: StoredCall) => (c.verifiedAt && isRecorded(c) ? c.verifiedAt : c.ingestedAt);
 
@@ -300,7 +303,9 @@ export const CALL_STAGES = {
     },
   },
   duplicate: { title: "Calls the CRM accepted more than once for the same event", test: (c) => c.duplicateDeliveries > 0 },
-  noLog: { title: "Calls with CRM callouts but no stored ingest log", test: (c) => c.attempts > 0 && c.ingestedAt === null },
+  // Information, not a problem: the callout shows the app took the call in (owner, 2026-11-19). Every
+  // such call so far was made before the first stored log.
+  noLog: { title: "Calls with CRM callouts but no stored ingest log (the callout shows the app took them in)", test: (c) => c.attempts > 0 && c.ingestedAt === null },
   // The journey: phone → app → recording uploaded → sent to the CRM → accepted. Each call stops at most
   // once, at the first step that broke (see journeyStop); the roll-ups count with these same tests.
   stopUpload: { title: "Calls stopped at the recording upload", test: (c, ctx, now) => journeyStop(c, ctx, now) === "upload" },
@@ -378,7 +383,8 @@ export function addToJourney(out: JourneySummary, c: StoredCall, ctx: ClientCont
   else if (isComplete(c, ctx)) out.complete++;
   else out.moving++;
   if (isRecorded(c)) out.recorded++;
-  if (c.ingestedAt) out.picked++;
+  // A CRM callout proves the app passed the call on, even without its stored ingest log.
+  if (c.ingestedAt || c.attempts > 0) out.picked++;
   if (c.attempts > 0) out.sent++;
 }
 
@@ -1030,37 +1036,59 @@ function accountIssues(input: ClientInput, now: number): Issue[] {
 // ---- Fleet-wide CallAnchor faults ----
 
 // `match` and `drill` must select the same log lines, so a count and its rows agree (QA P2).
-export const PLATFORM_FAULTS = [
+type PlatformFault = {
+  kind: string;
+  title: string;
+  level: IssueLevel;
+  match: (l: StoredLog) => boolean;
+  drill: IssueDrill;
+  // What the lines say beyond their count.
+  evidence?: (hits: StoredLog[]) => string[];
+};
+
+export const PLATFORM_FAULTS: PlatformFault[] = [
   {
+    // A health flag (owner, 2026-11-19): CallAnchor tries to delete each recording from S3 right after
+    // its CRM sync, and every attempt fails, so recordings stay in storage after they sync.
     kind: "platform_s3_purge",
     title: "CallAnchor isn't deleting recordings from S3 after they sync",
+    level: "warning",
     match: (l: StoredLog) => (l.source === "platform-recording-cleanup" || l.source.startsWith("platform-recording-cleanup.")) && l.message.startsWith("Failed"),
     drill: { kind: "logs", source: "platform-recording-cleanup", starts: "Failed" },
+    // The reason is in each line's metadata, which summaries don't read; open the lines to see it.
+    evidence: (hits) => [
+      `${n(new Set(hits.map((l) => l.callId ?? l.id)).size, "synced recording")} still in storage: the delete after the CRM sync failed`,
+      "On 19 Nov every failure said CallAnchor's storage user isn't allowed to delete files (s3:DeleteObject); open the log lines for the current reason",
+      "CallAnchor logs this as info only. Raise it with CallAnchor: their storage permissions need fixing",
+    ],
   },
   {
     kind: "platform_normalize",
     title: "Recording normalize-cleanup errors",
+    level: "info",
     match: (l: StoredLog) => (l.source === "mobile.recording.normalize-cleanup" || l.source.startsWith("mobile.recording.normalize-cleanup.")) && l.severity !== "info",
     drill: { kind: "logs", source: "mobile.recording.normalize-cleanup", problems: "1" },
   },
   {
     kind: "platform_retention",
     title: "Data retention purge errors",
+    level: "info",
     match: (l: StoredLog) => (l.source === "internal.calls.data-retention-purge" || l.source.startsWith("internal.calls.data-retention-purge.")) && l.severity !== "info",
     drill: { kind: "logs", source: "internal.calls.data-retention-purge", problems: "1" },
   },
-] as const;
+];
 
-export function platformIssues(logs: StoredLog[], now: number, windowText = "24 hours"): Issue[] {
+// `inText` finishes "12 log lines …": "today", "in the last 7 days".
+export function platformIssues(logs: StoredLog[], now: number, inText = "in the last 24 hours"): Issue[] {
   return PLATFORM_FAULTS.flatMap((fault) => {
     const hits = logs.filter(fault.match);
     if (hits.length === 0) return [];
     return [
-      issue({ scope: "fleet", clientId: null, licenseId: null }, fault.kind, "info", fault.title, now, {
+      issue({ scope: "fleet", clientId: null, licenseId: null }, fault.kind, fault.level, fault.title, now, {
         impact: 0,
-        impactText: `${n(hits.length, "log line")} in ${windowText}`,
+        impactText: `${n(hits.length, "log line")} ${inText}`,
         times: hits.map((l) => l.occurredAt),
-        evidence: [`${n(new Set(hits.map((l) => l.clientId)).size, "client")} affected. A CallAnchor fault, not the client's`],
+        evidence: [...(fault.evidence?.(hits) ?? []), `${n(new Set(hits.map((l) => l.clientId)).size, "client")} affected. A CallAnchor fault, not the client's`],
         drill: { ...fault.drill },
       }),
     ];

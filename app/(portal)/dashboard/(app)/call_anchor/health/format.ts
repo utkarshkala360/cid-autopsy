@@ -84,12 +84,14 @@ const scoped = (basePath: string, clientId?: string | null) => (clientId ? clien
 
 // Links into the item views. `scope` narrows to one client and sets the window, in days; without one,
 // a drill's own window applies. `issue` shows that issue's evidence above the rows.
-export function itemsHref(basePath: string, drill: Drill, scope: { client?: string; window?: number; issue?: string } = {}) {
-  const query = new URLSearchParams({
-    ...drill,
-    window: String(scope.window ?? (Number(drill.window) || 1)),
-    ...(scope.issue ? { issue: scope.issue } : {}),
-  });
+// `range` (its query) replaces any rolling `window` the drill carries; without either the list opens
+// on Today, the default.
+export function itemsHref(basePath: string, drill: Drill, scope: { client?: string; range?: { query: Record<string, string> }; issue?: string } = {}) {
+  const query = new URLSearchParams({ ...drill, ...(scope.issue ? { issue: scope.issue } : {}) });
+  if (scope.range) {
+    query.delete("window");
+    for (const [key, value] of Object.entries(scope.range.query)) query.set(key, value);
+  }
   return `${scoped(basePath, scope.client)}/items?${query}`;
 }
 

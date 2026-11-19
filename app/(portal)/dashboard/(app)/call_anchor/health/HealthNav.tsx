@@ -86,7 +86,7 @@ export function ClientTabs({ root }: { root: string }) {
     { key: "issues", label: "Issues", href: `${root}/issues${range}`, icon: "alert" },
     { key: "licenses", label: "Licenses", href: `${root}/licenses${range}`, icon: "licenses" },
     { key: "devices", label: "Devices", href: `${root}/devices${range}`, icon: "device" },
-    { key: "items", label: "Calls & logs", href: `${root}/items?kind=calls&stage=all&window=1`, icon: "logs" },
+    { key: "items", label: "Calls & logs", href: `${root}/items?kind=calls&stage=all`, icon: "logs" },
   ];
   return (
     <nav aria-label="This client" className="flex gap-1 overflow-x-auto border-t border-slate-200 bg-white px-4">

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { after } from "next/server";
-import { RangeLink } from "../RangeLink";
 import {
-  WINDOW_DAYS,
+  customBounds,
   loadEntities,
+  rangeFrom,
   warmEntities,
   type ClientEntity,
   type DeviceEntity,
@@ -16,8 +16,10 @@ import {
   type Needs,
   type RangeStats,
   type StripCell,
-  type WindowDays,
+  type Totals,
 } from "@/lib/callanchor/health";
+import type { TimeRange } from "@/lib/callanchor/range";
+import { RangePicker as RangeDropdown, reachVsText, vsText } from "../range-ui";
 import { MODULES, RULES, issueModule, type CallStage, type IssueModule, type SeatState } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import { inputClass, secondaryButtonClass } from "@/components/ui";
@@ -36,9 +38,8 @@ type Query = Record<string, string | string[] | undefined>;
 type Href = (changes: Record<string, string | null>) => string;
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-export const rangeOf = (query: Query): WindowDays => WINDOW_DAYS.find((d) => String(d) === one(query.range)) ?? 1;
-export const rangeLabel = (days: number) => (days === 1 ? "24 hours" : `${days} days`);
-const CELL_WORD: Record<WindowDays, [string, string]> = { 1: ["hour", "hours"], 3: ["6-hour block", "6-hour blocks"], 7: ["day", "days"], 15: ["day", "days"] };
+export const rangeOf = (query: Query): TimeRange => rangeFrom(query);
+const cellWord = (range: TimeRange): [string, string] => (range.cellMs < 86_400_000 ? ["hour", "hours"] : ["day", "days"]);
 
 // Links that change some of the page's query and keep the rest.
 export function queryHref(path: string, query: Query): Href {
@@ -141,7 +142,7 @@ function NameCell({ chip, href, label, sub, mono = false }: { chip: { icon: stri
 
 const levelChip = (level: Level, note: string) => ({ icon: LEVELS[level].icon, className: LEVELS[level].className, note });
 
-// The range's sync as a strip: one cell per hour (24 hours), 6 hours (3 days) or day (7, 15 days).
+// The range's sync as a strip: one cell per hour (ranges up to two days) or day.
 function Strip({ cells }: { cells: StripCell[] }) {
   const narrow = cells.length > 15;
   return (
@@ -161,8 +162,8 @@ function Strip({ cells }: { cells: StripCell[] }) {
   );
 }
 
-function CrmCell({ stats, lastThrough, days, now, ringHref }: { stats: RangeStats; lastThrough: LastThrough; days: WindowDays; now: number; ringHref?: string }) {
-  const [word, words] = CELL_WORD[days];
+function CrmCell({ stats, lastThrough, range, now, ringHref }: { stats: RangeStats; lastThrough: LastThrough; range: TimeRange; now: number; ringHref?: string }) {
+  const [word, words] = cellWord(range);
   return (
     <td className="px-3 py-2 align-top">
       <div className="flex items-start gap-3">
@@ -232,11 +233,11 @@ function NeedsCell({ needs, href }: { needs: Needs; href: string }) {
 const FEW_CALLS = 20;
 
 // Impact (owner, 2026-11-13): the calls surely lost in the range, then how many broke of how many.
-function ImpactCell({ stats, days }: { stats: RangeStats; days: WindowDays }) {
+function ImpactCell({ stats, range }: { stats: RangeStats; range: TimeRange }) {
   if (stats.broke === 0) return <td className={`${td} text-right text-xs text-slate-400`}>none lost</td>;
   const pctBroke = Math.round((stats.broke / stats.calls) * 1000) / 10;
   const few = stats.calls < FEW_CALLS;
-  const tip = `${int(stats.broke)} of ${int(stats.calls)} calls in the last ${rangeLabel(days)} stopped on their way (recording not uploaded, not sent, or not accepted by the CRM). With this many calls, at least ${int(stats.sureLost)} of them point to a real problem rather than chance${few ? `. Under ${FEW_CALLS} calls, one call swings the share a lot` : ""}.`;
+  const tip = `${int(stats.broke)} of ${int(stats.calls)} calls ${range.inText} stopped on their way (recording not uploaded, not sent, or not accepted by the CRM). With this many calls, at least ${int(stats.sureLost)} of them point to a real problem rather than chance${few ? `. Under ${FEW_CALLS} calls, one call swings the share a lot` : ""}.`;
   return (
     <td className={`${td} text-right`}>
       <span title={tip} className={`font-semibold tabular-nums ${stats.sureLost >= 5 ? "text-red-700" : stats.sureLost > 0 ? "text-amber-800" : "text-slate-600"}`}>
@@ -250,23 +251,27 @@ function ImpactCell({ stats, days }: { stats: RangeStats; days: WindowDays }) {
   );
 }
 
-const IMPACT_HEAD = (days: WindowDays) => ({
+const IMPACT_HEAD = (range: TimeRange) => ({
   label: "Impact",
-  info: `Calls lost in the last ${rangeLabel(days)}, allowing for chance: 1 broken call in 10 counts for almost nothing, 10 in 100 for about 5. Rows sort by health, then by this`,
+  info: `Calls lost ${range.inText}, allowing for chance: 1 broken call in 10 counts for almost nothing, 10 in 100 for about 5. Rows sort by health, then by this`,
 });
 
-// Calls in the range, under the row's name (owner, 2026-11-13): "39 calls in 24 hours · last 1 h ago".
-function CallsLine({ stats, lastCallAt, now, href, days }: { stats: RangeStats; lastCallAt: string | null; now: number; href: string; days: WindowDays }) {
+// Calls in the range, under the row's name (owner, 2026-11-13): "39 calls today · last 1 h ago", and
+// the same dates before the range (owner, 2026-11-19): "vs 31 yesterday (+26%)".
+function CallsLine({ stats, prev, lastCallAt, now, href, range }: { stats: RangeStats; prev: Totals | null; lastCallAt: string | null; now: number; href: string; range: TimeRange }) {
   return (
-    <p className="whitespace-nowrap">
-      {stats.calls ? (
-        <Link href={href} className="rounded font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-800">{int(stats.calls)} call{stats.calls === 1 ? "" : "s"}</Link>
-      ) : (
-        "No calls"
-      )}{" "}
-      in {rangeLabel(days)}
-      {lastCallAt && <span className="text-slate-400"> · last {ago(lastCallAt, now)}</span>}
-    </p>
+    <>
+      <p className="whitespace-nowrap">
+        {stats.calls ? (
+          <Link href={href} className="rounded font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-800">{int(stats.calls)} call{stats.calls === 1 ? "" : "s"}</Link>
+        ) : (
+          "No calls"
+        )}{" "}
+        {range.inText}
+        {lastCallAt && <span className="text-slate-400"> · last {ago(lastCallAt, now)}</span>}
+      </p>
+      <p className="whitespace-nowrap text-slate-400">{vsText(stats.calls, prev, range.prev.label)}</p>
+    </>
   );
 }
 
@@ -299,25 +304,16 @@ function SeatsCell({ seats, root }: { seats: ClientEntity["seats"]; root: string
   );
 }
 
-const CORE_HEAD = (days: WindowDays) => [
-  { label: "Call journey", info: `Phone → app → recording uploaded → sent to the CRM → accepted, for calls in the last ${rangeLabel(days)}. A red dot is a step where calls stopped, with how many` },
-  { label: "CRM syncs", info: `The ring: due calls in the last ${rangeLabel(days)} that the CRM accepted (2xx with a record id), of all due. The strip: each ${CELL_WORD[days][0]}, synced when ${"≥"} the synced-day rate in Settings reached it. Then when a call last went all the way through` },
+const CORE_HEAD = (range: TimeRange) => [
+  { label: "Call journey", info: `Phone → app → recording uploaded → sent to the CRM → accepted, for calls ${range.inText}. A red dot is a step where calls stopped, with how many` },
+  { label: "CRM syncs", info: `The ring: due calls ${range.inText} that the CRM accepted (2xx with a record id), of all due. The strip: each ${cellWord(range)[0]}, synced when ${"≥"} the synced-day rate in Settings reached it. Then when a call last went all the way through` },
   { label: "Needs action", info: "Open issues right now, critical and warning. Counts issues, not calls: one issue covers every call it affects. Under it, the calls not in the CRM across those issues, each counted once, back 15 days, and the worst issue. Opens them in the Issues tab" },
 ];
 
 // ---- The range picker and search, above every table ----
 
-export function RangePicker({ days, href }: { days: WindowDays; href: Href }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Range</span>
-      {WINDOW_DAYS.map((d) => (
-        <RangeLink key={d} href={href({ range: d === 1 ? null : String(d), page: null })} active={d === days}>
-          {rangeLabel(d)}
-        </RangeLink>
-      ))}
-    </div>
-  );
+export function RangePicker({ range, path, query }: { range: TimeRange; path: string; query: Query }) {
+  return <RangeDropdown range={range} path={path} query={query} bounds={customBounds()} />;
 }
 
 // The other ranges are computed once the page is sent, so switching range is usually instant: each
@@ -337,19 +333,19 @@ function SearchBox({ path, query, placeholder }: { path: string; query: Query; p
 
 // ---- Rows per entity ----
 
-type Ctx = { now: number; days: WindowDays; scoped: boolean };
+type Ctx = { now: number; range: TimeRange; scoped: boolean };
 const callsDrill = (stage: CallStage, extra: Record<string, string> = {}): Drill => ({ kind: "calls", stage, ...extra });
 
 export function IssueRows({ rows, ctx }: { rows: IssueEntity[]; ctx: Ctx }) {
-  const { now, days, scoped } = ctx;
+  const { now, range, scoped } = ctx;
   return (
-    <Table head={["Issue", ...(scoped ? [] : ["Client"]), "Phone · agent", "Status", { label: "Impact", info: "Calls this issue affects. Issues sort by severity, then by this" }, ...CORE_HEAD(days)]} empty={rows.length ? undefined : "No issues match."}>
+    <Table head={["Issue", ...(scoped ? [] : ["Client"]), "Phone · agent", "Status", { label: "Impact", info: "Calls this issue affects. Issues sort by severity, then by this" }, ...CORE_HEAD(range)]} empty={rows.length ? undefined : "No issues match."}>
       {rows.map((r) => {
         const { issue } = r;
         const level = ISSUE_LEVELS[issue.level];
         const links = issueLinks(HEALTH_PATH, issue);
         const scope: Record<string, string> = issue.licenseId ? { license: issue.licenseId } : {};
-        const items = (stage: CallStage) => itemsHref(HEALTH_PATH, callsDrill(stage, scope), { client: issue.clientId ?? undefined, window: days });
+        const items = (stage: CallStage) => itemsHref(HEALTH_PATH, callsDrill(stage, scope), { client: issue.clientId ?? undefined, range });
         return (
           <tr key={issue.id} className="hover:bg-slate-50">
             <NameCell
@@ -390,7 +386,7 @@ export function IssueRows({ rows, ctx }: { rows: IssueEntity[]; ctx: Ctx }) {
               {issue.impactText && <p className="text-xs text-slate-500">{issue.impactText}</p>}
             </td>
             <JourneyCell stats={r.stats} href={items} />
-            <CrmCell stats={r.stats} lastThrough={r.lastThrough} days={days} now={now} ringHref={items("notReached")} />
+            <CrmCell stats={r.stats} lastThrough={r.lastThrough} range={range} now={now} ringHref={items("notReached")} />
             <td className={td}>
               <Link href={links.primary} className={secondaryButtonClass}>{links.rows ? "Open items" : "Details"}</Link>
             </td>
@@ -402,12 +398,12 @@ export function IssueRows({ rows, ctx }: { rows: IssueEntity[]; ctx: Ctx }) {
 }
 
 export function ClientRows({ rows, ctx }: { rows: ClientEntity[]; ctx: Ctx }) {
-  const { now, days } = ctx;
+  const { now, range } = ctx;
   return (
-    <Table head={["Client", { label: "Licenses", info: "Out of the licenses purchased: how many are active, logged in, calling (a call within the unused threshold in Settings) and unused (not assigned, logged out, or logged in without calling). Each opens those licenses" }, IMPACT_HEAD(days), ...CORE_HEAD(days)]} empty={rows.length ? undefined : "No clients match."}>
+    <Table head={["Client", { label: "Licenses", info: "Out of the licenses purchased: how many are active, logged in, calling (a call within the unused threshold in Settings) and unused (not assigned, logged out, or logged in without calling). Each opens those licenses" }, IMPACT_HEAD(range), ...CORE_HEAD(range)]} empty={rows.length ? undefined : "No clients match."}>
       {rows.map((r) => {
         const root = clientHref(HEALTH_PATH, r.clientId);
-        const items = (stage: CallStage) => itemsHref(HEALTH_PATH, callsDrill(stage), { client: r.clientId, window: days });
+        const items = (stage: CallStage) => itemsHref(HEALTH_PATH, callsDrill(stage), { client: r.clientId, range });
         return (
           <tr key={r.clientId} className="hover:bg-slate-50">
             <NameCell
@@ -419,15 +415,15 @@ export function ClientRows({ rows, ctx }: { rows: ClientEntity[]; ctx: Ctx }) {
                   {r.internal && <span className="font-medium text-slate-700">internal · </span>}
                   {r.status}
                   {r.integrations.length ? ` · ${r.integrations.join(", ")}` : " · no integration"}
-                  <CallsLine stats={r.stats} lastCallAt={r.stats.lastCallAt} now={now} href={items("all")} days={days} />
+                  <CallsLine stats={r.stats} prev={r.prev} lastCallAt={r.stats.lastCallAt} now={now} href={items("all")} range={range} />
                   {r.error && <p className="text-red-700">{r.error}</p>}
                 </>
               }
             />
             <SeatsCell seats={r.seats} root={root} />
-            <ImpactCell stats={r.stats} days={days} />
+            <ImpactCell stats={r.stats} range={range} />
             <JourneyCell stats={r.stats} href={items} />
-            <CrmCell stats={r.stats} lastThrough={r.lastThrough} days={days} now={now} ringHref={items("notReached")} />
+            <CrmCell stats={r.stats} lastThrough={r.lastThrough} range={range} now={now} ringHref={items("notReached")} />
             <NeedsCell needs={r.needs} href={`${root}/issues`} />
           </tr>
         );
@@ -446,12 +442,12 @@ const SEAT_STATES: Record<SeatState, { label: string; tone: Tone }> = {
 const SEAT_TEXT: Record<Tone, string> = { green: "text-emerald-700", amber: "font-medium text-amber-800", slate: "text-slate-400", red: "text-red-700", sky: "text-sky-800" };
 
 export function LicenseRows({ rows, ctx }: { rows: LicenseEntity[]; ctx: Ctx }) {
-  const { now, days, scoped } = ctx;
+  const { now, range, scoped } = ctx;
   return (
-    <Table head={["Phone · agent", ...(scoped ? [] : ["Client"]), "Seat", "Device", IMPACT_HEAD(days), ...CORE_HEAD(days)]} empty={rows.length ? undefined : "No licenses match."}>
+    <Table head={["Phone · agent", ...(scoped ? [] : ["Client"]), "Seat", "Device", IMPACT_HEAD(range), ...CORE_HEAD(range)]} empty={rows.length ? undefined : "No licenses match."}>
       {rows.map((r) => {
         const seat = SEAT_STATES[r.seat.state];
-        const items = (stage: CallStage) => itemsHref(HEALTH_PATH, callsDrill(stage, { license: r.licenseId }), { client: r.clientId, window: days });
+        const items = (stage: CallStage) => itemsHref(HEALTH_PATH, callsDrill(stage, { license: r.licenseId }), { client: r.clientId, range });
         return (
           <tr key={r.licenseId} className="hover:bg-slate-50">
             <NameCell
@@ -461,7 +457,7 @@ export function LicenseRows({ rows, ctx }: { rows: LicenseEntity[]; ctx: Ctx }) 
               sub={
                 <>
                   <p className="whitespace-nowrap">{r.agentName ?? (r.seat.state === "unassigned" ? "Unassigned" : null)}</p>
-                  <CallsLine stats={r.stats} lastCallAt={r.lastCallAt} now={now} href={items("all")} days={days} />
+                  <CallsLine stats={r.stats} prev={r.prev} lastCallAt={r.lastCallAt} now={now} href={items("all")} range={range} />
                   {r.learning && <NewPhone learning={r.learning} />}
                 </>
               }
@@ -482,9 +478,9 @@ export function LicenseRows({ rows, ctx }: { rows: LicenseEntity[]; ctx: Ctx }) 
                 {r.recordingEnabled === false && <span className="font-medium text-red-700"> · recording off</span>}
               </p>
             </td>
-            <ImpactCell stats={r.stats} days={days} />
+            <ImpactCell stats={r.stats} range={range} />
             <JourneyCell stats={r.stats} href={items} />
-            <CrmCell stats={r.stats} lastThrough={r.lastThrough} days={days} now={now} ringHref={items("notReached")} />
+            <CrmCell stats={r.stats} lastThrough={r.lastThrough} range={range} now={now} ringHref={items("notReached")} />
             <NeedsCell needs={r.needs} href={`${scoped ? `${clientHref(HEALTH_PATH, r.clientId)}/issues` : `${HEALTH_PATH}/issues`}?license=${encodeURIComponent(r.licenseId)}`} />
           </tr>
         );
@@ -512,16 +508,16 @@ function NewPhone({ learning }: { learning: NonNullable<LicenseEntity["learning"
 const topText = (values: [string, number][]) => values.slice(0, 2).map(([v, n]) => `${v} (${n})`).join(", ") + (values.length > 2 ? ` +${values.length - 2}` : "");
 
 export function DeviceRows({ rows, ctx, clientId }: { rows: DeviceEntity[]; ctx: Ctx; clientId: string | null }) {
-  const { now, days } = ctx;
+  const { now, range } = ctx;
   const base = clientId ? clientHref(HEALTH_PATH, clientId) : HEALTH_PATH;
   return (
-    <Table head={["Device", "Licenses", "App version", "Firmware", IMPACT_HEAD(days), ...CORE_HEAD(days)]} empty={rows.length ? undefined : "No devices match."}>
+    <Table head={["Device", "Licenses", "App version", "Firmware", IMPACT_HEAD(range), ...CORE_HEAD(range)]} empty={rows.length ? undefined : "No devices match."}>
       {rows.map((r) => {
         const device = encodeURIComponent(r.device);
         // The items page takes up to 2,000 characters of license ids; past that it opens the licenses.
         const ids = r.licenseIds.join(",");
         const items = (stage: CallStage) =>
-          ids.length <= 2000 ? itemsHref(HEALTH_PATH, callsDrill(stage, { licenses: ids }), { client: clientId ?? undefined, window: days }) : `${base}/licenses?device=${device}`;
+          ids.length <= 2000 ? itemsHref(HEALTH_PATH, callsDrill(stage, { licenses: ids }), { client: clientId ?? undefined, range }) : `${base}/licenses?device=${device}`;
         const bad = r.statuses.critical + r.statuses.warning;
         return (
           <tr key={r.device} className="hover:bg-slate-50">
@@ -532,7 +528,7 @@ export function DeviceRows({ rows, ctx, clientId }: { rows: DeviceEntity[]; ctx:
               sub={
                 <>
                   {!clientId && <p>{`${r.clientIds.length} client${r.clientIds.length === 1 ? "" : "s"}`}</p>}
-                  <CallsLine stats={r.stats} lastCallAt={r.stats.lastCallAt} now={now} href={items("all")} days={days} />
+                  <CallsLine stats={r.stats} prev={r.prev} lastCallAt={r.stats.lastCallAt} now={now} href={items("all")} range={range} />
                 </>
               }
             />
@@ -552,9 +548,9 @@ export function DeviceRows({ rows, ctx, clientId }: { rows: DeviceEntity[]; ctx:
             </td>
             <td className="max-w-48 px-3 py-2 align-top text-xs text-slate-600">{topText(r.appVersions)}</td>
             <td className="max-w-48 px-3 py-2 align-top text-xs text-slate-600">{topText(r.firmware)}</td>
-            <ImpactCell stats={r.stats} days={days} />
+            <ImpactCell stats={r.stats} range={range} />
             <JourneyCell stats={r.stats} href={items} />
-            <CrmCell stats={r.stats} lastThrough={r.lastThrough} days={days} now={now} ringHref={items("notReached")} />
+            <CrmCell stats={r.stats} lastThrough={r.lastThrough} range={range} now={now} ringHref={items("notReached")} />
             <NeedsCell needs={r.needs} href={`${base}/issues?device=${device}`} />
           </tr>
         );
@@ -577,24 +573,24 @@ const UNUSED: SeatState[] = ["idle", "loggedOut", "unassigned"];
 const PAGE = 100;
 
 export function EntityTab({ entity, query, clientId }: { entity: Entity; query: Query; clientId: string | null }) {
-  const days = rangeOf(query);
+  const range = rangeOf(query);
   return (
     <Suspense key={entity} fallback={<LoadingNote text="Reading the stored data for this range…" expectMs={15000} />}>
-      <EntityBody entity={entity} query={query} clientId={clientId} days={days} />
+      <EntityBody entity={entity} query={query} clientId={clientId} range={range} />
     </Suspense>
   );
 }
 
-async function EntityBody({ entity, query, clientId, days }: { entity: Entity; query: Query; clientId: string | null; days: WindowDays }) {
+async function EntityBody({ entity, query, clientId, range }: { entity: Entity; query: Query; clientId: string | null; range: TimeRange }) {
   const path = clientId ? `${clientHref(HEALTH_PATH, clientId)}/${entity}` : `${HEALTH_PATH}/${entity}`;
   await requireCallAnchorSession(path);
   // A client opened by id shows even when it's internal.
   const show = clientId ? true : await showInternal();
-  const data = await loadEntities(show, days);
+  const data = await loadEntities(show, range);
   warmRanges(show);
   const now = Date.parse(data.loadedAt);
   const href = queryHref(path, query);
-  const ctx: Ctx = { now, days, scoped: clientId !== null };
+  const ctx: Ctx = { now, range: data.range, scoped: clientId !== null };
   const q = (one(query.q) ?? "").trim().toLowerCase();
   const found = (...texts: (string | null | undefined)[]) => !q || texts.some((t) => t?.toLowerCase().includes(q));
   const page = Math.max(1, Number(one(query.page)) || 1);
@@ -691,7 +687,12 @@ async function EntityBody({ entity, query, clientId, days }: { entity: Entity; q
     const reached = working.reduce((t, c) => t + c.stats.reached.delivered, 0);
     kpis = [
       { label: "Clients", value: int(working.length), note: `${data.clients.length - working.length} inactive${data.hiddenInternal ? ` · ${data.hiddenInternal} internal hidden` : ""}` },
-      { label: `Reached CRM, ${rangeLabel(days)}`, value: due ? `${Math.round((reached / due) * 1000) / 10}%` : "—", bar: due ? (reached / due) * 100 : null, note: `${int(reached)} of ${int(due)} due` },
+      {
+        label: `Reached CRM, ${range.label}`,
+        value: due ? `${Math.round((reached / due) * 1000) / 10}%` : "—",
+        bar: due ? (reached / due) * 100 : null,
+        note: `${int(reached)} of ${int(due)} due · ${reachVsText(data.fleet.totals, data.comparison.prev, range.prev.label)}`,
+      },
     ];
   } else if (entity === "licenses") {
     const all = own(data.licenses);
@@ -713,7 +714,7 @@ async function EntityBody({ entity, query, clientId, days }: { entity: Entity; q
         },
         {
           key: "calls",
-          title: `Calls, ${rangeLabel(days)}`,
+          title: `Calls, ${range.label}`,
           options: [
             { value: "yes", label: "Made calls", tone: "green", test: (r) => r.stats.calls > 0 },
             { value: "none", label: "No calls", tone: "slate", test: (r) => r.stats.calls === 0 },
@@ -781,7 +782,7 @@ async function EntityBody({ entity, query, clientId, days }: { entity: Entity; q
                 <Link href={picked.clear} aria-label={`Clear ${picked.label}`} className="ml-0.5 text-indigo-500 hover:text-indigo-900">✕</Link>
               </span>
             )}
-            <RangePicker days={days} href={href} />
+            <RangePicker range={range} path={path} query={query} />
             <SearchBox path={path} query={query} placeholder={t.search} />
           </div>
           <div className="mt-3">{table}</div>
@@ -799,10 +800,11 @@ async function EntityBody({ entity, query, clientId, days }: { entity: Entity; q
 }
 
 // The Overview's worst few of each entity, over the range, each opening its tab (owner, 2026-11-13).
-export async function WorstEntities({ days, show, limit = 5 }: { days: WindowDays; show: boolean; limit?: number }) {
-  const data = await loadEntities(show, days);
-  const ctx: Ctx = { now: Date.parse(data.loadedAt), days, scoped: false };
-  const range = days === 1 ? "" : `?range=${days}`;
+export async function WorstEntities({ range: picked, show, limit = 5 }: { range: TimeRange; show: boolean; limit?: number }) {
+  const data = await loadEntities(show, picked);
+  const ctx: Ctx = { now: Date.parse(data.loadedAt), range: data.range, scoped: false };
+  const params = new URLSearchParams(picked.query).toString();
+  const range = params ? `?${params}` : "";
   const needing = <T extends { level: Level; needs: Needs; stats: RangeStats }>(rows: T[]) => rows.filter((r) => r.level === "critical" || r.level === "warning").sort(worstFirst);
   const clients = needing(data.clients.filter((c) => c.status !== "inactive"));
   const licenses = needing(data.licenses);

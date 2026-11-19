@@ -85,7 +85,7 @@ export default async function ClientLayout({ children, params }: LayoutProps<"/d
               label="Last good CRM sync"
               value={summary.lastSyncAt ? ago(summary.lastSyncAt, now) : "never"}
               sub="any call accepted by the CRM"
-              href={`${root}/items?kind=syncs&status=delivered&window=1`}
+              href={`${root}/items?kind=syncs&status=delivered`}
             />
           </StatStrip>
         ) : (

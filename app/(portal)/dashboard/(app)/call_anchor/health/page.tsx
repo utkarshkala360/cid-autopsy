@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { loadFleetActivity, loadFleetHealth } from "@/lib/callanchor/health";
+import { loadEntities, loadFleetActivity, loadFleetHealth } from "@/lib/callanchor/health";
+import type { TimeRange } from "@/lib/callanchor/range";
 import { PortalError } from "@/lib/callanchor/portal";
 import { secondaryButtonClass } from "@/components/ui";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal, storedCookie, verifyUrl } from "@/lib/callanchor/session";
-import { RangePicker, WorstEntities, queryHref, rangeOf, warmRanges } from "./_views/entities";
+import { RangePicker, WorstEntities, rangeOf, warmRanges } from "./_views/entities";
+import { reachVsText, vsText } from "./range-ui";
 import { Hero, StatCell, StatStrip } from "./ui";
 import { formatTime, httpTone, int, itemsHref, pct, severityTone, toneBadge } from "./format";
 import { CoverageNote, ItemLink, LoadingNote, Section, Table, issueLinks, td } from "./parts";
@@ -63,10 +65,14 @@ async function FleetHealth({ query }: { query: Record<string, string | string[] 
   const working = rows.filter((r) => r.status !== "inactive");
   const levels = (level: string) => working.filter((r) => r.level === level).length;
   const { seats } = totals;
-  const reach = totals.due ? Math.round((totals.reached / totals.due) * 1000) / 10 : null;
   const range = rangeOf(query);
   const show = await showInternal();
   warmRanges(show);
+  // The hero's call numbers follow the picked range, with the dates before it (owner, 2026-11-19).
+  const picked = await loadEntities(show, range);
+  const fleet = picked.fleet.totals;
+  const before = picked.comparison.prev;
+  const reach = fleet.due ? Math.round((fleet.delivered / fleet.due) * 1000) / 10 : null;
   const needLicenses = data.licenses.filter((h) => h.status === "critical" || h.status === "warning").length;
 
   return (
@@ -76,8 +82,8 @@ async function FleetHealth({ query }: { query: Record<string, string | string[] 
         title="Overview"
         meta="The fleet at a glance: the worst clients, licenses and devices, and the CRM and system errors behind them. Issues, Clients, Licenses and Devices have their own tabs. Stored data, brought up to date by the pull above."
         kpis={[
-          { label: "Reached CRM, 24h", value: pct(reach), bar: reach, note: `${int(totals.reached)} of ${int(totals.due)} due` },
-          { label: "Calls, 24h", value: int(totals.calls), note: `${int(totals.callsToday)} since midnight IST` },
+          { label: `Reached CRM, ${range.label}`, value: pct(reach), bar: reach, note: `${int(fleet.delivered)} of ${int(fleet.due)} due · ${reachVsText(fleet, before, range.prev.label)}` },
+          { label: `Calls, ${range.label}`, value: int(fleet.calls), note: vsText(fleet.calls, before, range.prev.label) },
         ]}
       >
         <StatStrip attached>
@@ -121,39 +127,37 @@ async function FleetHealth({ query }: { query: Record<string, string | string[] 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <p className="text-sm text-slate-500">Worst first, each opening its tab. Health and Needs action are right now; Call journey, CRM syncs and errors cover the range.</p>
         <div className="ml-auto">
-          <RangePicker days={range} href={queryHref(HEALTH_PATH, query)} />
+          <RangePicker range={range} path={HEALTH_PATH} query={query} />
         </div>
       </div>
       <Suspense key="worst" fallback={<LoadingNote text="Reading clients, licenses and devices for this range…" expectMs={15000} />}>
-        <WorstEntities days={range} show={show} />
+        <WorstEntities range={range} show={show} />
       </Suspense>
       <Section
         title="Failed CRM syncs"
         note="Failed CRM syncs across clients, titled by what's trusted: the platform, the HTTP code, and whether the calls ever reached the CRM. The replies under each are samples of each client's own format, masked, and never decide severity. Counted by when the callout was sent."
       >
         <Suspense key="crm" fallback={<LoadingNote text="Reading the stored syncs for this range." expectMs={4000} />}>
-          <Activity view="crm" days={range} />
+          <Activity view="crm" range={range} />
         </Suspense>
       </Section>
       <Section title="System logs" note="Everything CallAnchor logged, by source and severity, with CallAnchor's own faults on top. Open a source for its log lines.">
         <Suspense key="logs" fallback={<LoadingNote text="Reading the stored logs for this range." expectMs={4000} />}>
-          <Activity view="logs" days={range} />
+          <Activity view="logs" range={range} />
         </Suspense>
       </Section>
     </>
   );
 }
 
-const windowLabel = (days: number) => (days === 1 ? "24 hours" : `${days} days`);
-
-async function Activity({ view, days }: { view: "crm" | "logs"; days: number }) {
-  const { errors, sources, platform } = await loadFleetActivity(await showInternal(), days);
-  const inRange = { window: days };
+async function Activity({ view, range }: { view: "crm" | "logs"; range: TimeRange }) {
+  const { errors, sources, platform } = await loadFleetActivity(await showInternal(), range);
+  const inRange = { range };
 
   if (view === "crm") {
     return (
       <>
-        <Table head={["What we know", "Calls", "What the CRM said (samples)", "Clients"]} empty={errors.length ? undefined : `No failed syncs in the last ${windowLabel(days)}.`}>
+        <Table head={["What we know", "Calls", "What the CRM said (samples)", "Clients"]} empty={errors.length ? undefined : `No failed syncs ${range.inText}.`}>
           {errors.slice(0, 25).map((e) => {
             const drill = { kind: "syncs", status: "failed", platform: e.platform, http: e.http === null ? "none" : String(e.http) } as const;
             const persistence = e.persistent === e.calls ? "persistent" : e.persistent === 0 ? "transient" : `${int(e.persistent)} persistent`;
@@ -203,7 +207,7 @@ async function Activity({ view, days }: { view: "crm" | "logs"; days: number }) 
           ))}
         </p>
       )}
-      <Table head={["Source", "Severity", "Events", "Latest", "Example message"]} empty={sources.length ? undefined : `No system logs in the last ${windowLabel(days)}.`}>
+      <Table head={["Source", "Severity", "Events", "Latest", "Example message"]} empty={sources.length ? undefined : `No system logs ${range.inText}.`}>
         {sources.map((s) => (
           <tr key={`${s.severity}|${s.source}`}>
             <td className={td}>

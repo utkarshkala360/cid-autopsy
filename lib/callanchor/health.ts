@@ -12,8 +12,10 @@ import {
   fleetLicenseContext,
   fleetStall,
   inStage,
+  dueOf,
   isDelivered,
   isRecorded,
+  isUploaded,
   isVerified,
   licenseHealth,
   perPhoneLicenses,
@@ -26,6 +28,7 @@ import {
   JOURNEY_STEPS,
   journeyStop,
   isComplete,
+  istLabel,
   type JourneySummary,
   rollUp,
   RULES,
@@ -40,6 +43,7 @@ import {
   type Seat,
 } from "@/lib/callanchor/issues";
 import { getJson, PortalError } from "@/lib/callanchor/portal";
+import { istInput, parseRange, rangeCells, type TimeRange } from "@/lib/callanchor/range";
 import {
   SYNC,
   optional,
@@ -50,6 +54,7 @@ import {
   readCalls,
   readCoverage,
   readDaily,
+  readFirstDay,
   readHealthSettings,
   readIntegrationChanges,
   readInternalClients,
@@ -60,6 +65,7 @@ import {
   readLicenseHistoryStart,
   readLicenses,
   readLogs,
+  readLogsSince,
   readOpenCalls,
   readReplyShapes,
   readSnapshots,
@@ -76,6 +82,7 @@ import {
   type License,
   type OneApiStatus,
   type ReplySuggestion,
+  type DayRow,
   type Snapshot,
   type StoredCall,
   type StoredCallout,
@@ -92,8 +99,68 @@ const DAY = 24 * HOUR;
 // Calls read for issues: today plus a full 7-day baseline before it.
 const ASSESS_DAYS = 8;
 
-export const WINDOW_DAYS = [1, 3, 7, 15] as const;
-export type WindowDays = (typeof WINDOW_DAYS)[number];
+// The range a page's query asks for (lib/callanchor/range.ts), held inside the days calls are stored.
+export function rangeFrom(query: Record<string, string | string[] | undefined>): TimeRange {
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  return parseRange({ range: one(query.range), window: one(query.window), from: one(query.from), to: one(query.to) }, Date.now(), SYNC.retainDays);
+}
+// The custom range inputs' limits: the days calls are stored, up to now.
+export const customBounds = () => ({ min: istInput(Date.now() - SYNC.retainDays * DAY + 60_000), max: istInput(Date.now()) });
+// A range that ends now (Today, This week…) runs to the moment it's computed; a past one keeps its end.
+const endsNow = (range: TimeRange) => range.to >= Date.now() - 5 * 60_000;
+const settle = (range: TimeRange, now: number): TimeRange => (endsNow(range) ? { ...range, to: now } : range);
+const untilOf = (range: TimeRange) => (endsNow(range) ? undefined : range.to);
+const inRange = (c: StoredCall, range: TimeRange) => {
+  const at = Date.parse(callTime(c)!);
+  return at >= range.from && at < range.to;
+};
+
+// ---- Comparing a range with the dates before it (owner, 2026-11-19) ----
+// The same numbers for the range and for the dates before it: the range from its calls, the dates
+// before from the daily totals (ca_daily), counted the same way. Numbers only: no rows behind them.
+export type Totals = { calls: number; due: number; delivered: number; recorded: number; uploaded: number; synced: number };
+// `prev` is null when the dates before come before the store began.
+export type Comparison = { label: string; days: string[]; prev: Totals | null };
+const emptyTotals = (): Totals => ({ calls: 0, due: 0, delivered: 0, recorded: 0, uploaded: 0, synced: 0 });
+
+function addCall(t: Totals, c: StoredCall, ctx: ClientContext, now: number) {
+  t.calls++;
+  if (inStage("due", c, ctx, now)) t.due++;
+  if (isDelivered(c)) t.delivered++;
+  if (isRecorded(c)) t.recorded++;
+  if (isUploaded(c)) t.uploaded++;
+  if (isVerified(c) && isDelivered(c)) t.synced++;
+}
+export function totalsOf(calls: StoredCall[], ctx: ClientContext, now: number) {
+  const t = emptyTotals();
+  for (const c of calls) addCall(t, c, ctx, now);
+  return t;
+}
+function addDay(t: Totals, r: DayRow, ctx: ClientContext) {
+  t.calls += r.calls;
+  t.due += dueOf(r, ctx);
+  t.delivered += r.delivered;
+  t.recorded += r.recorded;
+  t.uploaded += r.uploaded;
+  t.synced += r.synced;
+}
+const dayStartOf = (day: string) => Date.parse(`${day}T00:00:00+05:30`);
+
+// The daily rows of the dates a range is compared with, and whether those dates are stored at all.
+async function readPrevDays(range: TimeRange, scope: { clientId?: string | null; licenseId?: string | null }) {
+  const days = new Set(range.prev.days);
+  const [rows, firstDay] = await Promise.all([readDaily(scope, dayStartOf(range.prev.days[0]), RULES.serverGraceMs), readFirstDay()]);
+  return { rows: rows.filter((r) => days.has(r.day)), known: firstDay !== null && range.prev.days[0] >= firstDay };
+}
+function comparisonOf(range: TimeRange, prev: { rows: DayRow[]; known: boolean }, ctxOf: (clientId: string) => ClientContext | undefined): Comparison {
+  if (!prev.known) return { label: range.prev.label, days: range.prev.days, prev: null };
+  const t = emptyTotals();
+  for (const r of prev.rows) {
+    const ctx = ctxOf(r.clientId);
+    if (ctx) addDay(t, r, ctx);
+  }
+  return { label: range.prev.label, days: range.prev.days, prev: t };
+}
 
 type Client = { id: string; companyName: string; plan: string; status: string; accessSuspended: boolean; licenseCount: number };
 
@@ -332,8 +399,13 @@ export type CoverageSummary = Awaited<ReturnType<typeof readCoverage>> & { calls
 
 function coverage(base: Awaited<ReturnType<typeof readCoverage>>, calls: StoredCall[]): CoverageSummary {
   const logsSince = base.logsSince ? Date.parse(base.logsSince) : Infinity;
-  // Only calls inside the stored log window can be missing their ingest log (finding D).
-  const inWindow = calls.filter((c) => c.attempts > 0 && c.firstCalloutAt && Date.parse(c.firstCalloutAt) >= logsSince + HOUR);
+  // Only calls made inside the stored log window can be missing their ingest log (finding D). A retry
+  // of an older call is judged by when the call was made, from its payload (2026-11-19: all 27 such
+  // "gaps" were retries of calls made before the first stored log).
+  const inWindow = calls.filter((c) => {
+    const made = c.startedAt ?? c.firstCalloutAt;
+    return c.attempts > 0 && made !== null && Date.parse(made) >= logsSince + HOUR;
+  });
   return { ...base, callsWithCallouts: inWindow.length, callsWithoutLog: inWindow.filter((c) => c.ingestedAt === null).length };
 }
 
@@ -405,8 +477,15 @@ const FRESH_MS = 5_000;
 const KEEP_MS = 30 * 60_000;
 const memo = new Map<string, { at: number; value?: unknown; pending?: Promise<unknown> }>();
 
+// Custom ranges add keys, so the oldest settled ones go once there are too many.
+const MEMO_MAX = 200;
+
 async function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
   const now = Date.now();
+  if (!memo.has(key) && memo.size >= MEMO_MAX) {
+    const oldest = [...memo].filter(([, e]) => !e.pending).sort((a, b) => a[1].at - b[1].at).slice(0, memo.size - MEMO_MAX + 1);
+    for (const [k] of oldest) memo.delete(k);
+  }
   const entry = memo.get(key) ?? { at: 0 };
   memo.set(key, entry);
   const start = () => {
@@ -557,17 +636,17 @@ async function computeFleetHealth(cookie: string, memberId: string, showInternal
 
 // CRM errors and system log sources for the Overview's Needs action filters, over a window the
 // user picks (24 hours by default; owner, 2026-11-13). Served like the fleet: last result at once.
-export function loadFleetActivity(showInternal: boolean, days: number) {
-  return cached(`activity:${showInternal}:${days}`, async () => {
+export function loadFleetActivity(showInternal: boolean, range: TimeRange) {
+  return cached(`activity:${showInternal}:${range.id}`, async () => {
     const now = Date.now();
-    const since = now - days * DAY;
-    const [callouts, everyLog, scope, names] = await Promise.all([readCallouts(null, since), readLogs(null, since), internalScope(showInternal), readClientNames()]);
+    const until = untilOf(range);
+    const [callouts, everyLog, scope, names] = await Promise.all([readCallouts(null, range.from, until), readLogs(null, range.from, until), internalScope(showInternal), readClientNames()]);
     const keep = (clientId: string | null) => !clientId || !scope.hidden.has(clientId);
     const logs = everyLog.filter((l) => keep(l.clientId));
     return {
       errors: errorGroups(callouts.filter((e) => keep(e.clientId)), names),
       sources: summarizeSources(logs),
-      platform: platformIssues(logs, now, days === 1 ? "24 hours" : `${days} days`),
+      platform: platformIssues(logs, now, range.inText),
     };
   });
 }
@@ -675,7 +754,7 @@ export function funnel(calls: StoredCall[], ctx: ClientContext, now: number) {
   };
 }
 
-export async function loadClientHealth(cookie: string, clientId: string, days: WindowDays) {
+export async function loadClientHealth(cookie: string, clientId: string, asked: TimeRange) {
   const started = Date.now();
   await loadSettings();
   const base = `/api/clients/${clientId}`;
@@ -691,12 +770,13 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
   const tenant = summarizeTenant(tenantBody, client.status);
   await Promise.all([saveLicenses(clientId, tenantBody.licenses), saveIntegrations(clientId, tenant.integrations)]);
   const now = Date.now();
-  const since = now - days * DAY;
-  const [[assessment], calls, events, logs, [snapshot], store, cover, suggestions, lastSyncs, integrationChanges, internal] = await Promise.all([
+  const range = settle(asked, now);
+  const until = untilOf(range);
+  const [[assessment], calls, events, logs, [snapshot], store, cover, suggestions, lastSyncs, integrationChanges, internal, prev] = await Promise.all([
     assess(now, clientId, { tenant, status: client.status, accessSuspended: client.accessSuspended }),
-    readCalls({ clientId }, since),
-    readCallouts(clientId, since),
-    readLogs(clientId, since),
+    readCalls({ clientId }, range.from, until),
+    readCallouts(clientId, range.from, until),
+    readLogs(clientId, range.from, until),
     readSnapshots(clientId),
     readStoreStatus(clientId),
     readCoverage(clientId),
@@ -704,17 +784,15 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     readLastSyncs(clientId),
     readIntegrationChanges(clientId, now - 30 * DAY),
     readInternalClients(),
+    readPrevDays(range, { clientId }),
   ]);
   if (!assessment) throw new PortalError(404, "Client not stored yet");
   await remember(assessment.issues);
 
-  // Hourly buckets for one day, daily otherwise, split by HTTP class.
-  const bucketMs = days === 1 ? HOUR : DAY;
-  const bucketCount = Math.ceil((now - since) / bucketMs);
-  const firstBucket = now - bucketCount * bucketMs;
-  const trend = Array.from({ length: bucketCount }, (_, i) => ({ start: new Date(firstBucket + i * bucketMs).toISOString(), delivered: 0, rejected: 0, unreachable: 0, other: 0 }));
+  // The range's cells (hours for up to two days, else days), split by HTTP class.
+  const trend = rangeCells(range).map((cell) => ({ start: new Date(cell.start).toISOString(), delivered: 0, rejected: 0, unreachable: 0, other: 0 }));
   for (const event of events) {
-    const bucket = trend[Math.floor((Date.parse(event.at) - firstBucket) / bucketMs)];
+    const bucket = trend[Math.floor((Date.parse(event.at) - range.from) / range.cellMs)];
     if (!bucket) continue;
     const cls = httpClass(event.httpStatus);
     if (event.status === "delivered") bucket.delivered++;
@@ -754,14 +832,16 @@ export async function loadClientHealth(cookie: string, clientId: string, days: W
     integrationChanges,
     funnel: funnel(calls, assessment.ctx, now),
     journey: journeySummary(calls, assessment.ctx, now),
+    totals: totalsOf(calls, assessment.ctx, now),
+    comparison: comparisonOf(range, prev, () => assessment.ctx),
     callCount: calls.length,
     replies: summarizeReplies(events),
     suggestions: suggestions.filter((s) => s.scope === "client" ? s.scopeId === clientId : events.some((e) => e.platformId === s.scopeId)),
     sources: summarizeSources(logs),
     trend,
-    trendHourly: days === 1,
-    windowLabel: days === 1 ? "the last 24 hours" : `the last ${days} days`,
-    since: new Date(since).toISOString(),
+    trendHourly: range.cellMs === HOUR,
+    range,
+    since: new Date(range.from).toISOString(),
     coverage: coverage(cover, assessment.calls),
     pullErrors: [...new Set(pull.errors)],
     store,
@@ -808,9 +888,8 @@ export const deviceOf = (l: { deviceBrand: string | null; deviceModel: string | 
   return brand && !model.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${model}` : model;
 };
 
-// One cell of the CRM sync strip: an hour for 24 hours, 6 hours for 3 days, a day for 7 and 15. The
-// range rolls back from now, as the items page's window does, so a cell's count and the calls it
-// opens agree.
+// One cell of the CRM sync strip: an hour for ranges up to two days, else a day (rangeCells), from
+// the range's start, as the items page reads it, so a cell's count and the calls it opens agree.
 export type StripCell = { start: string; end: string; calls: number; due: number; delivered: number; state: DayState };
 export type RangeStats = {
   calls: number;
@@ -828,6 +907,8 @@ export type RangeStats = {
   // but only the second is sure). Rows sort by this within their severity.
   broke: number;
   sureLost: number;
+  // The range's numbers, for the comparison with the dates before it.
+  totals: Totals;
 };
 
 // The lower end of the 95% range for `part` of `whole` (Wilson score interval).
@@ -841,7 +922,8 @@ export function sureShare(part: number, whole: number) {
 export type LastThrough = { at: string; callId: string; clientId: string } | null;
 // `calls`: distinct calls not in the CRM across the open issues, each counted once.
 export type Needs = { critical: number; warning: number; calls: number; top: string | null };
-type EntityBase = { level: Level; levelNote: string; needs: Needs; stats: RangeStats; lastThrough: LastThrough };
+// `prev`: the same numbers on the dates before the range; null before the store began.
+type EntityBase = { level: Level; levelNote: string; needs: Needs; stats: RangeStats; prev: Totals | null; lastThrough: LastThrough };
 export type ClientEntity = EntityBase & { clientId: string; name: string; status: string; internal: boolean; integrations: string[]; seats: Seats; error: string | null };
 export type LicenseEntity = EntityBase & {
   licenseId: string;
@@ -872,18 +954,15 @@ export type DeviceEntity = EntityBase & {
 };
 export type IssueEntity = { issue: Issue; clientName: string | null; last4: string | null; phone: string | null; agentName: string | null; device: string | null; stats: RangeStats; lastThrough: LastThrough; rolledUp: boolean };
 
-const CELL_MS: Record<WindowDays, number> = { 1: HOUR, 3: 6 * HOUR, 7: DAY, 15: DAY };
+type Acc = { calls: number; journey: JourneySummary; due: number; delivered: number; totals: Totals; cells: { calls: number; due: number; delivered: number }[]; lastCallAt: string | null };
+const newAcc = (cells: number): Acc => ({ calls: 0, journey: emptyJourney(), due: 0, delivered: 0, totals: emptyTotals(), cells: Array.from({ length: cells }, () => ({ calls: 0, due: 0, delivered: 0 })), lastCallAt: null });
 
-type Acc = { calls: number; journey: JourneySummary; due: number; delivered: number; cells: { calls: number; due: number; delivered: number }[]; lastCallAt: string | null };
-const newAcc = (cells: number): Acc => ({ calls: 0, journey: emptyJourney(), due: 0, delivered: 0, cells: Array.from({ length: cells }, () => ({ calls: 0, due: 0, delivered: 0 })), lastCallAt: null });
-
-function finishAcc(acc: Acc, days: WindowDays, now: number): RangeStats {
-  const size = CELL_MS[days];
-  const count = acc.cells.length;
+function finishAcc(acc: Acc, range: TimeRange): RangeStats {
+  const bounds = rangeCells(range);
   const strip = acc.cells.map((c, i): StripCell => {
     const rate = c.due ? (c.delivered / c.due) * 100 : 0;
     const state: DayState = c.calls === 0 ? "none" : c.due === 0 ? "quiet" : rate >= RULES.syncedDayRate ? "synced" : c.delivered > 0 ? "partial" : "failed";
-    return { start: new Date(now - (count - i) * size).toISOString(), end: new Date(now - (count - 1 - i) * size).toISOString(), ...c, state };
+    return { start: new Date(bounds[i].start).toISOString(), end: new Date(bounds[i].end).toISOString(), ...c, state };
   });
   const broke = acc.journey.stops.upload + acc.journey.stops.sent + acc.journey.stops.crm;
   return {
@@ -892,6 +971,7 @@ function finishAcc(acc: Acc, days: WindowDays, now: number): RangeStats {
     calls: acc.calls,
     journey: acc.journey,
     reached: { delivered: acc.delivered, due: acc.due },
+    totals: acc.totals,
     strip,
     synced: strip.filter((c) => c.state === "synced").length,
     active: strip.filter((c) => c.state === "synced" || c.state === "partial" || c.state === "failed").length,
@@ -917,30 +997,38 @@ const assessFleet = () => cached("assess:fleet", async () => {
   return { now, assessments: await assess(now, null) };
 });
 
-export function loadEntities(showInternal: boolean, days: WindowDays) {
-  return cached(`entities:${showInternal}:${days}`, () => computeEntities(showInternal, days));
+export function loadEntities(showInternal: boolean, range: TimeRange) {
+  return cached(`entities:${showInternal}:${range.id}`, () => computeEntities(showInternal, range));
 }
 
-// Computes the ranges not yet in this server's memory, so switching range is instant. Ranges
+// Computes the preset ranges not yet in this server's memory, so switching range is instant. Ranges
 // already kept refresh only when a page reads them.
 export function warmEntities(showInternal: boolean) {
-  return Promise.all(WINDOW_DAYS.filter((d) => !memo.has(`entities:${showInternal}:${d}`)).map((d) => loadEntities(showInternal, d))).then(
+  const presets = (["today", "yesterday", "this-week", "last-week", "7d", "15d"] as const).map((key) => rangeFrom({ range: key }));
+  return Promise.all(presets.filter((r) => !memo.has(`entities:${showInternal}:${r.id}`)).map((r) => loadEntities(showInternal, r))).then(
     () => undefined,
     () => undefined,
   );
 }
 
-async function computeEntities(showInternal: boolean, days: WindowDays) {
+async function computeEntities(showInternal: boolean, asked: TimeRange) {
   await loadSettings();
   const now = Date.now();
-  const [{ assessments: everyClient }, scope, calls, everyLog] = await Promise.all([assessFleet(), internalScope(showInternal), readCalls({}, now - days * DAY), readLogs(null, now - DAY)]);
+  const range = settle(asked, now);
+  const [{ assessments: everyClient }, scope, calls, everyLog, prev] = await Promise.all([
+    assessFleet(),
+    internalScope(showInternal),
+    readCalls({}, range.from, untilOf(range)),
+    readLogs(null, now - DAY),
+    readPrevDays(range, {}),
+  ]);
   const assessments = everyClient.filter((a) => !scope.hidden.has(a.snapshot.clientId));
   const ctxOf = new Map(assessments.map((a) => [a.snapshot.clientId, a.ctx]));
   const licenseList = assessments.flatMap((a) => a.licenses.map((h) => ({ h, a })));
   const deviceOfLicense = new Map(licenseList.map(({ h }) => [h.license.licenseId, deviceOf(h.license)]));
 
   // One pass over the range's calls, into the fleet, each client, license and device.
-  const cellCount = (days * DAY) / CELL_MS[days];
+  const cellCount = rangeCells(range).length;
   const fleet = newAcc(cellCount);
   const byClient = new Map<string, Acc>();
   const byLicense = new Map<string, Acc>();
@@ -948,12 +1036,11 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
   // A client's own devices: its licenses on each model.
   const byClientDevice = new Map<string, Acc>();
   const accOf = (map: Map<string, Acc>, key: string) => map.get(key) ?? map.set(key, newAcc(cellCount)).get(key)!;
-  const since = now - days * DAY;
   for (const c of calls) {
     const ctx = c.clientId ? ctxOf.get(c.clientId) : undefined;
     if (!ctx) continue;
     const at = callTime(c)!;
-    const cell = Math.min(cellCount - 1, Math.max(0, Math.floor((Date.parse(at) - since) / CELL_MS[days])));
+    const cell = Math.min(cellCount - 1, Math.max(0, Math.floor((Date.parse(at) - range.from) / range.cellMs)));
     const due = inStage("due", c, ctx, now);
     const delivered = due && isDelivered(c);
     const device = c.licenseId ? deviceOfLicense.get(c.licenseId) : undefined;
@@ -967,6 +1054,7 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
       if (!acc) continue;
       acc.calls++;
       addToJourney(acc.journey, c, ctx, now);
+      addCall(acc.totals, c, ctx, now);
       if (due) acc.due++;
       if (delivered) acc.delivered++;
       acc.cells[cell].calls++;
@@ -975,7 +1063,31 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
       if (!acc.lastCallAt || at > acc.lastCallAt) acc.lastCallAt = at;
     }
   }
-  const stats = (acc: Acc | undefined) => finishAcc(acc ?? newAcc(cellCount), days, now);
+  const stats = (acc: Acc | undefined) => finishAcc(acc ?? newAcc(cellCount), range);
+  // The dates before, per client, license and device, from the daily totals.
+  const prevFleet = prev.known ? emptyTotals() : null;
+  const prevClient = new Map<string, Totals>();
+  const prevLicense = new Map<string, Totals>();
+  const prevDevice = new Map<string, Totals>();
+  const prevClientDevice = new Map<string, Totals>();
+  const totalsIn = (map: Map<string, Totals>, key: string) => map.get(key) ?? map.set(key, emptyTotals()).get(key)!;
+  if (prev.known) {
+    for (const r of prev.rows) {
+      const ctx = ctxOf.get(r.clientId);
+      if (!ctx) continue;
+      const device = r.licenseId ? deviceOfLicense.get(r.licenseId) : undefined;
+      for (const t of [
+        prevFleet!,
+        totalsIn(prevClient, r.clientId),
+        r.licenseId ? totalsIn(prevLicense, r.licenseId) : null,
+        device ? totalsIn(prevDevice, device) : null,
+        device ? totalsIn(prevClientDevice, `${r.clientId}|${device}`) : null,
+      ]) {
+        if (t) addDay(t, r, ctx);
+      }
+    }
+  }
+  const prevOf = (map: Map<string, Totals>, key: string) => (prev.known ? (map.get(key) ?? emptyTotals()) : null);
   const through = (p: Pulse["lastComplete"], clientId: string): LastThrough => (p ? { ...p, clientId } : null);
 
   const clients = assessments.map(({ snapshot, issues, level, seats, pulse: p }): ClientEntity => {
@@ -992,6 +1104,7 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
       levelNote: levelNote(level, needs),
       needs,
       stats: stats(byClient.get(snapshot.clientId)),
+      prev: prevOf(prevClient, snapshot.clientId),
       lastThrough: through(p.lastComplete, snapshot.clientId),
     };
   });
@@ -1023,12 +1136,13 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
       levelNote: levelNote(h.status, needs),
       needs,
       stats: stats(byLicense.get(h.license.licenseId)),
+      prev: prevOf(prevLicense, h.license.licenseId),
       lastThrough: through(h.pulse.lastComplete, a.snapshot.clientId),
     };
   });
 
   const issuesOf = new Map(licenseList.map(({ h }) => [h.license.licenseId, h.issues]));
-  const devicesFrom = (list: LicenseEntity[], acc: (device: string) => Acc | undefined) =>
+  const devicesFrom = (list: LicenseEntity[], acc: (device: string) => Acc | undefined, before: (device: string) => Totals | null) =>
     [...Map.groupBy(list, (l) => l.device)].map(([device, group]): DeviceEntity => {
       const statuses = { critical: 0, warning: 0, healthy: 0, idle: 0 } satisfies Record<LicenseStatus, number>;
       for (const l of group) statuses[l.level as LicenseStatus]++;
@@ -1048,12 +1162,13 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
         levelNote: bad ? `${LEVEL_WORDS[level]}: ${bad} of ${group.length} licenses need action${needs.top ? `, worst: ${needs.top}` : ""}` : LEVEL_WORDS[level],
         needs,
         stats: stats(acc(device)),
+        prev: before(device),
         lastThrough: group.reduce<LastThrough>((best, l) => laterThrough(best, l.lastThrough), null),
       };
     });
-  const devices = devicesFrom(licenses, (d) => byDevice.get(d));
+  const devices = devicesFrom(licenses, (d) => byDevice.get(d), (d) => prevOf(prevDevice, d));
   const clientDevices = Object.fromEntries(
-    [...Map.groupBy(licenses, (l) => l.clientId)].map(([clientId, list]) => [clientId, devicesFrom(list, (d) => byClientDevice.get(`${clientId}|${d}`))]),
+    [...Map.groupBy(licenses, (l) => l.clientId)].map(([clientId, list]) => [clientId, devicesFrom(list, (d) => byClientDevice.get(`${clientId}|${d}`), (d) => prevOf(prevClientDevice, `${clientId}|${d}`))]),
   );
 
   // Every issue once: fleet-wide ones, each client's (with license issues not rolled up), and the
@@ -1092,9 +1207,10 @@ async function computeEntities(showInternal: boolean, days: WindowDays) {
     devices,
     clientDevices,
     fleet: fleetStats,
+    comparison: { label: range.prev.label, days: range.prev.days, prev: prevFleet } satisfies Comparison,
     hiddenInternal: everyClient.length - assessments.length,
     unusedAfterMs: RULES.seatUnusedMs,
-    days,
+    range,
     loadedAt: new Date(now).toISOString(),
   };
 }
@@ -1142,43 +1258,59 @@ const LICENSE_FIELD_LABELS: Record<string, string> = {
 
 // One license: its status and issues, its calls against its 7-day baseline, and its change history.
 // The agent's name is read live when a CallAnchor session is available.
-export async function loadLicense(licenseId: string, cookie: string | null) {
+export async function loadLicense(licenseId: string, cookie: string | null, asked: TimeRange) {
   await loadSettings();
   const now = Date.now();
+  const range = settle(asked, now);
   const stored = await readLicense(licenseId);
   if (!stored) return null;
-  const [[assessment], calls, changes, tenant, portal] = await Promise.all([
+  const [[assessment], calls, changes, tenant, portal, prev] = await Promise.all([
     assess(now, stored.clientId),
-    readCalls({ licenseId }, now - ASSESS_DAYS * DAY),
+    // The range, and the usual days before it for the chart's baseline.
+    readCalls({ licenseId }, Math.min(range.from - RULES.baselineDays * DAY, now - ASSESS_DAYS * DAY), untilOf(range)),
     readLicenseChanges({ licenseId }, now - SYNC.snapshotDays * DAY),
     cookie ? optional(getJson<Tenant>(cookie, `/api/clients/${stored.clientId}/tenant`)) : Promise.resolve(null),
     readAudit({ licenseId }, now - SYNC.snapshotDays * DAY),
+    readPrevDays(range, { licenseId }),
   ]);
   const health = assessment?.licenses.find((h) => h.license.licenseId === licenseId) ?? null;
   const ctx = assessment?.ctx ?? clientContext(null);
-  const day = calls.filter((c) => within(c, now, DAY));
-  // Calls per hour today against the average for that hour over the full days before it that this
-  // phone (or its agent) has been seen, up to 7: none, then 1 to 7 (owner, 2026-11-13).
-  const seenMs = health?.baselineSince ? now - Date.parse(health.baselineSince) : 0;
-  const priorDays = Math.max(0, Math.min(RULES.baselineDays, Math.floor(seenMs / DAY) - 1));
-  const hourly = Array.from({ length: 24 }, (_, i) => ({ start: new Date(now - (24 - i) * HOUR).toISOString(), calls: 0, baseline: 0 }));
+  const picked = calls.filter((c) => inRange(c, range));
+  // Calls per cell of the range (hours for up to two days, else days) against the usual for that cell:
+  // the same hour of the day, or a day, averaged over the full days before the range that this phone
+  // (or its agent) has been seen, up to 7: none, then 1 to 7 (owner, 2026-11-13).
+  const seenMs = health?.baselineSince ? range.from - Date.parse(health.baselineSince) : 0;
+  const priorDays = Math.max(0, Math.min(RULES.baselineDays, Math.floor(seenMs / DAY)));
+  const hourlyCells = range.cellMs === HOUR;
+  const chart = rangeCells(range).map((cell) => ({ start: new Date(cell.start).toISOString(), calls: 0, baseline: 0 }));
+  const usualByHour = Array.from({ length: 24 }, () => 0);
+  let usualDay = 0;
   for (const c of calls) {
-    const age = now - Date.parse(callTime(c)!);
-    const slot = 23 - (Math.floor(age / HOUR) % 24);
-    if (age <= DAY) hourly[slot].calls++;
-    else if (age <= (priorDays + 1) * DAY) hourly[slot].baseline += 1 / priorDays;
+    const at = Date.parse(callTime(c)!);
+    if (at >= range.from && at < range.to) {
+      const cell = chart[Math.floor((at - range.from) / range.cellMs)];
+      if (cell) cell.calls++;
+    } else if (priorDays > 0 && at < range.from && at >= range.from - priorDays * DAY) {
+      usualByHour[new Date(at + 5.5 * HOUR).getUTCHours()] += 1 / priorDays;
+      usualDay += 1 / priorDays;
+    }
   }
+  for (const cell of chart) cell.baseline = hourlyCells ? usualByHour[new Date(Date.parse(cell.start) + 5.5 * HOUR).getUTCHours()] : usualDay;
   const live = tenant?.licenses.find((l) => l.id === licenseId);
   return {
     license: stored,
     companyName: assessment?.snapshot.companyName ?? stored.clientId,
     agent: live?.assignedTo?.name ?? null,
     health,
-    funnel: funnel(day, ctx, now),
-    journey: journeySummary(day, ctx, now),
-    hourly,
+    funnel: funnel(picked, ctx, now),
+    journey: journeySummary(picked, ctx, now),
+    totals: totalsOf(picked, ctx, now),
+    comparison: comparisonOf(range, prev, () => ctx),
+    chart,
+    hourlyCells,
     priorDays,
-    calls: day.length,
+    range,
+    calls: picked.length,
     // Agents' names aren't stored, so a reassignment names only the current agent, read live (QA L10).
     changes: changes.map((c, i) => ({
       ...c,
@@ -1286,14 +1418,14 @@ export const ITEMS_PER_PAGE = 100;
 export async function loadCallItems(
   scope: { clientId?: string; licenseId?: string; licenseIds?: string[]; showInternal?: boolean },
   stage: CallStage,
-  days: WindowDays,
+  range: TimeRange,
   page: number,
 ) {
   await loadSettings();
   const now = Date.now();
   const narrowed = Boolean(scope.clientId || scope.licenseId);
   const [calls, snapshots, licenses, internal] = await Promise.all([
-    readCalls({ clientId: scope.clientId, licenseId: scope.licenseId }, now - days * DAY),
+    readCalls({ clientId: scope.clientId, licenseId: scope.licenseId }, range.from, untilOf(range)),
     readSnapshots(scope.clientId),
     readLicenses(scope.clientId),
     internalScope(narrowed || Boolean(scope.showInternal)),
@@ -1346,7 +1478,16 @@ const text = (value: unknown) => (typeof value === "string" && value ? value : t
 // Phone → app → recording uploaded → sent to the CRM → accepted, in plain words, with every id that
 // links the step to the next: the phone (license), CallAnchor's call record, the upload session and
 // recording file, the CRM request and the CRM's own record id.
-function journey(call: StoredCall | null, callouts: StoredCallout[], logs: StoredLog[], requests: AnchorResult[], ctx: ClientContext, now: number, license: { licenseId: string; last4: string | null; number?: string | null } | null): JourneyStep[] {
+function journey(
+  call: StoredCall | null,
+  callouts: StoredCallout[],
+  logs: StoredLog[],
+  requests: AnchorResult[],
+  ctx: ClientContext,
+  now: number,
+  license: { licenseId: string; last4: string | null; number?: string | null } | null,
+  logsSince: string | null,
+): JourneyStep[] {
   const by = (source: string) => logs.find((l) => l.source === source);
   const ingest = by("mobile.call.create");
   const upload = by("mobile.recording.upload-complete") ?? by("mobile.recording.upload-init") ?? by("mobile.recording.upload-failed");
@@ -1382,14 +1523,20 @@ function journey(call: StoredCall | null, callouts: StoredCallout[], logs: Store
     ],
   };
 
+  // A CRM callout proves the app passed the call on: CallAnchor only sends calls it holds (owner,
+  // 2026-11-19). Without the ingest log, say whether the call came before our stored logs.
+  const madeAt = call ? (call.startedAt ?? call.firstCalloutAt) : null;
+  const beforeLogs = madeAt !== null && logsSince !== null && madeAt < logsSince;
   const app: JourneyStep = {
     key: "app",
     label: "Picked up by the app",
     at: call?.ingestedAt ?? null,
-    state: call?.ingestedAt ? "done" : "unknown",
+    state: call?.ingestedAt || callouts.length || (call?.attempts ?? 0) > 0 ? "done" : "unknown",
     note: call?.ingestedAt
       ? "The CallAnchor app sent the call to CallAnchor."
-      : "Not in our stored logs. CallAnchor keeps them about 3 days, so this call came in before we stored it, or the log was missed.",
+      : callouts.length || (call?.attempts ?? 0) > 0
+        ? `Known from the CRM callout: CallAnchor only sends a call it took in from the app. Its ingest log isn't stored${beforeLogs ? `, as the call was made before we started storing logs (${istLabel(logsSince!)})` : ""}.`
+        : "Not in our stored logs. CallAnchor keeps them about 3 days, so this call came in before we stored it, or the log was missed.",
     ids: [
       { label: "CallAnchor call id", value: call?.callId ?? callouts[0]?.callId ?? null },
       { label: "Ingest log", value: ingest?.id ?? null },
@@ -1465,7 +1612,7 @@ const licensePath = (licenseId: string) => `/dashboard/call_anchor/health/licens
 export async function loadCall(callId: string, cookie: string | null) {
   await loadSettings();
   const now = Date.now();
-  const [{ callouts, logs }, call] = await Promise.all([readCall(callId), readStoredCall(callId)]);
+  const [{ callouts, logs }, call, logsSince] = await Promise.all([readCall(callId), readStoredCall(callId), readLogsSince()]);
   const clientId = call?.clientId ?? logs.find((l) => l.clientId)?.clientId ?? callouts[0]?.clientId ?? null;
   const [[snapshot], license] = await Promise.all([clientId ? readSnapshots(clientId) : Promise.resolve([]), call?.licenseId ? readLicense(call.licenseId) : Promise.resolve(null)]);
   const ctx = clientContext(snapshot?.tenant ?? null);
@@ -1487,7 +1634,7 @@ export async function loadCall(callId: string, cookie: string | null) {
     takesRecordings: snapshot?.tenant ? ctx.takesRecordings : null,
     call,
     license,
-    journey: journey(call, callouts, logs, requests, ctx, now, license ? { licenseId: license.licenseId, last4: license.last4 } : null),
+    journey: journey(call, callouts, logs, requests, ctx, now, license ? { licenseId: license.licenseId, last4: license.last4 } : null, logsSince),
     complete: call ? isComplete(call, ctx) : false,
     stop: call ? journeyStop(call, ctx, now) : null,
     hasIntegration: snapshot?.tenant ? ctx.hasIntegration : null,

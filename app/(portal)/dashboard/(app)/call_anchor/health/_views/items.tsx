@@ -2,7 +2,9 @@ import Link from "next/link";
 import { agentText, phoneText } from "@/lib/callanchor/labels";
 import { cache, Suspense } from "react";
 import { notFound } from "next/navigation";
-import { ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, WINDOW_DAYS, type WindowDays } from "@/lib/callanchor/health";
+import { customBounds, ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, rangeFrom } from "@/lib/callanchor/health";
+import type { TimeRange } from "@/lib/callanchor/range";
+import { RangePicker } from "../range-ui";
 import { isCallStage, JOURNEY_STEPS, stageTitle, type CallStage, type JourneyKey } from "@/lib/callanchor/issues";
 import { HEALTH_PATH, requireCallAnchorSession, showInternal } from "@/lib/callanchor/session";
 import {
@@ -58,7 +60,7 @@ const STAGES: Record<CallStage, { label: string; tone: Tone }> = {
   notConnected: { label: "Didn't connect", tone: "info" },
   notRecorded: { label: "Not recorded", tone: "bad" },
   mislabeled: { label: "Marked not recorded, uploaded", tone: "wait" },
-  noLog: { label: "No stored ingest log", tone: "bad" },
+  noLog: { label: "No stored ingest log (callout shows the app took it in)", tone: "info" },
   uploaded: { label: "Uploaded", tone: "ok" },
   verified: { label: "Verified", tone: "ok" },
   skipped: { label: "Skipped, trial limit", tone: "wait" },
@@ -142,7 +144,7 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
   // The issue these rows are behind, shown above them (QA U1).
   const issueId = one(query.issue);
   if (issueId !== undefined && !ISSUE_ID.test(issueId)) notFound();
-  const days = (WINDOW_DAYS.find((d) => String(d) === one(query.window)) ?? 1) as WindowDays;
+  const range = rangeFrom(query);
   const page = Math.max(1, Math.min(10_000, Number.parseInt(one(query.page) ?? "1", 10) || 1));
 
   // Only the filters this kind knows, so links rebuilt from them stay clean.
@@ -153,7 +155,7 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
   }
   const phones = filters.licenses?.split(",") ?? [];
   if (phones.length > 50 || phones.some((id) => !ID_PATTERN.test(id))) notFound();
-  const base = { kind, ...(stage ? { stage } : {}), window: String(days), ...filters, ...(issueId ? { issue: issueId } : {}) };
+  const base = { kind, ...(stage ? { stage } : {}), ...range.query, ...filters, ...(issueId ? { issue: issueId } : {}) };
   const href = (changes: Record<string, string | null>, at = root) => {
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries({ ...base, ...changes })) if (value !== null) next.set(key, value);
@@ -163,7 +165,7 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
   // Another kind keeps the client, window and phone; its own filters start empty. Another stage drops
   // the issue, whose rows these no longer are.
   const kindHref = (next: Kind) => {
-    const params = new URLSearchParams({ kind: next, ...(next === "calls" ? { stage: stage ?? "all" } : {}), window: String(days) });
+    const params = new URLSearchParams({ kind: next, ...(next === "calls" ? { stage: stage ?? "all" } : {}), ...range.query });
     if (next === "calls" && filters.license) params.set("license", filters.license);
     return `${root}/items?${params}`;
   };
@@ -196,7 +198,7 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
       <div className="lg:flex lg:gap-8">
       {kind === "calls" ? (
         <Suspense key={path} fallback={<ItemFilters {...filterProps} />}>
-          <CountedFilters {...filterProps} load={() => callItems(client, filters.license, phones.join(","), !hideInternal, stage!, days, page)} />
+          <CountedFilters {...filterProps} load={() => callItems(client, filters.license, phones.join(","), !hideInternal, stage!, range, page)} />
         </Suspense>
       ) : (
         <ItemFilters {...filterProps} />
@@ -211,19 +213,7 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
       <p className="mt-1 text-sm text-slate-500">{clientName ?? "All clients"} · one row per item, newest first.</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-slate-500">Window</span>
-        {WINDOW_DAYS.map((d) => (
-          <Link
-            key={d}
-            href={href({ window: String(d), page: null })}
-            aria-current={d === days ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 text-xs font-medium ${
-              d === days ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            {d === 1 ? "24 hours" : `${d} days`}
-          </Link>
-        ))}
+        <RangePicker range={range} path={`${root}/items`} query={{ ...base, ...(page > 1 ? { page: String(page) } : {}) }} bounds={customBounds()} />
         {client && (
           <Chip href={href({ page: null }, HEALTH_PATH)} label="Client" value={clientName!} />
         )}
@@ -233,9 +223,9 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
       </div>
 
       <Suspense key={path} fallback={<LoadingNote text="Reading the stored items…" />}>
-        {kind === "syncs" && <SyncItems filter={{ ...calloutFilter(filters, client), hideInternal }} days={days} page={page} names={names} href={href} />}
-        {kind === "logs" && <LogItems filter={{ ...filters, clientId: client, problems: filters.problems === "1", hideInternal }} days={days} page={page} names={names} href={href} />}
-        {kind === "calls" && <CallItems client={client} license={filters.license} licenses={phones} showInternal={!hideInternal} days={days} stage={stage!} page={page} names={names} href={href} />}
+        {kind === "syncs" && <SyncItems filter={{ ...calloutFilter(filters, client), hideInternal }} range={range} page={page} names={names} href={href} />}
+        {kind === "logs" && <LogItems filter={{ ...filters, clientId: client, problems: filters.problems === "1", hideInternal }} range={range} page={page} names={names} href={href} />}
+        {kind === "calls" && <CallItems client={client} license={filters.license} licenses={phones} showInternal={!hideInternal} range={range} stage={stage!} page={page} names={names} href={href} />}
       </Suspense>
       </div>
       </div>
@@ -245,8 +235,8 @@ export async function ItemsView({ query, clientId }: { query: Query; clientId: s
 
 // One load of a scope's calls per request, shared by the filter panel's counts and the call rows.
 const callItems = cache(
-  (client: string | undefined, license: string | undefined, licenses: string, showInternal: boolean, stage: CallStage, days: WindowDays, page: number) =>
-    loadCallItems({ clientId: client, licenseId: license, licenseIds: licenses ? licenses.split(",") : [], showInternal }, stage, days, page),
+  (client: string | undefined, license: string | undefined, licenses: string, showInternal: boolean, stage: CallStage, range: TimeRange, page: number) =>
+    loadCallItems({ clientId: client, licenseId: license, licenseIds: licenses ? licenses.split(",") : [], showInternal }, stage, range, page),
 );
 
 type FilterProps = { kind: Kind; stage?: CallStage; kindHref: (kind: Kind) => string; stageHref: (stage: CallStage) => string };
@@ -486,8 +476,8 @@ function FilterLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-async function SyncItems({ filter, days, page, names, href }: { filter: CalloutFilter; days: WindowDays; page: number; names: Map<string, string>; href: Href }) {
-  const { items, total, now } = await readCalloutPage(filter, days, page);
+async function SyncItems({ filter, range, page, names, href }: { filter: CalloutFilter; range: TimeRange; page: number; names: Map<string, string>; href: Href }) {
+  const { items, total, now } = await readCalloutPage(filter, range, page);
   const allClients = !filter.clientId;
   return (
     <>
@@ -526,8 +516,8 @@ async function SyncItems({ filter, days, page, names, href }: { filter: CalloutF
   );
 }
 
-async function LogItems({ filter, days, page, names, href }: { filter: LogFilter; days: WindowDays; page: number; names: Map<string, string>; href: Href }) {
-  const { items, total, now } = await readLogPage(filter, days, page);
+async function LogItems({ filter, range, page, names, href }: { filter: LogFilter; range: TimeRange; page: number; names: Map<string, string>; href: Href }) {
+  const { items, total, now } = await readLogPage(filter, range, page);
   const allClients = !filter.clientId;
   return (
     <>
@@ -563,18 +553,18 @@ async function LogItems({ filter, days, page, names, href }: { filter: LogFilter
   );
 }
 
-async function CallItems({ client, license, licenses, showInternal, days, stage, page, names, href }: {
+async function CallItems({ client, license, licenses, showInternal, range, stage, page, names, href }: {
   client?: string;
   license?: string;
   licenses: string[];
   showInternal: boolean;
-  days: WindowDays;
+  range: TimeRange;
   stage: CallStage;
   page: number;
   names: Map<string, string>;
   href: Href;
 }) {
-  const { items, total, title, loadedAt } = await callItems(client, license, licenses.join(","), showInternal, stage, days, page);
+  const { items, total, title, loadedAt } = await callItems(client, license, licenses.join(","), showInternal, stage, range, page);
   const now = Date.parse(loadedAt);
   return (
     <>
