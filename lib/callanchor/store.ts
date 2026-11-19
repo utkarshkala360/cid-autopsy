@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { CRM_STATUS_SQL, crmStatus, deliveryLabel, mask } from "@/lib/callanchor/labels";
+import { AUTH_SQL, CRM_STATUS_SQL, crmStatus, deliveryLabel, mask } from "@/lib/callanchor/labels";
 import { auditLinks, callFacts, type AuditEntry } from "@/lib/callanchor/links";
 import { getJson, PortalError } from "@/lib/callanchor/portal";
 import { db } from "@/lib/db";
@@ -342,7 +342,11 @@ async function refreshCalls(callIds: (string | null)[]) {
 }
 
 // The pipeline needs one metadata field: a call's recordingStatus, or a webhook sync's status.
+// A retention purge that failed only because the call record was already gone (owner, 2026-11-19):
+// harmless, though CallAnchor logs it as an error.
+export const ALREADY_DELETED = "already_deleted";
 const logDetail = (meta: Record<string, unknown> | null) => {
+  if (typeof meta?.error === "string" && meta.error.includes("Record to delete does not exist")) return ALREADY_DELETED;
   const value = meta?.recordingStatus ?? meta?.status;
   return typeof value === "string" ? value : null;
 };
@@ -427,11 +431,11 @@ async function saveAudit(entries: AuditEntry[]) {
 //   calls     every call rebuilt from its stored logs and callouts (also after logs or callouts)
 export const READ_VERSIONS = {
   licenses: 1, // 1: device from lastLoginDevice (2026-11-19)
-  logs: 1,
+  logs: 2, // 2: detail "already_deleted" on retention purges of a missing record (2026-11-19)
   audit: 1,
   callouts: 1,
   clients: 1,
-  calls: 1,
+  calls: 2, // 2: unavailable_code from the mark-unavailable message (2026-11-19)
 } as const;
 type ReadKind = keyof typeof READ_VERSIONS;
 export const LICENSE_READ_VERSION = READ_VERSIONS.licenses;
@@ -1067,12 +1071,14 @@ const toCallout = (r: Row): StoredCallout => ({
   label: r.label,
 });
 
+// The severity shown: CallAnchor's, except a purge of an already-gone record, which is info.
+const SEVERITY_SQL = `(CASE WHEN detail = '${ALREADY_DELETED}' THEN 'info' ELSE severity END)`;
 const toLog = (r: Row): StoredLog => ({
   id: r.id,
   clientId: r.client_id,
   occurredAt: iso(r.occurred_at),
   category: r.category,
-  severity: r.severity,
+  severity: r.detail === ALREADY_DELETED ? "info" : r.severity,
   source: r.source,
   resourceId: r.resource_id,
   callId: r.call_id ?? null,
@@ -1164,7 +1170,7 @@ export async function readCalloutPage(filter: CalloutFilter, range: { from: numb
   if (filter.http === "none") c.add("http_status IS NULL");
   else if (filter.http !== undefined) c.add("http_status = ?", filter.http);
   if (filter.label !== undefined) c.add("label = ?", filter.label);
-  if (filter.auth) c.add("http_status IN (401, 403)");
+  if (filter.auth) c.add(AUTH_SQL);
   if (filter.hideInternal) c.add(NOT_INTERNAL);
   const rows = await db().query(
     `SELECT *, count(*) OVER () AS total FROM ca_callout_events t ${c.where} ORDER BY at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
@@ -1180,10 +1186,10 @@ export async function readLogPage(filter: LogFilter, range: { from: number; to: 
   c.add("occurred_at < ?", new Date(range.to).toISOString());
   if (filter.clientId) c.add("client_id = ?", filter.clientId);
   if (filter.source) c.add("(source = ? OR source LIKE ?)", filter.source, `${escapeLike(filter.source)}.%`);
-  if (filter.severity) c.add("severity = ?", filter.severity);
+  if (filter.severity) c.add(`${SEVERITY_SQL} = ?`, filter.severity);
   if (filter.detail) c.add("detail = ?", filter.detail);
   if (filter.starts) c.add("message LIKE ?", `${escapeLike(filter.starts)}%`);
-  if (filter.problems) c.add("severity <> 'info'");
+  if (filter.problems) c.add(`${SEVERITY_SQL} <> 'info'`);
   if (filter.hideInternal) c.add(NOT_INTERNAL);
   const rows = await db().query(
     `SELECT *, count(*) OVER () AS total FROM ca_system_logs t ${c.where} ORDER BY occurred_at DESC, id LIMIT ${ITEMS_PER_PAGE} OFFSET ${(page - 1) * ITEMS_PER_PAGE}`,
@@ -1344,6 +1350,7 @@ export type StoredCall = {
   // mobile.recording.mark-unavailable: the phone found no recording file, and its reasonMessage.
   unavailableAt: string | null;
   unavailableReason: string | null;
+  unavailableCode: string | null;
 };
 
 const isoOrNull = (value: unknown) => (value ? iso(value) : null);
@@ -1376,6 +1383,7 @@ const toCall = (r: Row): StoredCall => ({
   licenseVia: r.license_via ?? null,
   unavailableAt: isoOrNull(r.unavailable_at),
   unavailableReason: r.unavailable_reason ?? null,
+  unavailableCode: r.unavailable_code ?? null,
 });
 
 // A call's time is when it was ingested, or its first callout when its ingest log wasn't stored.

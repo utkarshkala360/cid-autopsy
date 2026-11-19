@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { agentText, phoneText } from "@/lib/callanchor/labels";
+import { agentText, phoneText, unavailableText } from "@/lib/callanchor/labels";
 import { cache, Suspense } from "react";
 import { notFound } from "next/navigation";
 import { customBounds, ISSUE_ID, ITEMS_PER_PAGE as CALLS_PER_PAGE, loadCallItems, loadIssue, rangeFrom } from "@/lib/callanchor/health";
@@ -610,7 +610,7 @@ async function CallItems({ client, license, licenses, showInternal, range, stage
                   <p className="text-red-700">upload failed</p>
                 ) : c.unavailableAt ? (
                   <p className="whitespace-normal text-red-700" title="mobile.recording.mark-unavailable">
-                    phone couldn&apos;t save it{c.unavailableReason ? `: ${c.unavailableReason}` : ""}
+                    phone couldn&apos;t save it{unavailableText(c.unavailableCode, c.unavailableReason) ? `: ${unavailableText(c.unavailableCode, c.unavailableReason)}` : ""}
                   </p>
                 ) : null}
               </td>

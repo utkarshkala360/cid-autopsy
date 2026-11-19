@@ -347,6 +347,9 @@ ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS license_via TEXT;
 -- nothing to upload. reasonMessage says why ("No recording file found after call").
 ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS unavailable_at TIMESTAMPTZ;
 ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS unavailable_reason TEXT;
+-- The phone's reason code from the log message ("Recording marked unavailable: GOOGLE_DIALER_NO_RECORDING");
+-- the metadata's reasonCode arrives redacted. Shown in plain words by unavailableText in labels.ts.
+ALTER TABLE ca_calls ADD COLUMN IF NOT EXISTS unavailable_code TEXT;
 
 -- Rebuilds the given calls from the stored logs and callouts. store.ts calls it after each save. A
 -- call exists once it has a mobile.call.create log or a callout.
@@ -354,13 +357,13 @@ CREATE OR REPLACE FUNCTION ca_refresh_calls(ids TEXT[]) RETURNS void LANGUAGE sq
 INSERT INTO ca_calls AS t (call_id, client_id, license_id, ingested_at, recording_detail, upload_started_at, uploaded_at,
   verified_at, upload_failed_at, attempts, first_callout_at, last_callout_at, first_delivered_at, delivered_events,
   last_status, last_http, last_label, last_platform, duplicate_deliveries, call_type, call_seconds, has_recording,
-  started_at, agent_last4, license_via, unavailable_at, unavailable_reason, updated_at)
+  started_at, agent_last4, license_via, unavailable_at, unavailable_reason, unavailable_code, updated_at)
 SELECT ids.id, coalesce(l.client_id, c.client_id), coalesce(l.license_id, m.license_id), l.ingested_at, l.detail, l.started, l.uploaded,
   l.verified, l.failed, coalesce(c.attempts, 0), c.first_at, c.last_at, c.first_delivered_at,
   coalesce(c.delivered_events, '{}'), c.last_status, c.last_http, c.last_label, c.last_platform, coalesce(c.duplicates, 0),
   coalesce(l.call_type, c.call_type), c.seconds, c.has_recording, c.started_at, c.agent_last4,
   CASE WHEN l.license_id IS NOT NULL THEN 'ingest' WHEN m.license_id IS NOT NULL THEN 'agent_number' END,
-  l.unavailable, l.unavailable_reason, now()
+  l.unavailable, l.unavailable_reason, l.unavailable_code, now()
 FROM unnest(ids) AS ids(id)
 CROSS JOIN LATERAL (
   SELECT max(client_id) AS client_id,
@@ -374,7 +377,9 @@ CROSS JOIN LATERAL (
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.upload-failed') AS failed,
     min(occurred_at) FILTER (WHERE source = 'mobile.recording.mark-unavailable') AS unavailable,
     (array_agg(left(raw->'metadata'->>'reasonMessage', 200) ORDER BY occurred_at)
-      FILTER (WHERE source = 'mobile.recording.mark-unavailable'))[1] AS unavailable_reason
+      FILTER (WHERE source = 'mobile.recording.mark-unavailable'))[1] AS unavailable_reason,
+    (array_agg(substring(message FROM 'Recording marked unavailable: ([A-Z_]+)') ORDER BY occurred_at)
+      FILTER (WHERE source = 'mobile.recording.mark-unavailable'))[1] AS unavailable_code
   FROM ca_system_logs WHERE call_id = ids.id
 ) l
 CROSS JOIN LATERAL (
@@ -414,7 +419,8 @@ ON CONFLICT (call_id) DO UPDATE SET
   call_type = coalesce(EXCLUDED.call_type, t.call_type), call_seconds = coalesce(EXCLUDED.call_seconds, t.call_seconds),
   has_recording = coalesce(EXCLUDED.has_recording, t.has_recording), started_at = coalesce(EXCLUDED.started_at, t.started_at),
   agent_last4 = coalesce(EXCLUDED.agent_last4, t.agent_last4),
-  unavailable_at = EXCLUDED.unavailable_at, unavailable_reason = EXCLUDED.unavailable_reason, updated_at = now()
+  unavailable_at = EXCLUDED.unavailable_at, unavailable_reason = EXCLUDED.unavailable_reason,
+  unavailable_code = EXCLUDED.unavailable_code, updated_at = now()
 $$;
 
 -- Rows stored before duplicate_deliveries existed get it once; afterwards this matches nothing.

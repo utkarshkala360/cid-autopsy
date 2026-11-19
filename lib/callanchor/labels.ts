@@ -62,9 +62,26 @@ export const deliveryLabel = (event: Delivery) => (event.status === "failed" ? e
 export const crmStatus = (status: string, _httpStatus: number | null) => status;
 export const CRM_STATUS_SQL = "status";
 
-// Only the HTTP code identifies a sign-in failure. Reply text is each client's own code, so words like
-// "unauthorized" in it aren't reliable (finding F, owner 2026-11-04).
-export const isAuthFailure = (httpStatus: number | null) => httpStatus === 401 || httpStatus === 403;
+// A sign-in failure is HTTP 401 or 403. Reply text is each client's own code, so words like
+// "unauthorized" in it aren't reliable (finding F, owner 2026-11-04). One exception (owner,
+// 2026-11-19): when CallAnchor can't get a CRM token at all, it sends nothing, so the callout has no
+// HTTP code, and its error starts with CallAnchor's own words, not the client's: "OAuth token request
+// failed" (Salesforce invalid_grant, app_not_found). That's a sign-in failure, not a CRM outage.
+const SIGN_IN_PREFIX = "OAuth token request failed";
+export const isSignInFailure = (httpStatus: number | null, label: string | null | undefined) => httpStatus === null && !!label?.startsWith(SIGN_IN_PREFIX);
+export const isAuthFailure = (httpStatus: number | null, label?: string | null) => httpStatus === 401 || httpStatus === 403 || isSignInFailure(httpStatus, label);
+// The same test on ca_callout_events.
+export const AUTH_SQL = `(http_status IN (401, 403) OR (http_status IS NULL AND label LIKE '${SIGN_IN_PREFIX}%'))`;
+
+// Why the phone had no recording, in plain words, from the reason code in CallAnchor's
+// mark-unavailable log (owner, 2026-11-19); else CallAnchor's own message.
+const UNAVAILABLE_CODES: Record<string, string> = {
+  GOOGLE_DIALER_NO_RECORDING: "the Google Phone app didn't record the call: turn on call recording in the Google Phone app on this phone",
+  RECORDING_FILE_NOT_FOUND: "no recording file was found on the phone: check call recording is on in the phone's dialer and the app has storage access",
+  CAPTURE_SKIPPED: "recording was skipped by the call capture policy",
+};
+export const unavailableText = (code: string | null | undefined, message: string | null | undefined) =>
+  (code && UNAVAILABLE_CODES[code]) || message || (code ? code.toLowerCase().replace(/_/g, " ") : null);
 
 // The trusted part of a CRM reply: its HTTP class.
 export type HttpClass = "2xx" | "4xx" | "5xx" | "no response" | "other";

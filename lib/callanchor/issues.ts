@@ -1,5 +1,5 @@
 import "server-only";
-import { isAuthFailure } from "@/lib/callanchor/labels";
+import { isAuthFailure, isSignInFailure, unavailableText } from "@/lib/callanchor/labels";
 export { MODULES, issueModule, type IssueModule } from "@/lib/callanchor/modules";
 import type {
   DayRow,
@@ -246,9 +246,12 @@ export const CALL_STAGES = {
   },
   notReached: { title: "Calls due at the CRM that didn't reach it", test: (c, ctx, now) => !isDelivered(c) && isDue(c, ctx, now) },
   failed: { title: "Calls whose CRM sync failed", test: isFailed },
-  rejected: { title: "Calls the CRM rejected (HTTP 4xx)", test: (c) => isFailed(c) && is4xx(c) && !isAuthFailure(c.lastHttp) },
-  auth: { title: "Calls rejected for CRM sign-in (HTTP 401 or 403)", test: (c) => isFailed(c) && isAuthFailure(c.lastHttp) },
-  unreachable: { title: "Calls where the CRM didn't respond or returned 5xx", test: (c) => isFailed(c) && (c.lastHttp === null || c.lastHttp >= 500) },
+  rejected: { title: "Calls the CRM rejected (HTTP 4xx)", test: (c) => isFailed(c) && is4xx(c) && !isAuthFailure(c.lastHttp, c.lastLabel) },
+  auth: { title: "Calls rejected for CRM sign-in (HTTP 401 or 403, or no CRM token)", test: (c) => isFailed(c) && isAuthFailure(c.lastHttp, c.lastLabel) },
+  unreachable: {
+    title: "Calls where the CRM didn't respond or returned 5xx",
+    test: (c) => isFailed(c) && ((c.lastHttp === null && !isSignInFailure(c.lastHttp, c.lastLabel)) || (c.lastHttp ?? 0) >= 500),
+  },
   missing: {
     title: "Calls with no CRM callout {serverGrace} after they came in",
     test: isMissing,
@@ -399,7 +402,10 @@ export function callProblem(c: StoredCall, ctx: ClientContext, now: number): str
   const stuck = stuckStage(c, now);
   if (stuck) return stuck;
   // The phone said there's no recording file, so waiting won't help (audit note 1).
-  if (c.unavailableAt && !isUploaded(c)) return `Phone couldn't save the recording${c.unavailableReason ? `: ${c.unavailableReason}` : ""}`;
+  if (c.unavailableAt && !isUploaded(c)) {
+    const why = unavailableText(c.unavailableCode, c.unavailableReason);
+    return `Phone couldn't save the recording${why ? `: ${why}` : ""}`;
+  }
   if (inStage("waiting", c, ctx, now)) return "Phone hasn't uploaded the recording";
   if (inStage("unsynced", c, ctx, now)) return "Verified, not synced to the CRM";
   if (inStage("missing", c, ctx, now)) return "No CRM callout was sent";
@@ -668,7 +674,12 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
     add("crm_auth", "critical", "CRM is rejecting the sign-in", crm({
       calls: auth,
       impactText: `${n(auth.length, "call")} not in the CRM`,
-      evidence: [httpCodes(auth), "HTTP 401 and 403 mean the CRM refused the credentials: reconnect the integration or fix the token"],
+      evidence: [
+        httpCodes(auth),
+        auth.some((c) => isSignInFailure(c.lastHttp, c.lastLabel))
+          ? "CallAnchor couldn't get a CRM token (no HTTP code: the CRM refused the sign-in before any call was sent), or the CRM answered 401 or 403: reconnect the integration or check its connected app"
+          : "HTTP 401 and 403 mean the CRM refused the credentials: reconnect the integration or fix the token",
+      ],
       samples: samples(auth),
       drill: drill("auth"),
     }));
@@ -709,7 +720,7 @@ export function clientIssues(input: ClientInput, now: number): Issue[] {
     let streak = 0;
     let longest = 0;
     for (const c of ordered) {
-      streak = isFailed(c) && (c.lastHttp === null || c.lastHttp >= 500) ? streak + 1 : 0;
+      streak = inStage("unreachable", c, ctx, now) ? streak + 1 : 0;
       longest = Math.max(longest, streak);
     }
     add("crm_unreachable", longest >= RULES.unreachableRun ? "critical" : "warning", "CRM isn't responding", crm({
@@ -1070,10 +1081,12 @@ export const PLATFORM_FAULTS: PlatformFault[] = [
     drill: { kind: "logs", source: "mobile.recording.normalize-cleanup", problems: "1" },
   },
   {
+    // Failures to delete a record that was already gone are left out (owner, 2026-11-19): harmless.
     kind: "platform_retention",
     title: "Data retention purge errors",
     level: "info",
-    match: (l: StoredLog) => (l.source === "internal.calls.data-retention-purge" || l.source.startsWith("internal.calls.data-retention-purge.")) && l.severity !== "info",
+    match: (l: StoredLog) =>
+      (l.source === "internal.calls.data-retention-purge" || l.source.startsWith("internal.calls.data-retention-purge.")) && l.severity !== "info" && l.detail !== "already_deleted",
     drill: { kind: "logs", source: "internal.calls.data-retention-purge", problems: "1" },
   },
 ];
