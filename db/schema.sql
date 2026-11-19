@@ -244,6 +244,13 @@ ALTER TABLE ca_licenses ADD COLUMN IF NOT EXISTS agent_name TEXT;
 -- client list pull; number_last4 stays for rows saved before.
 ALTER TABLE ca_licenses ADD COLUMN IF NOT EXISTS number TEXT;
 
+-- The license as CallAnchor last sent it, so a field read wrongly can be checked and re-read.
+-- read_version is LICENSE_READ_VERSION in lib/callanchor/store.ts when the row was saved: a row read
+-- by older code makes the next pull fetch the client list at once and re-save every license
+-- (owner, 2026-11-19: a OnePlus saved before lastLoginDevice was read stayed unknown).
+ALTER TABLE ca_licenses ADD COLUMN IF NOT EXISTS raw JSONB;
+ALTER TABLE ca_licenses ADD COLUMN IF NOT EXISTS read_version INTEGER NOT NULL DEFAULT 0;
+
 -- A dated row each time a license's state changes: login, logout, app update, device switch.
 CREATE TABLE IF NOT EXISTS ca_license_changes (
   id         BIGSERIAL   PRIMARY KEY,

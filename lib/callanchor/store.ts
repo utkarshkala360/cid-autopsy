@@ -415,6 +415,10 @@ async function saveAudit(entries: AuditEntry[]) {
   }
 }
 
+// Bump when saveLicenses reads a license differently: every row saved by older code is then re-read
+// on the next pull (planPull), not only new licenses. 1: device from lastLoginDevice (2026-11-19).
+export const LICENSE_READ_VERSION = 1;
+
 // A license's device brand and model: the separate fields when sent, else split from lastLoginDevice.
 function deviceParts(l: License): { brand: string | null; model: string | null } {
   const brand = l.lastLoginAndroidBrand?.trim() || null;
@@ -468,8 +472,8 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
   if (licenses.length) {
     await db()`
       INSERT INTO ca_licenses (license_id, client_id, member_id, number_last4, status, is_active, is_logged_in, last_login_label,
-        device_brand, device_model, firmware, google_dialer, app_version, app_version_code, recording_enabled, call_policy, lifetime_calls, agent_name, number)
-      SELECT * FROM unnest(
+        device_brand, device_model, firmware, google_dialer, app_version, app_version_code, recording_enabled, call_policy, lifetime_calls, agent_name, number, raw, read_version)
+      SELECT *, ${LICENSE_READ_VERSION}::int FROM unnest(
         ${licenses.map((l) => l.id)}::text[],
         ${licenses.map(() => clientId)}::text[],
         ${licenses.map((l) => l.assignedTo?.id ?? null)}::text[],
@@ -488,7 +492,8 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         ${licenses.map((l) => l.callCapturePolicy ?? null)}::text[],
         ${licenses.map((l) => l.lifetimeCallRecordCount ?? 0)}::int[],
         ${licenses.map((l) => l.assignedTo?.name?.trim() || null)}::text[],
-        ${licenses.map((l) => l.number?.trim() || null)}::text[]
+        ${licenses.map((l) => l.number?.trim() || null)}::text[],
+        ${licenses.map((l) => JSON.stringify(l))}::jsonb[]
       )
       ON CONFLICT (license_id) DO UPDATE SET
         client_id = EXCLUDED.client_id, member_id = EXCLUDED.member_id, number_last4 = EXCLUDED.number_last4,
@@ -496,7 +501,8 @@ export async function saveLicenses(clientId: string, licenses: License[]) {
         last_login_label = EXCLUDED.last_login_label, device_brand = EXCLUDED.device_brand, device_model = EXCLUDED.device_model,
         firmware = EXCLUDED.firmware, google_dialer = EXCLUDED.google_dialer, app_version = EXCLUDED.app_version,
         app_version_code = EXCLUDED.app_version_code, recording_enabled = EXCLUDED.recording_enabled,
-        call_policy = EXCLUDED.call_policy, lifetime_calls = EXCLUDED.lifetime_calls, agent_name = EXCLUDED.agent_name, number = EXCLUDED.number, updated_at = now(), removed_at = NULL,
+        call_policy = EXCLUDED.call_policy, lifetime_calls = EXCLUDED.lifetime_calls, agent_name = EXCLUDED.agent_name, number = EXCLUDED.number, raw = EXCLUDED.raw, read_version = EXCLUDED.read_version,
+        updated_at = now(), removed_at = NULL,
         calls_grew_at = CASE WHEN EXCLUDED.lifetime_calls > ca_licenses.lifetime_calls THEN now() ELSE ca_licenses.calls_grew_at END
     `;
   }
@@ -848,9 +854,13 @@ export async function planPull(clientId: string | null, force = false): Promise<
   const snapshots = states.get("snapshots");
   if (!snapshots?.refreshedAt) return [{ key: "snapshots", label: "Client list" }];
   const steps: PullStep[] = [];
-  // The client list also carries each license's agent name and full number: pull it at once while a
-  // phone lacks either (both added 2026-11-13), instead of waiting for its next 10-minute turn.
-  const namesMissing = await db()`SELECT 1 FROM ca_licenses WHERE removed_at IS NULL AND ((member_id IS NOT NULL AND agent_name IS NULL) OR number IS NULL) LIMIT 1`.then(
+  // The client list carries every license: pull it at once, on any page, while a phone lacks its agent
+  // name or full number (both added 2026-11-13) or was saved by older code (LICENSE_READ_VERSION),
+  // instead of waiting for its next 10-minute turn. The pull re-saves every license, old ones too.
+  const namesMissing = await db()`
+    SELECT 1 FROM ca_licenses WHERE removed_at IS NULL
+      AND ((member_id IS NOT NULL AND agent_name IS NULL) OR number IS NULL OR read_version < ${LICENSE_READ_VERSION})
+    LIMIT 1`.then(
     (rows) => rows.length > 0,
     () => false,
   );

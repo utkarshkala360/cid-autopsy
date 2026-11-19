@@ -136,8 +136,8 @@ Rules already established in this repo.
   Devices (one per brand + model; licenses with no model share an "Unknown" row; there is no device
   id), Settings. Every row shows Health as an icon chip on its name (level on hover), Call journey
   (dotted steps), CRM syncs (one cell: reached-of-due ring, a strip over the range, last call
-  through) and Needs action, plus a few identity columns of its own. A time range (24h default, 3,
-  7, 15 days) drives Call journey and CRM syncs; Health and Needs action are always right now (open
+  through) and Needs action, plus a few identity columns of its own. A time range (see the
+  time range rule below) drives Call journey and CRM syncs; Health and Needs action are always right now (open
   issues). A client's page is the client hero over the same Issues, Licenses and Devices tables,
   scoped to it, so a license row looks the same everywhere. Overview keeps the hero, stat strip,
   failed CRM syncs, system logs and the worst few of each entity.
@@ -245,6 +245,8 @@ Rules already established in this repo.
 - Changing the range keeps the current table on screen until the new one is ready, with a spinner on
   the picked option (`RangeLink`); Suspense boundaries are keyed by page, never by range. Each page
   view computes the ranges not yet in memory after the response (`warmEntities`) (owner, 2026-11-13).
+- When the way a license is read changes, bump `LICENSE_READ_VERSION` in `lib/callanchor/store.ts`
+  so licenses already saved are re-read, not only new ones (owner, 2026-11-19).
 - Users never wait on data they've already seen (owner, 2026-11-13). The fleet, licenses and client
   summary loaders keep their last result in server memory and serve it at once, recomputing in the
   background when it's over 5 seconds old, one run per key (`cached` in `lib/callanchor/health.ts`);
@@ -265,6 +267,14 @@ Rules already established in this repo.
   `npm run audit:notes`, and mark each note done or won't fix with what changed (owner, 2026-11-12):
   `npm run audit:notes -- --mark <ids> done "what changed" --commit <hash>`, after the fix is
   committed. Notes are never deleted; `--days 7` shows closed ones too.
+- Time ranges are calendar ranges in IST (a day starts at midnight IST), picked from a dropdown
+  instead of chips, on every window picker: Today (default), Yesterday, This week, Last week and so
+  on. Each range shows a comparison with the same range one step earlier: Today with the day before,
+  a week with the week before. The license page's fixed "last 24 hours" sections follow the picked
+  range too (owner, 2026-11-19; replaces the rolling 24 hours, 3, 7 and 15 days).
+- When the owner says "run audit", run `npm run audit:notes`, then ask the owner questions about the
+  notes before building anything, even when the note, the SOP or the code seems to answer them.
+  Build only after the owner answers and says to go ahead (owner, 2026-11-19).
 - Commit only redacted fixtures. `npm test` in `callanchor-apis/` must pass before a commit there.
 
 ## Happy implementation
@@ -342,6 +352,8 @@ Agent proposals awaiting the owner's decision. Newest first.
 
 | Date | Recommendation | Why | Status |
 | --- | --- | --- | --- |
+| 2026-11-19 | Count a call the CRM accepted as a success at every step it implies (`recording.ready` accepted ⇒ recorded, uploaded and checked, marked "known from the CRM sync"); a call with no ingest log because it was made before our stored logs (or is a retry of one) is labelled "before our logs", not red. 0-second calls aren't treated as fine across the board: a CRM rejection stays a failure | All 965 "no stored ingest log" calls are ours: 938 came before logs were first stored (10 Nov), 27 are retries of such calls; 199 calls synced with `recording.ready` show as "not uploaded" for the same reason | Awaiting owner |
+| 2026-11-19 | Raise with CallAnchor: the delete-recording-from-S3-after-CRM-sync step fails on every call (IAM user lacks `s3:DeleteObject`), logged at info only, so recordings are never removed after sync | 1,954 logs, 1,925 of the 1,926 calls synced with a recording; also 36 retention purges fail because the call record is already gone (harmless, but flagged as errors) | Awaiting owner |
 | 2026-11-19 | Raise with CallAnchor: a call left at `pending_upload` with no `upload-init` stays that way forever and never gets a CRM callout; ask for a timeout that marks it unavailable with a reason, so the CRM still gets the call | 328 such calls 8-19 Nov, none ever reached the CRM; 77 had a successful upload from the same phone within 15 minutes, so the app was alive | Awaiting owner |
 | 2026-11-19 | Raise with CallAnchor: the `normalize-cleanup` step's S3 role can't delete the original file (AccessDenied), on every LAVA LZG412 upload | 215 logs; uploads still succeed, but originals pile up in the bucket | Awaiting owner |
 | 2026-11-13 | Leave calls started before the stored log window out of "Data is thin" (use the payload's `startedAt`) | Call `cmv0kcal30wqy8tpxgsm2joak` was made 9 Oct and retried 13 Nov: its ingest log was pruned at 15 days, which is expected, yet it's reported as a gap | Awaiting owner |
@@ -368,6 +380,7 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 | Date | Change | Status | Link |
 | --- | --- | --- | --- |
+| 2026-11-19 | Licenses saved by older code are re-read: `ca_licenses.read_version` below `LICENSE_READ_VERSION` triggers an immediate client list pull on any page, re-saving every license; `ca_licenses.raw` keeps each license as CallAnchor sent it | Done, typechecks and lints; pushed 2026-11-19 | `LICENSE_READ_VERSION`, `saveLicenses` and `planPull` in `lib/callanchor/store.ts`, `db/schema.sql` |
 | 2026-11-19 | Device read from `lastLoginDevice` when the tenant sends no brand/model fields (licenses showed unknown device, e.g. a OnePlus at Manish Minerals); filled on the next tenant pull; empty-to-known isn't a device change | Done, typechecks and lints; pushed 2026-11-19 | `deviceParts` and `saveLicenses` in `lib/callanchor/store.ts` |
 | 2026-11-19 | Agent name shown with every phone number: under the number in the Calls & logs table, beside it on the call and issue pages, and in the breadcrumb and phone filter chip | Done, typechecks and lints; pushed 2026-11-19 | `agentText` in `lib/callanchor/labels.ts`, `callItems` in `lib/callanchor/health.ts`, `health/_views/items.tsx`, `call.tsx`, `issue.tsx`, `health/layout.tsx` |
 | 2026-11-18 | Popup hand-back on `/sf-connect`: the CallAnchor package opens it with `&org=…&state=…&origin=<its Lightning origin>`; after the exchange the page posts `{type: "callanchor:refresh-token", state, refreshToken}` to `window.opener` (target origin = that origin), waits for `callanchor:refresh-token-saved` with the same state, then closes. Hands back only when `origin` is the org's own `*.lightning.force.com` and the token's `instance_url` is that same org; otherwise, or with no confirmation in 15 s, it shows the token to copy. Replaced the `package=true` URL redirect (owner: token must not go in a URL) | Done, typechecks and lints; origin checks tested; popup round trip not run; not pushed | `readHandback` / `lightningOrigin` in `app/(portal)/sf-auth/hosts.ts`, `handBack` in `sf-auth.tsx` |
@@ -416,6 +429,20 @@ Agreed changes. Newest first. Status is Planned, In progress or Done.
 
 One line per piece of feedback, newest first: date, what the owner said, and what changed.
 
+- 2026-11-19: The device still showed unknown after the fix, and the owner asked that licenses saved
+  earlier get re-read too, not only new ones. The client list (which saves licenses) wasn't pulled from
+  a client's pages unless a name or number was missing. Licenses now carry `read_version`; any row
+  below `LICENSE_READ_VERSION` makes the next pull re-save every license. Each license's raw JSON is kept.
+
+- 2026-11-19: Asked to read the audit notes and ask questions before fixing, and that every "run
+  audit" should start with questions even when the answer is written in the note. Ran
+  `npm run audit:notes` (2 open: #8, #9) and asked; added the rule to the SOP. Nothing built yet.
+  Answers: #9: Today from midnight IST is the default, every picker becomes a dropdown (Today,
+  Yesterday, This week, Last week…), each compared with the range before it, and the license page
+  follows it (SOP rule). #8: said synced calls get deleted from the portal, so count them as a
+  success, and to look for similar cases, but to be careful because not every 0-second call is fine.
+  Checked: no-ingest-log calls all predate our logs; CallAnchor's post-sync recording purge actually
+  fails every time. Both are listed under Recommendations, with follow-up questions to the owner.
 - 2026-11-19: Pointed out that the tenant API gives Vaishnavi's (Manish Minerals) device as OnePlus
   while the portal showed it unknown. Cause: some licenses carry only `lastLoginDevice` ("Brand
   Model") without `lastLoginAndroidBrand`/`Model`, and we read only the latter. Now split from
